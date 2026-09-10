@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.local
+.DS_Store
+*.local
+tsconfig.tsbuildinfo
+
+# secretos reales de Edge Functions
+dev/secretos.env

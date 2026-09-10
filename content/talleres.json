@@ -1,0 +1,459 @@
+[
+  {
+    "id": "w-001",
+    "slug": "ceramica-desde-cero",
+    "title": "Cerámica desde cero",
+    "category": "ceramica",
+    "shortDescription": "Una experiencia para aprender, ensuciarte las manos y crear tu primera pieza.",
+    "description": [
+      "Empezamos por lo básico: sentir el barro, entender cómo responde y perderle el miedo. No necesitas experiencia ni haber tocado arcilla antes.",
+      "Trabajamos con técnicas de modelado a mano —pellizco, churro y placa— para que salgas con una pieza terminada y con ganas de volver por la siguiente."
+    ],
+    "date": "2026-09-12",
+    "startTime": "11:00",
+    "endTime": "13:30",
+    "duration": "2 h 30 min",
+    "price": 650,
+    "capacity": 12,
+    "reserved": 4,
+    "instructor": "[Nombre] — Fundadora",
+    "level": "Principiante",
+    "includes": [
+      "Arcilla y herramientas",
+      "Delantal",
+      "Quema y esmaltado",
+      "Café y algo dulce"
+    ],
+    "crearas": [
+      "Un tazón o vaso modelado a mano",
+      "Una pieza pequeña de práctica"
+    ],
+    "faqs": [
+      {
+        "q": "¿Necesito experiencia?",
+        "a": "Ninguna. El taller está pensado para primeras veces."
+      },
+      {
+        "q": "¿Cuándo me llevo mi pieza?",
+        "a": "Después de quema y esmaltado, alrededor de tres semanas. Te avisamos por WhatsApp."
+      },
+      {
+        "q": "¿Cómo pago?",
+        "a": "Puedes pagar tu lugar en línea al momento de reservar. Tu reservación queda confirmada una vez que el pago ha sido aprobado."
+      }
+    ],
+    "image": "/images/talleres/ceramica-desde-cero.jpg",
+    "gallery": [
+      "/images/talleres/ceramica-desde-cero-1.jpg",
+      "/images/talleres/ceramica-desde-cero-2.jpg",
+      "/images/talleres/ceramica-desde-cero-3.jpg"
+    ],
+    "tono": "terracota",
+    "status": "publicado"
+  },
+  {
+    "id": "w-002",
+    "slug": "pinta-tu-propia-pieza",
+    "title": "Pinta tu propia pieza",
+    "category": "pintura",
+    "shortDescription": "Eliges una pieza en bizcocho y la haces tuya con color.",
+    "description": [
+      "Una tarde tranquila, sin prisa. Escoges una pieza ya horneada y la pintas como quieras: con plantilla, a mano suelta o copiando algo que traigas guardado en el celular.",
+      "Es el taller ideal para venir acompañada, platicar y salir con algo hecho por ti."
+    ],
+    "date": "2026-09-14",
+    "startTime": "16:00",
+    "endTime": "18:00",
+    "duration": "2 h",
+    "price": 550,
+    "capacity": 10,
+    "reserved": 7,
+    "instructor": "[Nombre] — Talleres",
+    "level": "Todos los niveles",
+    "includes": [
+      "Pieza en bizcocho a elegir",
+      "Esmaltes y pinceles",
+      "Quema final"
+    ],
+    "crearas": [
+      "Una pieza pintada por completo",
+      "Un diseño propio sobre cerámica"
+    ],
+    "faqs": [
+      {
+        "q": "¿Puedo elegir qué pieza pintar?",
+        "a": "Sí, tenemos tazas, platos y macetas pequeñas disponibles el día del taller."
+      },
+      {
+        "q": "¿Puedo venir con alguien?",
+        "a": "Claro. Puedes reservar y pagar varios lugares en la misma operación."
+      }
+    ],
+    "image": "/images/talleres/pinta-tu-propia-pieza.jpg",
+    "gallery": [
+      "/images/talleres/pinta-tu-propia-pieza-1.jpg",
+      "/images/talleres/pinta-tu-propia-pieza-2.jpg"
+    ],
+    "tono": "azul",
+    "status": "publicado"
+  },
+  {
+    "id": "w-003",
+    "slug": "ceramica-tematica-septiembre",
+    "title": "Cerámica temática",
+    "category": "especiales",
+    "shortDescription": "Cada mes cambiamos de tema. Este mes: vajilla de mesa mexicana.",
+    "description": [
+      "Una sesión con tema fijo que cambia cada mes. Trabajamos una sola idea a fondo, con referencias, molde y color pensados para ese tema.",
+      "Se llena rápido: los lugares se abren el primer día del mes."
+    ],
+    "date": "2026-09-21",
+    "startTime": "11:00",
+    "endTime": "14:00",
+    "duration": "3 h",
+    "price": 780,
+    "capacity": 10,
+    "reserved": 10,
+    "instructor": "[Nombre] — Fundadora",
+    "level": "Todos los niveles",
+    "includes": [
+      "Materiales del tema del mes",
+      "Quema y esmaltado",
+      "Comida ligera"
+    ],
+    "crearas": [
+      "Dos piezas de vajilla coordinadas"
+    ],
+    "faqs": [
+      {
+        "q": "¿Cuándo abren lugares nuevos?",
+        "a": "El primer día de cada mes anunciamos el tema y liberamos lugares en Instagram."
+      }
+    ],
+    "image": "/images/talleres/ceramica-tematica.jpg",
+    "gallery": [
+      "/images/talleres/ceramica-tematica-1.jpg",
+      "/images/talleres/ceramica-tematica-2.jpg"
+    ],
+    "tono": "olivo",
+    "status": "publicado"
+  },
+  {
+    "id": "w-004",
+    "slug": "taller-libre-sabado",
+    "title": "Taller libre",
+    "category": "libre",
+    "shortDescription": "El estudio abierto: tú traes la idea, nosotras el barro y las herramientas.",
+    "description": [
+      "Sin instrucción guiada. Reservas mesa, tomas materiales y trabajas a tu ritmo. Siempre hay alguien del estudio cerca por si te atoras.",
+      "Pensado para quienes ya tomaron un taller y quieren seguir practicando."
+    ],
+    "date": "2026-09-26",
+    "startTime": "10:00",
+    "endTime": "14:00",
+    "duration": "4 h",
+    "price": 420,
+    "capacity": 8,
+    "reserved": 5,
+    "instructor": "Estudio abierto",
+    "level": "Intermedio",
+    "includes": [
+      "Mesa de trabajo",
+      "Herramientas del estudio",
+      "Arcilla por kilo (se cobra aparte)"
+    ],
+    "crearas": [
+      "Lo que traigas en mente"
+    ],
+    "faqs": [
+      {
+        "q": "¿Puedo venir si es mi primera vez?",
+        "a": "Te recomendamos empezar por “Cerámica desde cero”. El taller libre no tiene instrucción guiada."
+      }
+    ],
+    "image": "/images/talleres/taller-libre.jpg",
+    "gallery": [
+      "/images/talleres/taller-libre-1.jpg"
+    ],
+    "tono": "tinta",
+    "status": "publicado"
+  },
+  {
+    "id": "w-005",
+    "slug": "day-pass-estudio",
+    "title": "Day pass",
+    "category": "libre",
+    "shortDescription": "Un día completo en el estudio, con todo incluido.",
+    "description": [
+      "Llegas en la mañana y te vas cuando cerramos. Acceso a mesas, torno de práctica y materiales básicos.",
+      "Un buen plan para un día libre, sola o acompañada."
+    ],
+    "date": "2026-10-03",
+    "startTime": "10:00",
+    "endTime": "18:00",
+    "duration": "8 h",
+    "price": 890,
+    "capacity": 6,
+    "reserved": 2,
+    "instructor": "Estudio abierto",
+    "level": "Todos los niveles",
+    "includes": [
+      "Acceso todo el día",
+      "Materiales básicos",
+      "Café y comida ligera"
+    ],
+    "crearas": [
+      "Todas las piezas que alcances a terminar"
+    ],
+    "faqs": [
+      {
+        "q": "¿Puedo salir y volver?",
+        "a": "Sí, tu lugar se queda apartado todo el día."
+      }
+    ],
+    "image": "/images/talleres/day-pass.jpg",
+    "gallery": [
+      "/images/talleres/day-pass-1.jpg"
+    ],
+    "tono": "arcilla",
+    "status": "publicado"
+  },
+  {
+    "id": "w-006",
+    "slug": "torno-primera-vez",
+    "title": "Torno por primera vez",
+    "category": "ceramica",
+    "shortDescription": "Centrar, abrir y levantar. Dos horas frente al torno.",
+    "description": [
+      "El torno intimida hasta que lo tocas. En esta sesión trabajas con tu propio torno durante toda la clase, en grupos muy pequeños.",
+      "Salimos con al menos una pieza levantada por ti."
+    ],
+    "date": "2026-10-10",
+    "startTime": "11:00",
+    "endTime": "13:00",
+    "duration": "2 h",
+    "price": 720,
+    "capacity": 6,
+    "reserved": 3,
+    "instructor": "[Nombre] — Fundadora",
+    "level": "Principiante",
+    "includes": [
+      "Torno individual",
+      "Arcilla",
+      "Quema y esmaltado"
+    ],
+    "crearas": [
+      "Un cilindro o tazón levantado en torno"
+    ],
+    "faqs": [
+      {
+        "q": "¿Qué ropa llevo?",
+        "a": "Ropa que puedas ensuciar. El barro sale con agua, pero mejor no estrenar nada."
+      }
+    ],
+    "image": "/images/talleres/torno.jpg",
+    "gallery": [
+      "/images/talleres/torno-1.jpg",
+      "/images/talleres/torno-2.jpg"
+    ],
+    "tono": "terracota",
+    "status": "publicado"
+  },
+  {
+    "id": "w-007",
+    "slug": "piezas-personalizadas",
+    "title": "Piezas personalizadas",
+    "category": "especiales",
+    "shortDescription": "Diseñamos contigo una pieza para un regalo, una boda o tu casa.",
+    "description": [
+      "Una sesión de trabajo para definir forma, color y cantidad. De ahí sale un presupuesto y un calendario de producción.",
+      "Sirve igual para un juego de tazas de regalo que para la vajilla de un restaurante."
+    ],
+    "date": "2026-10-17",
+    "startTime": "12:00",
+    "endTime": "13:30",
+    "duration": "1 h 30 min",
+    "price": 0,
+    "capacity": 4,
+    "reserved": 1,
+    "instructor": "[Nombre] — Fundadora",
+    "level": "Todos los niveles",
+    "includes": [
+      "Sesión de diseño",
+      "Muestrario de esmaltes",
+      "Presupuesto por escrito"
+    ],
+    "crearas": [
+      "El boceto y la ficha técnica de tu encargo"
+    ],
+    "faqs": [
+      {
+        "q": "¿La sesión tiene costo?",
+        "a": "La sesión de diseño no se cobra. La producción se cotiza según la pieza."
+      }
+    ],
+    "image": "/images/talleres/personalizadas.jpg",
+    "gallery": [
+      "/images/talleres/personalizadas-1.jpg"
+    ],
+    "tono": "olivo",
+    "status": "publicado"
+  },
+  {
+    "id": "w-008",
+    "slug": "acuarela-botanica",
+    "title": "Acuarela botánica",
+    "category": "pintura",
+    "shortDescription": "Papel, agua y plantas del patio. Una mañana lenta.",
+    "description": [
+      "Cambiamos el barro por el papel. Aprendemos aguadas, transparencias y cómo dejar que el agua haga su parte.",
+      "Trabajamos observando plantas reales, no fotos."
+    ],
+    "date": "2026-10-24",
+    "startTime": "10:30",
+    "endTime": "13:00",
+    "duration": "2 h 30 min",
+    "price": 590,
+    "capacity": 12,
+    "reserved": 9,
+    "instructor": "[Nombre invitada]",
+    "level": "Principiante",
+    "includes": [
+      "Papel de algodón",
+      "Acuarelas y pinceles",
+      "Café de olla"
+    ],
+    "crearas": [
+      "Tres láminas botánicas"
+    ],
+    "faqs": [
+      {
+        "q": "¿Puedo llevar mis materiales?",
+        "a": "Si ya tienes pinceles favoritos, tráelos. Lo demás lo ponemos nosotras."
+      }
+    ],
+    "image": "/images/talleres/acuarela.jpg",
+    "gallery": [
+      "/images/talleres/acuarela-1.jpg"
+    ],
+    "tono": "azul",
+    "status": "publicado"
+  },
+  {
+    "id": "w-009",
+    "slug": "esmaltes-y-color",
+    "title": "Esmaltes y color",
+    "category": "ceramica",
+    "shortDescription": "Cómo se comporta el color en el horno y por qué a veces sorprende.",
+    "description": [
+      "Un taller para quienes ya modelan y quieren entender el esmalte: capas, superposiciones y pruebas.",
+      "Hacemos una tabla de muestras que te llevas para tus siguientes piezas."
+    ],
+    "date": "2026-11-07",
+    "startTime": "11:00",
+    "endTime": "14:00",
+    "duration": "3 h",
+    "price": 690,
+    "capacity": 10,
+    "reserved": 2,
+    "instructor": "[Nombre] — Fundadora",
+    "level": "Intermedio",
+    "includes": [
+      "Piezas de prueba",
+      "Esmaltes del estudio",
+      "Tabla de muestras para llevar"
+    ],
+    "crearas": [
+      "Una tabla de esmaltes propia",
+      "Dos piezas esmaltadas"
+    ],
+    "faqs": [
+      {
+        "q": "¿Necesito traer piezas?",
+        "a": "No, nosotras ponemos las piezas de prueba."
+      }
+    ],
+    "image": "/images/talleres/esmaltes.jpg",
+    "gallery": [
+      "/images/talleres/esmaltes-1.jpg"
+    ],
+    "tono": "arcilla",
+    "status": "publicado"
+  },
+  {
+    "id": "w-010",
+    "slug": "noche-de-barro",
+    "title": "Noche de barro",
+    "category": "especiales",
+    "shortDescription": "Entre semana, después del trabajo, con música y vino.",
+    "description": [
+      "Abrimos el estudio de noche una vez al mes. Modelado libre, playlist larga y una copa incluida.",
+      "Es más plan social que clase, pero siempre sale algo."
+    ],
+    "date": "2026-11-13",
+    "startTime": "19:00",
+    "endTime": "22:00",
+    "duration": "3 h",
+    "price": 640,
+    "capacity": 16,
+    "reserved": 14,
+    "instructor": "Equipo Casa Numa",
+    "level": "Todos los niveles",
+    "includes": [
+      "Arcilla y herramientas",
+      "Una copa",
+      "Snacks"
+    ],
+    "crearas": [
+      "Una pieza libre"
+    ],
+    "faqs": [
+      {
+        "q": "¿Es solo para mayores de edad?",
+        "a": "Sí, por la bebida incluida. Hay opción sin alcohol."
+      }
+    ],
+    "image": "/images/talleres/noche-de-barro.jpg",
+    "gallery": [
+      "/images/talleres/noche-de-barro-1.jpg"
+    ],
+    "tono": "tinta",
+    "status": "publicado"
+  },
+  {
+    "id": "w-011",
+    "slug": "taller-libre-noviembre",
+    "title": "Taller libre",
+    "category": "libre",
+    "shortDescription": "El estudio abierto: tú traes la idea, nosotras el barro.",
+    "description": [
+      "Misma dinámica del taller libre: mesa, herramientas y tu ritmo."
+    ],
+    "date": "2026-11-21",
+    "startTime": "10:00",
+    "endTime": "14:00",
+    "duration": "4 h",
+    "price": 420,
+    "capacity": 8,
+    "reserved": 0,
+    "instructor": "Estudio abierto",
+    "level": "Intermedio",
+    "includes": [
+      "Mesa de trabajo",
+      "Herramientas del estudio"
+    ],
+    "crearas": [
+      "Lo que traigas en mente"
+    ],
+    "faqs": [
+      {
+        "q": "¿Hay que reservar?",
+        "a": "Sí, los lugares son limitados por mesa."
+      }
+    ],
+    "image": "/images/talleres/taller-libre-nov.jpg",
+    "gallery": [],
+    "tono": "olivo",
+    "status": "publicado"
+  }
+]

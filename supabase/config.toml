@@ -1,0 +1,45 @@
+project_id = "casa-numa"
+
+# ---------------------------------------------------------------------------
+# Edge Functions
+# ---------------------------------------------------------------------------
+
+# Las llama el navegador con la anon key, que Supabase valida como JWT.
+[functions.create-reservation]
+verify_jwt = true
+
+[functions.create-checkout-session]
+verify_jwt = true
+
+[functions.reservation-status]
+verify_jwt = true
+
+[functions.submit-form]
+verify_jwt = true
+
+# Requieren sesión de admin. La verificación real de que el usuario está en
+# admin_profiles la hace la propia función (_shared/admin.ts): ocultar un botón
+# en React no es seguridad.
+[functions.admin-actions]
+verify_jwt = true
+
+[functions.cloudinary-sign]
+verify_jwt = true
+
+# ---------------------------------------------------------------------------
+# CRÍTICO: verify_jwt debe estar en false en las dos de abajo.
+# ---------------------------------------------------------------------------
+
+# Stripe no manda un JWT de Supabase. Con la verificación activada, TODOS los
+# webhooks devolverían 401 y ningún pago se confirmaría jamás — y el síntoma en
+# el panel de Stripe es solo "endpoint fallando", sin más explicación.
+#
+# A cambio, la firma HMAC es la única defensa de este endpoint. Por eso se
+# verifica antes de leer nada del cuerpo de la petición.
+[functions.stripe-webhook]
+verify_jwt = false
+
+# Lo dispara pg_cron vía pg_net, que tampoco manda un JWT de Supabase.
+# La autorización la hace el encabezado x-cron-secret dentro de la función.
+[functions.process-jobs]
+verify_jwt = false

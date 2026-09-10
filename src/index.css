@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    @apply bg-papel font-sans text-tinta antialiased;
+  }
+
+  /* Foco visible en todo lo interactivo. El demo no lo tenía y es un
+     requisito de accesibilidad básico para quien navega con teclado. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-terracota ring-offset-2 ring-offset-papel;
+  }
+}
+
+@layer components {
+  .contenedor {
+    @apply mx-auto w-full max-w-[82rem] px-5 sm:px-8 lg:px-12;
+  }
+
+  /* Titular gigante de la portada. Los valores vienen del demo. */
+  .titular {
+    @apply font-display font-normal;
+    font-size: clamp(2.6rem, 8vw, 6.5rem);
+    line-height: 0.92;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+
+  /* Etiqueta pequeña en versalitas: se usa por todo el sitio. */
+  .dato {
+    @apply font-sans text-[0.72rem] font-semibold uppercase tracking-[0.18em];
+  }
+
+  .entrada-pagina {
+    @apply animate-entrada;
+  }
+
+  .salto-contenido {
+    @apply absolute left-4 top-4 z-[100] -translate-y-24 bg-tinta px-4 py-2 text-crema transition-transform focus:translate-y-0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
