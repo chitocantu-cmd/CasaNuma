@@ -140,11 +140,79 @@ if (accion === 'admin') {
   }
 }
 
-if (!['estado', 'limpiar', 'admin'].includes(accion)) {
+
+// ---------------------------------------------------------------------------
+if (accion === 'demo') {
+  // Repone la ocupacion de demostracion del seed, para que la agenda se vea
+  // viva: talleres llenos, otros con "ultimos lugares". Son reservas reales
+  // que el sistema cuenta igual que cualquier otra.
+  //
+  // BORRAR ANTES DE OPERAR DE VERDAD:  node dev/admin-db.mjs limpiar
+  console.log('\n  Reponiendo ocupacion de demostracion…\n');
+
+  const NOMBRES = ['Maria Fernanda G.','Ana Sofia R.','Regina M.','Paulina T.',
+    'Valeria C.','Daniela H.','Ximena L.','Andrea P.'];
+
+  const OCUPACION = {
+    'ceramica-desde-cero': [2,1,1],
+    'pinta-tu-propia-pieza': [2,1,3,1],
+    'ceramica-tematica-septiembre': [2,1,3,2,1,1],
+    'taller-libre-sabado': [2,1,2],
+    'day-pass-estudio': [2],
+    'torno-primera-vez': [2,1],
+    'acuarela-botanica': [2,1,3,2,1],
+    'esmaltes-y-color': [2],
+    'noche-de-barro': [2,1,3,2,1,2,3],
+  };
+
+  // Clientes
+  const clientes = NOMBRES.map((n, i) => ({
+    full_name: n, email: `demo${i + 1}@casanuma.local`,
+    phone: `+5281800010${String(i).padStart(2, '0')}`,
+  }));
+  await rest('customers', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(clientes),
+  });
+  const { data: cs } = await rest('customers?select=id,email&email=like.*@casanuma.local');
+  const porCorreo = Object.fromEntries((cs ?? []).map((c) => [c.email, c.id]));
+
+  const { data: ws } = await rest('workshops?select=id,slug,price');
+  const porSlug = Object.fromEntries((ws ?? []).map((w) => [w.slug, w]));
+
+  const filas = [];
+  const alfabeto = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  const codigo = () => 'NUMA-' + Array.from({ length: 6 },
+    () => alfabeto[Math.floor(Math.random() * alfabeto.length)]).join('');
+
+  for (const [slug, partes] of Object.entries(OCUPACION)) {
+    const w = porSlug[slug];
+    if (!w) continue;
+    partes.forEach((n, i) => {
+      const email = `demo${(i % NOMBRES.length) + 1}@casanuma.local`;
+      filas.push({
+        reservation_code: codigo(), workshop_id: w.id,
+        customer_id: porCorreo[email], quantity: n,
+        unit_price: w.price, total_amount: (Number(w.price) * n).toFixed(2),
+        currency: 'MXN', status: 'confirmed',
+        confirmed_at: new Date(Date.now() - i * 3600000).toISOString(),
+        notes: 'Ocupacion de demostracion. Borrar antes de operar.',
+      });
+    });
+  }
+
+  const r = await rest('reservations', { method: 'POST', body: JSON.stringify(filas) });
+  console.log(`    ${filas.length} reservaciones  ${r.code >= 200 && r.code < 300 ? 'OK' : r.code + ' ' + r.texto.slice(0, 120)}`);
+  console.log('');
+}
+
+if (!['estado', 'limpiar', 'admin', 'demo'].includes(accion)) {
   console.log(`
   Uso:
     node dev/admin-db.mjs estado
     node dev/admin-db.mjs limpiar
     node dev/admin-db.mjs admin tu@correo.com
+    node dev/admin-db.mjs demo
 `);
 }
