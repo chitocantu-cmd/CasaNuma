@@ -9,3 +9,4 @@ tsconfig.tsbuildinfo
 # secretos reales de Edge Functions
 dev/secretos.env
 dev/acceso-admin.txt
+supabase/.temp/
