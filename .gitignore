@@ -10,3 +10,4 @@ tsconfig.tsbuildinfo
 dev/secretos.env
 dev/acceso-admin.txt
 supabase/.temp/
+*-tmp.mjs
