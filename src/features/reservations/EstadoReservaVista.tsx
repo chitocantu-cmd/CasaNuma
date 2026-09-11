@@ -39,8 +39,10 @@ export default function EstadoReservaVista({ code }: { code: string }) {
       const r = await consultarReserva(code, email);
       setReserva(r);
       setError(null);
-      // Solo se deja de consultar cuando el estado ya es definitivo.
-      return r.status !== 'pending_payment';
+      // Se deja de consultar cuando el estado ya es definitivo, o cuando la
+      // reserva esta pendiente pero nunca se inicio un pago: en ese caso no
+      // hay nada que esperar y seguir consultando es gastar por gastar.
+      return r.status !== 'pending_payment' || !r.payment_status;
     } catch (e) {
       if (e instanceof ErrorApi && e.codigo === 'RESERVATION_NOT_FOUND') {
         setError('No encontramos esa reservación con ese correo. Revisa que sea el mismo que usaste al reservar.');
@@ -102,6 +104,39 @@ export default function EstadoReservaVista({ code }: { code: string }) {
           onClick={() => { setEmailListo(false); setError(null); }}>
           Probar con otro correo
         </Boton>
+      </div>
+    );
+  }
+
+  // ---- Apartado, sin pago iniciado -----------------------------------------
+  // Si la reserva sigue pendiente pero NUNCA se creó un pago, no hay nada que
+  // confirmar: el cobro en línea no está conectado todavía. Decir "estamos
+  // confirmando tu pago" sería mentir y dejaría a la clienta esperando algo
+  // que no va a pasar.
+  if (reserva && reserva.status === 'pending_payment' && !reserva.payment_status) {
+    return (
+      <div className="contenedor max-w-lg py-32">
+        <p className="dato text-olivo">Lugar apartado</p>
+        <h1 className="mt-3 font-display text-[2.2rem] leading-tight">
+          Ya guardamos tu lugar.
+        </h1>
+        <p className="mt-4 leading-relaxed text-tinta/70">
+          Te escribimos por WhatsApp para confirmar tu reservación y darte las
+          formas de pago.
+        </p>
+
+        <dl className="mt-10 space-y-3 border-y border-tinta/15 py-7">
+          <Fila k="Taller" v={reserva.workshop.title} />
+          <Fila k="Cuándo" v={fechaLarga(reserva.workshop.date)} />
+          <Fila k="Horario" v={rangoHorario(reserva.workshop.start_time, reserva.workshop.end_time)} />
+          <Fila k="Lugares" v={String(reserva.quantity)} />
+          <Fila k="Total" v={pesos(reserva.total_amount, reserva.currency)} />
+          <Fila k="Tu código" v={reserva.reservation_code} />
+        </dl>
+
+        <div className="mt-10">
+          <BotonEnlace to="/talleres" variante="secundario">Ver más talleres</BotonEnlace>
+        </div>
       </div>
     );
   }
