@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './componentes/Layout';
 import { AuthProvider, RequiereAdmin } from './features/admin/auth';
@@ -14,14 +15,30 @@ import PagoExitoso from './paginas/PagoExitoso';
 import PagoCancelado from './paginas/PagoCancelado';
 import NoEncontrado from './paginas/NoEncontrado';
 
-import AdminLayout from './paginas/admin/AdminLayout';
-import AdminLogin from './paginas/admin/AdminLogin';
-import AdminDashboard from './paginas/admin/AdminDashboard';
-import AdminTalleres from './paginas/admin/AdminTalleres';
-import AdminTallerForm from './paginas/admin/AdminTallerForm';
-import AdminReservaciones from './paginas/admin/AdminReservaciones';
-import AdminPagos from './paginas/admin/AdminPagos';
-import AdminProspectos from './paginas/admin/AdminProspectos';
+// ---------------------------------------------------------------------------
+// El panel se carga aparte, solo cuando alguien entra a /admin.
+// ---------------------------------------------------------------------------
+// Es un tercio del codigo de la aplicacion y lo usan dos o tres personas. Sin
+// esta separacion, cada clienta que abre la agenda desde su telefono descarga
+// tambien las tablas de reservaciones, el formulario de talleres y el cliente
+// de Cloudinary — codigo que nunca va a ejecutar.
+// ---------------------------------------------------------------------------
+const AdminLayout = lazy(() => import('./paginas/admin/AdminLayout'));
+const AdminLogin = lazy(() => import('./paginas/admin/AdminLogin'));
+const AdminDashboard = lazy(() => import('./paginas/admin/AdminDashboard'));
+const AdminTalleres = lazy(() => import('./paginas/admin/AdminTalleres'));
+const AdminTallerForm = lazy(() => import('./paginas/admin/AdminTallerForm'));
+const AdminReservaciones = lazy(() => import('./paginas/admin/AdminReservaciones'));
+const AdminPagos = lazy(() => import('./paginas/admin/AdminPagos'));
+const AdminProspectos = lazy(() => import('./paginas/admin/AdminProspectos'));
+
+function CargandoPanel() {
+  return (
+    <div className="contenedor py-32 text-center">
+      <p className="dato text-tinta/45">Cargando panel…</p>
+    </div>
+  );
+}
 
 export default function App() {
   // Sin las variables de Supabase no hay nada que mostrar: mejor decir qué
@@ -31,6 +48,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <Suspense fallback={<CargandoPanel />}>
         <Routes>
           {/* Sitio público. Los clientes NUNCA crean cuenta. */}
           <Route element={<Layout />}>
@@ -63,6 +81,7 @@ export default function App() {
             <Route path="prospectos" element={<AdminProspectos />} />
           </Route>
         </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   );
