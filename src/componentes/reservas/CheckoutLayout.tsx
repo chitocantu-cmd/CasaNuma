@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom';
 import { repo, ErrorDatos } from '../../datos';
 import type { Reserva, SolicitudReserva } from '../../datos/tipos';
+import { sinLugar } from '../../lib/cupo';
 import { Icono } from '../base/Iconos';
 import { MarcaDemo } from '../base/Pendiente';
 import CheckoutSteps from './CheckoutSteps';
@@ -67,6 +68,19 @@ export default function CheckoutLayout({
       </div>
     </div>
   );
+}
+
+/**
+ * Vuelve a preguntar el cupo al backend antes de seguir: lo que se cargó al
+ * abrir la página puede haber cambiado. Devuelve el mensaje para la persona,
+ * o null si hay lugar. (El backend lo comprueba de nuevo al apartar.)
+ */
+export async function comprobarCupo(sesionIds: string[], personas: number): Promise<string | null> {
+  const actuales = await repo.disponibilidad(sesionIds);
+  const falta = actuales.find((s) => sinLugar(s) || (s.disponibles !== null && s.disponibles < personas));
+  if (!falta) return null;
+  if (sinLugar(falta) || !falta.disponibles) return 'Este horario ya está agotado. Elige otro.';
+  return `Solo ${falta.disponibles === 1 ? 'queda 1 lugar disponible' : `quedan ${falta.disponibles} lugares disponibles`}.`;
 }
 
 /**

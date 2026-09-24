@@ -3,77 +3,63 @@
 // ---------------------------------------------------------------------------
 // Los talleres ya NO salen de aquí: la agenda real vive en src/datos/agenda.ts.
 //
+// Las fechas de NUMA Kids y de las clases de membresía salen de la agenda
+// real (Tardes de Cerámica · Niños y Clases de Cerámica). Un mes que Casa
+// Numa no ha publicado no se ofrece: no se inventan fechas.
+//
 // Lo que sigue siendo de ejemplo:
-// · Fechas concretas y cupos de membresía y NUMA Kids (8 y 10 de ejemplo):
-//   los días, horarios y precios sí vienen de src/contenido/oferta.ts.
+// · El historial de las reservas DEMO en meses sin agenda publicada usa el
+//   patrón del PDF (viernes, sábados y domingos) solo para que el panel no
+//   arranque vacío.
 // · Productos de NUMA Store: fichas de ejemplo; Casa Numa subirá las reales.
 //
 // Las fechas se generan respecto a hoy para que la demo nunca "caduque".
 // ===========================================================================
 
-import { KIDS, MEMBRESIA } from '../../contenido/oferta';
-import {
-  claveMes, diaSemana, diasDelMes, etiquetaMes, hoy, proximoDia, sumarDias, sumarMeses,
-} from '../../lib/calendario';
+import { MEMBRESIA } from '../../contenido/oferta';
+import { claveMes, diaSemana, diasDelMes, etiquetaMes, hoy } from '../../lib/calendario';
 import type { MesMembresia, Producto, Sesion } from '../tipos';
-import { AGENDA } from '../agenda';
+import { AGENDA, flujoAgenda, idSesionAgenda } from '../agenda';
 
-const CUPO_MEMBRESIA = 8;
-const CUPO_KIDS = 10;
-
-/** Hash estable: la misma sesión siempre arranca con la misma ocupación. */
-function hash(texto: string): number {
-  let h = 5381;
-  for (let i = 0; i < texto.length; i++) h = ((h << 5) + h + texto.charCodeAt(i)) >>> 0;
-  return h;
-}
-
-/** Ocupación inicial simulada: algunas llenas, algunas con últimos lugares. */
-export function ocupacionInicial(id: string, cupo: number): number {
-  const r = hash(id) % 100;
-  if (r < 14) return cupo;
-  if (r < 36) return cupo - 1 - (hash(id + 'u') % 2);
-  return hash(id + 'o') % Math.max(1, cupo - 3);
-}
-
-function sesion(id: string, fecha: string, inicio: string, fin: string, cupo: number): Sesion {
+function sesion(id: string, fecha: string, inicio: string, fin: string | null, cupo: number | null): Sesion {
   return { id, fecha, inicio, fin, cupo, disponibles: cupo, agotada: false };
 }
 
+/** Sesiones de la agenda de un camino ('kids' o 'membresia'), por fecha. */
+function sesionesDeAgenda(flujo: 'kids' | 'membresia'): Sesion[] {
+  return AGENDA.filter((r) => r.is_active && flujoAgenda(r) === flujo)
+    .flatMap((r) => r.sessions.map((x) => sesion(idSesionAgenda(r, x.start_time), r.date, x.start_time, x.end_time, x.capacity)))
+    .sort((a, b) => (a.fecha + a.inicio).localeCompare(b.fecha + b.inicio));
+}
+
 // ---------------------------------------------------------------------------
-// Membresía: viernes, sábados y domingos de cada mes
+// Membresía: las Clases de Cerámica publicadas en la agenda
 // ---------------------------------------------------------------------------
+/**
+ * Clases de membresía de un mes. Si el mes está en la agenda, son esas. Si
+ * no (solo pasa con el historial de reservas DEMO), el patrón del PDF.
+ */
 export function sesionesMembresiaDelMes(clave: string): Sesion[] {
+  const publicadas = sesionesDeAgenda('membresia').filter((s) => claveMes(s.fecha) === clave);
+  if (publicadas.length) return publicadas;
   return diasDelMes(clave).flatMap((fecha) => {
     const h = MEMBRESIA.horarios.find((x) => x.diaSemana === diaSemana(fecha));
-    return h ? [sesion(`mem-${fecha}`, fecha, h.inicio, h.fin, CUPO_MEMBRESIA)] : [];
+    return h ? [sesion(`mem-${fecha}`, fecha, h.inicio, h.fin, null)] : [];
   });
 }
 
-/** El mes actual y los dos siguientes; el filtro de "reservable" va aparte. */
+/** Meses con clases publicadas, de este mes en adelante. */
 export function mesesMembresiaSemilla(): MesMembresia[] {
   const actual = claveMes(hoy());
-  return [0, 1, 2].map((n) => {
-    const clave = sumarMeses(actual, n);
-    return { clave, etiqueta: etiquetaMes(clave), sesiones: sesionesMembresiaDelMes(clave), demo: true };
-  });
+  const meses = [...new Set(sesionesDeAgenda('membresia').map((s) => claveMes(s.fecha)))].filter((m) => m >= actual);
+  return meses.map((clave) => ({ clave, etiqueta: etiquetaMes(clave), sesiones: sesionesMembresiaDelMes(clave), demo: false }));
 }
 
 // ---------------------------------------------------------------------------
-// NUMA Kids: jueves a las 5:00 p.m., las próximas diez semanas
+// NUMA Kids: las Tardes de Cerámica (Niños) publicadas en la agenda
 // ---------------------------------------------------------------------------
 export function sesionesKidsSemilla(): Sesion[] {
-  // Si la agenda real ya tiene un taller de niños ese jueves a la misma hora
-  // (p. ej. "Tardes de Cerámica (Niños)" del 1 de octubre), manda la agenda:
-  // no se ofrece además una sesión de NUMA Kids de ejemplo en el mismo horario.
-  const ocupados = new Set(
-    AGENDA.filter((t) => t.is_active && t.category === 'kids' && t.sessions.some((x) => x.start_time === KIDS.inicio))
-      .map((t) => t.date),
-  );
-  const primero = proximoDia(hoy(), KIDS.diaSemana);
-  return Array.from({ length: 10 }, (_, i) => sumarDias(primero, i * 7))
-    .filter((fecha) => !ocupados.has(fecha))
-    .map((fecha) => sesion(`kids-${fecha}`, fecha, KIDS.inicio, KIDS.fin, CUPO_KIDS));
+  return sesionesDeAgenda('kids');
 }
 
 // ---------------------------------------------------------------------------

@@ -83,7 +83,10 @@ export const MEMBRESIA = {
 
 export const KIDS = {
   precio: 680,
-  edadMinima: 7,
+  // "Talleres octubre numa.docx" (Tardes de Cerámica · Niños, jueves 5:00 p.m.,
+  // $680): 10 a 14 años. Reemplaza el "a partir de 7" del PDF.
+  edadMinima: 10,
+  edadMaxima: 14,
   diaSemana: 4,
   dia: 'Jueves',
   inicio: '17:00',
@@ -98,6 +101,9 @@ export const KIDS = {
     { icono: 'horno', titulo: 'Horneado' },
   ] satisfies Inclusion[],
 } as const;
+
+/** "10 a 14 años" */
+export const EDADES_KIDS = `${KIDS.edadMinima} a ${KIDS.edadMaxima} años`;
 
 /** Qué se paga en línea y qué se atiende por WhatsApp (documento, sección 1). */
 export const CANALES = {

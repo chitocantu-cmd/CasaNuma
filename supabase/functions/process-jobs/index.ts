@@ -1,8 +1,8 @@
 // ===========================================================================
 // Casa Numa · process-jobs
 // ---------------------------------------------------------------------------
-// Vacía la cola de integration_jobs: correos (Resend) y agenda (Google
-// Calendar).
+// Vacía la cola de integration_jobs: correos (Resend), avisos por WhatsApp
+// (API oficial de WhatsApp Business) y agenda (Google Calendar).
 //
 // Esta separación es la que hace que una caída de Google o de Resend NO pueda
 // costar una venta. El cliente ya pagó y su reserva ya está confirmada mucho
@@ -18,13 +18,17 @@ import {
   type DatosReserva, type DatosLead,
 } from '../_shared/emails.ts';
 import { sincronizarTaller, type ResumenTaller } from '../_shared/google-calendar.ts';
+import { avisarReservaPorWhatsApp } from '../_shared/whatsapp.ts';
 
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
-const ADMIN_EMAIL = Deno.env.get('RESEND_ADMIN_EMAIL') ?? '';
+// Correo del equipo para avisos de reserva. ADMIN_NOTIFICATION_EMAIL es el
+// nombre nuevo; RESEND_ADMIN_EMAIL se sigue aceptando para no romper la
+// configuración actual. No hay valor por omisión: no se inventa un correo.
+const ADMIN_EMAIL = Deno.env.get('ADMIN_NOTIFICATION_EMAIL') || Deno.env.get('RESEND_ADMIN_EMAIL') || '';
 
 interface Job {
   id: string;
-  type: 'email_send' | 'calendar_sync';
+  type: 'email_send' | 'calendar_sync' | 'whatsapp_send';
   entity_type: string;
   entity_id: string;
   payload: Record<string, unknown>;
@@ -72,6 +76,7 @@ Deno.serve(async (req: Request) => {
 async function ejecutar(job: Job): Promise<void> {
   if (job.type === 'calendar_sync') return await sincronizarCalendario(job);
   if (job.type === 'email_send') return await mandarCorreo(job);
+  if (job.type === 'whatsapp_send') return await mandarWhatsApp(job);
   throw new Error(`Tipo de trabajo desconocido: ${job.type}`);
 }
 
@@ -97,7 +102,7 @@ async function mandarCorreo(job: Job): Promise<void> {
 
   // Avisos de prospecto: no cuelgan de una reserva.
   if (plantilla === 'admin_lead') {
-    if (!ADMIN_EMAIL) throw new Error('Falta RESEND_ADMIN_EMAIL');
+    if (!ADMIN_EMAIL) throw new Error('Falta ADMIN_NOTIFICATION_EMAIL');
     const { data, error } = await db.rpc('datos_prospecto', {
       p_lead_id: job.entity_id,
       p_tipo: String(job.payload.tipo ?? 'contacto'),
@@ -122,8 +127,10 @@ async function mandarCorreo(job: Job): Promise<void> {
       return;
 
     case 'admin_reserva':
-      if (!ADMIN_EMAIL) throw new Error('Falta RESEND_ADMIN_EMAIL');
-      await enviar(avisoAdminReserva(r, ADMIN_EMAIL));
+      // Sin correo configurado el trabajo falla a propósito: queda en las
+      // alertas del panel hasta que se configure y se reintente.
+      if (!ADMIN_EMAIL) throw new Error('Falta ADMIN_NOTIFICATION_EMAIL');
+      await enviar(avisoAdminReserva(r, ADMIN_EMAIL, APP_URL));
       return;
 
     case 'cancelacion':
@@ -133,6 +140,14 @@ async function mandarCorreo(job: Job): Promise<void> {
     default:
       throw new Error(`Plantilla desconocida: ${plantilla}`);
   }
+}
+
+async function mandarWhatsApp(job: Job): Promise<void> {
+  const { data, error } = await db.rpc('datos_reserva', { p_reservation_id: job.entity_id });
+  if (error) throw error;
+  if (!data) throw new Error(`Reserva ${job.entity_id} no encontrada`);
+  const enviado = await avisarReservaPorWhatsApp(data as DatosReserva);
+  if (!enviado) console.info(`[process-jobs/whatsapp] omitido: WhatsApp Business sin configurar (${job.entity_id})`);
 }
 
 function json(body: unknown): Response {

@@ -2,23 +2,27 @@ import type { ReactNode } from 'react';
 import { m } from 'framer-motion';
 import type { Reserva } from '../../datos/tipos';
 import { fuenteDatos, siteConfig } from '../../config/site';
-import { fechaCompleta, rango } from '../../lib/calendario';
+import { fechaCompleta, hora } from '../../lib/calendario';
 import { pesosCortos } from '../../lib/formato';
 import { descargarIcsReserva } from '../../lib/ics';
-import { Boton, BotonEnlace } from '../base/Boton';
+import { BotonEnlace } from '../base/Boton';
 import { EASE_NUMA } from '../base/Revelar';
 import CeramicShape, { type NombreSilueta } from '../marca/CeramicShape';
 
+const mayuscula = (t: string) => t.replace(/^./, (c) => c.toUpperCase());
+
 /**
- * Confirmación: lo primero que se lee es que ya está. Después, el código,
- * las fechas y qué sigue. La reserva ya vive en "Mi cuenta".
+ * Confirmación: lo primero que se lee es que ya está y su número de reserva.
+ * Después, qué, cuándo, cuántos y cuánto. La reserva ya vive en "Mi cuenta"
+ * y en el panel del equipo.
  */
 export default function Confirmacion({
-  reserva, titulo, silueta = 'olla', children,
+  reserva: r, titulo = '¡Tu lugar está reservado!', silueta = 'olla', volver, children,
 }: {
   reserva: Reserva;
-  titulo: string;
+  titulo?: string;
   silueta?: NombreSilueta;
+  volver: { to: string; texto: string };
   children?: ReactNode;
 }) {
   const lugar = siteConfig.direccion ? `${siteConfig.direccion}, ${siteConfig.zona}` : `Casa Numa, ${siteConfig.zona}`;
@@ -33,52 +37,52 @@ export default function Confirmacion({
       >
         <CeramicShape nombre={silueta} className="h-20 w-auto" />
       </m.div>
-      <p className="eyebrow mt-8 text-cafe/65">Reserva confirmada · {reserva.codigo}</p>
-      <h1 className="mt-5 font-display text-t1 font-light">{titulo}</h1>
-      <p className="mx-auto mt-6 max-w-[46ch] text-cuerpo-l text-cafe/80">
-        {fuenteDatos === 'demo' ? (
-          <>Tu reserva ya está guardada en tu cuenta. En la versión real, la confirmación llega también a {reserva.contacto.email}.</>
-        ) : (
-          <>
-            Te enviamos los detalles a <strong className="font-medium text-cafe">{reserva.contacto.email}</strong>. También
-            los encuentras en tu cuenta.
-          </>
-        )}
-      </p>
+      <h1 className="mt-8 font-display text-t1 font-light">{titulo}</h1>
 
-      <div className="mt-12 rounded-suave border border-cafe/15 p-6 text-left sm:p-8">
-        <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-cafe/10 pb-5">
-          <p className="font-display text-t4 font-light">{reserva.titulo}</p>
-          <p className="cifra text-[1.6rem] leading-none">{pesosCortos(reserva.total)}</p>
-        </div>
-        <ol className="mt-5 space-y-3">
-          {reserva.sesiones.map((s, i) => (
-            <li key={s.id} className="flex flex-wrap items-baseline justify-between gap-2 text-cuerpo">
-              <span className="flex items-baseline gap-3">
-                {reserva.sesiones.length > 1 && <span className="cifra w-5 text-cafe/45">{i + 1}</span>}
-                <span className="first-letter:uppercase">{fechaCompleta(s.fecha)}</span>
-              </span>
-              <span className="text-cafe/70">{rango(s.inicio, s.fin)}</span>
+      <p className="eyebrow mt-8 text-cafe/60">Número de reserva</p>
+      <p className="cifra mt-2 text-[clamp(2.6rem,7vw,3.8rem)] leading-none tracking-[0.04em]">{r.folio}</p>
+
+      <div className="mt-10 rounded-suave border border-cafe/15 p-6 text-left sm:p-8">
+        <p className="font-display text-t3 font-light">{r.titulo}</p>
+        <ul className="mt-4 space-y-1.5 text-cuerpo">
+          {r.sesiones.map((s, i) => (
+            <li key={s.id} className="flex flex-wrap gap-x-3">
+              {r.sesiones.length > 1 && <span className="cifra w-5 text-cafe/45">{i + 1}</span>}
+              <span>{mayuscula(fechaCompleta(s.fecha))}</span>
+              <span className="text-cafe/70">{hora(s.inicio)}</span>
             </li>
           ))}
-        </ol>
-        {reserva.ninos && reserva.ninos.length > 0 && (
-          <p className="mt-5 border-t border-cafe/10 pt-5 text-nota text-cafe/75">
-            {reserva.ninos.map((n) => `${n.nombre} (${n.edad} años)`).join(' · ')}
+        </ul>
+        <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-cafe/10 pt-5">
+          <p className="text-nota text-cafe/75">
+            {r.ninos?.length
+              ? r.ninos.map((n) => `${n.nombre} (${n.edad} años)`).join(' · ')
+              : `${r.participantes} ${r.participantes === 1 ? 'participante' : 'participantes'}`}
           </p>
-        )}
-        {reserva.tipo === 'taller' && reserva.participantes > 1 && (
-          <p className="mt-5 border-t border-cafe/10 pt-5 text-nota text-cafe/75">{reserva.participantes} personas</p>
-        )}
+          <p className="text-right">
+            <span className="eyebrow block text-[0.6rem] text-cafe/55">Total</span>
+            <span className="cifra text-[1.9rem] leading-none">{pesosCortos(r.total)}</span>
+          </p>
+        </div>
         {children && <div className="mt-5 border-t border-cafe/10 pt-5 text-nota text-cafe/75">{children}</div>}
       </div>
 
-      <div className="mt-10 flex flex-wrap justify-center gap-3">
-        <BotonEnlace to="/cuenta" flecha>Ver en mi cuenta</BotonEnlace>
-        <Boton variante="secundario" onClick={() => descargarIcsReserva(reserva, lugar)}>
-          Agregar a mi calendario
-        </Boton>
+      <p className="mx-auto mt-8 max-w-[48ch] text-nota text-cafe/75">
+        Te enviamos la confirmación a <strong className="font-medium text-cafe">{r.contacto.email}</strong>.
+        {fuenteDatos === 'demo' && ' En esta demo el correo no sale: queda registrado en los avisos del panel.'}
+      </p>
+
+      <div className="mt-8 flex flex-wrap justify-center gap-3">
+        <BotonEnlace to="/cuenta" flecha>Ver mis reservas</BotonEnlace>
+        <BotonEnlace to={volver.to} variante="secundario">{volver.texto}</BotonEnlace>
       </div>
+      <button
+        type="button"
+        onClick={() => descargarIcsReserva(r, lugar)}
+        className="subrayado-fijo mt-6 pb-0.5 text-nota text-cafe/75"
+      >
+        Agregar a mi calendario
+      </button>
     </div>
   );
 }

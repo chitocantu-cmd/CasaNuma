@@ -145,6 +145,34 @@ export const Icono = {
       <path d="M3.5 20.5h17" />
     </Base>
   ),
+  // --- Panel --------------------------------------------------------------------
+  resumen: (p: P) => (
+    <Base {...p}>
+      <rect x="3.5" y="3.5" width="7" height="8" rx="1.5" />
+      <rect x="13.5" y="3.5" width="7" height="5" rx="1.5" />
+      <rect x="13.5" y="11.5" width="7" height="9" rx="1.5" />
+      <rect x="3.5" y="14.5" width="7" height="6" rx="1.5" />
+    </Base>
+  ),
+  lista: (p: P) => <Base {...p}><path d="M9 6.5h11M9 12h11M9 17.5h11M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" strokeWidth={1.6} /></Base>,
+  tarjeta: (p: P) => (
+    <Base {...p}>
+      <rect x="3" y="5.5" width="18" height="13" rx="2.5" />
+      <path d="M3 10h18M7 15h3" />
+    </Base>
+  ),
+  sobre: (p: P) => (
+    <Base {...p}>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+      <path d="m4.5 7 7.5 6 7.5-6" />
+    </Base>
+  ),
+  buscar: (p: P) => <Base {...p}><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></Base>,
+  telefono: (p: P) => (
+    <Base {...p}>
+      <path d="M5 4.5h3.2l1.6 4-2.1 1.3a10 10 0 0 0 5.5 5.5l1.3-2.1 4 1.6V18a1.5 1.5 0 0 1-1.6 1.5A15.5 15.5 0 0 1 3.5 6.1 1.5 1.5 0 0 1 5 4.5Z" />
+    </Base>
+  ),
   estrella: (p: P) => (
     <Base {...p}>
       <path d="M12 3.8 14.2 9l5.3.4-4 3.5 1.2 5.3L12 15.5l-4.7 2.7 1.2-5.3-4-3.5L9.8 9 12 3.8Z" />

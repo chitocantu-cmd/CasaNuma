@@ -34,6 +34,14 @@ function srcsetReferencia(ref: keyof typeof REFERENCIAS) {
   };
 }
 
+/** Foto definitiva: varios anchos en /public, o una sola ruta/URL. */
+function srcsetFoto(src: string, anchos?: readonly number[]) {
+  if (!anchos?.length) return { src, srcSet: undefined };
+  const media = `${src}-${anchos[Math.min(1, anchos.length - 1)]}.webp`;
+  if (embebido) return { src: recurso(media), srcSet: undefined };
+  return { src: media, srcSet: anchos.map((w) => `${src}-${w}.webp ${w}w`).join(', ') };
+}
+
 export default function Foto({
   id,
   foto: fotoDirecta,
@@ -63,7 +71,7 @@ export default function Foto({
   // 2 · Referencia del brandbook (solo fuera de producción)
   const fuente =
     foto.src && !fallo
-      ? { src: foto.src, srcSet: undefined }
+      ? srcsetFoto(foto.src, foto.anchos)
       : mostrarPendientes && foto.referencia
         ? srcsetReferencia(foto.referencia)
         : null;
@@ -88,7 +96,7 @@ export default function Foto({
         {esReferencia && (
           <span
             className="eyebrow absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-crema/90 px-2.5 py-1 text-[0.56rem] tracking-[0.16em] text-cafe"
-            title={`Foto de referencia del brandbook. Sustituir por: ${foto.encuadre}`}
+            title={`Foto de referencia, no es de Casa Numa. Sustituir por: ${foto.encuadre}`}
           >
             Referencia
           </span>

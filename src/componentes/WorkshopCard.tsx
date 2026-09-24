@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom';
 import type { Taller } from '../datos/tipos';
 import { DIAS_CORTOS, MESES, diaSemana, hora, partes, rango } from '../lib/calendario';
 import { pocosLugares, sinLugar, textoLugares } from '../lib/cupo';
-import { cuandoTaller, precioTaller, publicoTaller } from '../lib/talleres';
+import { cuandoTaller, precioTaller, publicoTaller, rutaReserva } from '../lib/talleres';
 import { mensajeInformacionTaller } from '../contenido/whatsapp';
 import Foto from './base/Foto';
-import { BotonEnlace, EnlaceFlecha } from './base/Boton';
+import { BotonEnlace, EnlaceFlecha, clasesBoton } from './base/Boton';
 import CtaInformacion from './base/CtaInformacion';
 import { MarcaDemo } from './base/Pendiente';
 import CeramicShape from './marca/CeramicShape';
@@ -24,8 +24,9 @@ export function SelloFecha({ fecha, className = '' }: { fecha: string; className
 
 /**
  * Ficha de un taller de la agenda: foto grande, fecha, público, horario,
- * precio y la acción que corresponde — reservar en línea o pedir
- * información cuando el precio no está publicado.
+ * precio y la acción que corresponde — reservar en línea (taller o NUMA
+ * Kids), apartar con la membresía, o pedir información cuando el precio no
+ * está publicado.
  */
 export default function WorkshopCard({ taller: t, compacta = false }: { taller: Taller; compacta?: boolean }) {
   const detalle = `/talleres/${t.slug}`;
@@ -86,7 +87,7 @@ export default function WorkshopCard({ taller: t, compacta = false }: { taller: 
               ) : (
                 <li key={s.id}>
                   <Link
-                    to={`${detalle}?sesion=${s.id}`}
+                    to={rutaReserva(t, s.id)}
                     className="inline-flex min-h-10 items-center rounded-full border border-cafe/25 px-4 text-[0.78rem] text-cafe transition-colors hover:border-cafe hover:bg-cafe hover:text-crema"
                   >
                     {hora(s.inicio)}
@@ -99,9 +100,16 @@ export default function WorkshopCard({ taller: t, compacta = false }: { taller: 
 
         <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-3 pt-6">
           {!abierto ? (
-            <p className="text-nota text-cafe/65">Este taller ya no tiene lugares.</p>
+            <span className={clasesBoton('secundario', compacta ? 'chico' : 'normal', 'cursor-default opacity-60 hover:bg-transparent hover:text-cafe')} aria-disabled="true">
+              Agotado
+            </span>
+          ) : t.flujo === 'membresia' ? (
+            <>
+              <BotonEnlace to={rutaReserva(t)} tamano={compacta ? 'chico' : 'normal'} flecha>Reservar con membresía</BotonEnlace>
+              {!compacta && <EnlaceFlecha to="/membresia">Ver membresía</EnlaceFlecha>}
+            </>
           ) : t.reservaEnLinea ? (
-            <BotonEnlace to={detalle} tamano={compacta ? 'chico' : 'normal'} flecha>Reservar mi lugar</BotonEnlace>
+            <BotonEnlace to={rutaReserva(t)} tamano={compacta ? 'chico' : 'normal'} flecha>Reservar mi lugar</BotonEnlace>
           ) : (
             <>
               <CtaInformacion

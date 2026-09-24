@@ -20,10 +20,10 @@ export function pocosLugares(s: Sesion): boolean {
 
 export function textoLugares(s: Sesion): string {
   if (yaPaso(s.fecha, s.inicio)) return 'Ya pasó';
-  if (sinLugar(s)) return 'Lleno';
+  if (sinLugar(s)) return 'Agotado';
   if (s.disponibles === null) return 'Cupo limitado';
-  if (s.disponibles === 1) return 'Último lugar';
-  if (s.disponibles <= 3) return `Últimos ${s.disponibles} lugares`;
+  if (s.disponibles === 1) return 'Solo queda 1 lugar';
+  if (s.disponibles <= 3) return `Solo quedan ${s.disponibles} lugares`;
   return `${s.disponibles} lugares`;
 }
 

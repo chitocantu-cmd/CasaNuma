@@ -134,7 +134,7 @@ export default function Calendar({
       <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[0.72rem] text-cafe/70">
         <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-cafe/60" />Con lugares</li>
         <li className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-naranja" />Últimos lugares</li>
-        <li className="flex items-center gap-2"><span className="line-through">12</span>Lleno</li>
+        <li className="flex items-center gap-2"><span className="line-through">12</span>Agotado</li>
       </ul>
     </div>
   );

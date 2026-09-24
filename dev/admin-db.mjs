@@ -6,6 +6,8 @@
 //
 //   node dev/admin-db.mjs limpiar          borra los datos de prueba
 //   node dev/admin-db.mjs estado           resumen de lo que hay en la base
+//   node dev/admin-db.mjs folio-cero       el próximo folio vuelve a NUMA-00001
+//                                          (solo si ninguna reserva tiene folio)
 //   node dev/admin-db.mjs admin <correo>   vuelve admin a un usuario existente
 // ===========================================================================
 
@@ -54,6 +56,11 @@ if (accion === 'estado') {
     console.log(`  ${t.padEnd(20)} ${Array.isArray(data) ? data.length : '?'}`);
   }
 
+  const { data: folio } = await rest('folio_counters?select=last_value&name=eq.reservation');
+  if (Array.isArray(folio) && folio.length) {
+    console.log(`  ${'folio (último)'.padEnd(20)} ${folio[0].last_value}`);
+  }
+
   const { data: res } = await rest('reservations?select=reservation_code,status,quantity,created_at&order=created_at.desc&limit=8');
   if (res?.length) {
     console.log('\n  Últimas reservaciones');
@@ -98,6 +105,36 @@ if (accion === 'limpiar') {
   console.log(`    prospectos membresía    ${m.code === 204 || m.code === 200 ? 'OK' : m.code}`);
 
   console.log('\n  Listo.\n');
+}
+
+// ---------------------------------------------------------------------------
+// Tras borrar los datos de prueba, el contador de folios vuelve a cero para
+// que la primera reserva real sea NUMA-00001. Se niega si queda cualquier
+// reserva con folio: reiniciar entonces repetiría folios.
+if (accion === 'folio-cero') {
+  // process.exitCode en vez de process.exit(): en Windows, salir de golpe con
+  // fetch abierto hace que Node imprima un "Assertion failed" que asusta.
+  const { data: conFolio, code } = await rest('reservations?select=folio&folio=not.is.null&limit=5');
+  if (code !== 200) {
+    console.error(`\n  No pude leer las reservas (HTTP ${code}). ¿Ya se aplicó la migración v2?\n`);
+    process.exitCode = 1;
+  } else if (conFolio.length) {
+    console.error(`\n  Aún hay reservas con folio (${conFolio.map((r) => r.folio).join(', ')}…).`);
+    console.error('  Corre primero: node dev/admin-db.mjs limpiar\n');
+    process.exitCode = 1;
+  } else {
+    const r = await rest('folio_counters?name=eq.reservation', {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ last_value: 0 }),
+    });
+    if (r.code !== 200 || !r.data?.length) {
+      console.error(`\n  No se pudo reiniciar el contador (HTTP ${r.code}): ${r.texto.slice(0, 200)}\n`);
+      process.exitCode = 1;
+    } else {
+      console.log('\n  Contador de folios en 0: la próxima reserva confirmada será NUMA-00001.\n');
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -207,11 +244,12 @@ if (accion === 'demo') {
   console.log('');
 }
 
-if (!['estado', 'limpiar', 'admin', 'demo'].includes(accion)) {
+if (!['estado', 'limpiar', 'folio-cero', 'admin', 'demo'].includes(accion)) {
   console.log(`
   Uso:
     node dev/admin-db.mjs estado
     node dev/admin-db.mjs limpiar
+    node dev/admin-db.mjs folio-cero
     node dev/admin-db.mjs admin tu@correo.com
     node dev/admin-db.mjs demo
 `);

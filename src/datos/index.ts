@@ -1,9 +1,9 @@
 import { fuenteDatos } from '../config/site';
-import { repoDemo } from './demo/repoDemo';
-import { ErrorDatos, type Repositorio } from './repositorio';
+import { repoAdminDemo, repoDemo } from './demo/repoDemo';
+import { ErrorDatos, type Repositorio, type RepositorioAdmin } from './repositorio';
 
 export { ErrorDatos } from './repositorio';
-export type { Repositorio } from './repositorio';
+export type { Repositorio, RepositorioAdmin } from './repositorio';
 
 /**
  * Pendiente de integración: el backend real (Supabase + Stripe) ya existe en
@@ -12,11 +12,15 @@ export type { Repositorio } from './repositorio';
  * mensaje claro en vez de mezclar datos reales con simulados.
  * Ver docs/INTEGRACION.md.
  */
-const noConectado: Repositorio = new Proxy({} as Repositorio, {
-  get: () => () =>
-    Promise.reject(
-      new ErrorDatos('NO_CONECTADO', 'El sitio todavía no está conectado al sistema de reservas. Intenta más tarde.'),
-    ),
-});
+function noConectado<T extends object>(): T {
+  return new Proxy({} as T, {
+    get: () => () =>
+      Promise.reject(
+        new ErrorDatos('NO_CONECTADO', 'El sitio todavía no está conectado al sistema de reservas. Intenta más tarde.'),
+      ),
+  });
+}
 
-export const repo: Repositorio = fuenteDatos === 'demo' ? repoDemo : noConectado;
+export const repo: Repositorio = fuenteDatos === 'demo' ? repoDemo : noConectado<Repositorio>();
+/** Panel de Casa Numa. Exige sesión con rol 'admin' en cada llamada. */
+export const repoAdmin: RepositorioAdmin = fuenteDatos === 'demo' ? repoAdminDemo : noConectado<RepositorioAdmin>();

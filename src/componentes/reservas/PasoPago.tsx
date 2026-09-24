@@ -114,7 +114,7 @@ export default function PasoPago({
         <Boton onClick={pagar} disabled={pagando || !reloj}>
           {pagando ? 'Procesando pago…' : `Pagar ${pesosCortos(reserva.total)}`}
         </Boton>
-        <p className="text-[0.74rem] text-cafe/60">Código de apartado: {reserva.codigo}</p>
+        <p className="text-[0.74rem] text-cafe/60">Tu folio se genera en cuanto se confirme el pago.</p>
       </div>
     </div>
   );

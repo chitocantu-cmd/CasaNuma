@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node supabase/tests/logica.test.mjs",
     "test:migraciones": "node supabase/tests/harness.mjs",
+    "test:reservas": "node supabase/tests/reservas-v2.test.mjs",
     "desplegar": "node dev/desplegar.mjs",
     "verificar": "node dev/verificar.mjs",
     "preview-local": "node dev/preview-server.mjs",

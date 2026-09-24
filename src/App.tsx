@@ -2,6 +2,7 @@ import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { LazyMotion, MotionConfig, domAnimation } from 'framer-motion';
 import Layout from './componentes/layout/Layout';
+import { fuenteDatos } from './config/site';
 import { SesionProvider } from './features/cuenta/sesion';
 import SinConfigurar from './paginas/SinConfigurar';
 import Inicio from './paginas/Inicio';
@@ -37,8 +38,14 @@ const Reserva = SIN_BACKEND ? null : lazy(() => import('./paginas/Reserva'));
 const PagoExitoso = SIN_BACKEND ? null : lazy(() => import('./paginas/PagoExitoso'));
 const PagoCancelado = SIN_BACKEND ? null : lazy(() => import('./paginas/PagoCancelado'));
 
-// Panel administrativo: aparte, solo para el equipo, con Supabase adentro.
-const PanelAdmin = SIN_BACKEND ? null : lazy(() => import('./paginas/admin/PanelAdmin'));
+// Panel administrativo: aparte, solo para el equipo. Habla con el mismo
+// repositorio que el sitio: en la demo, con los datos locales (funciona incluso
+// en la presentación); con fuenteDatos = 'supabase', el panel de Supabase.
+const PanelAdmin =
+  fuenteDatos === 'demo'
+    ? lazy(() => import('./paginas/panel/Panel'))
+    : SIN_BACKEND ? null : lazy(() => import('./paginas/admin/PanelAdmin'));
+const panelConBackend = fuenteDatos !== 'demo';
 
 // Se lee de las variables en vez de importar el cliente de Supabase: así el
 // cliente (y su peso) solo se descarga en las rutas que lo usan.
@@ -92,7 +99,9 @@ export default function App() {
                   <Route path="*" element={<NoEncontrado />} />
                 </Route>
 
-                {PanelAdmin && <Route path="/admin/*" element={<ConBackend><PanelAdmin /></ConBackend>} />}
+                {PanelAdmin && (
+                  <Route path="/admin/*" element={panelConBackend ? <ConBackend><PanelAdmin /></ConBackend> : <PanelAdmin />} />
+                )}
               </Routes>
             </Suspense>
           </SesionProvider>

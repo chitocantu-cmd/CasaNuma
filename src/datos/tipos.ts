@@ -34,6 +34,8 @@ export interface Taller {
   resumen: string;
   descripcion: string[];
   foto: IdFoto;
+  /** Todas las fotos del taller, incluida `foto`. */
+  galeria: IdFoto[];
   /** Filtros de la agenda. */
   categoria: CategoriaTaller;
   /** Texto corto de público o tipo: "Niños", "Adultos", "Clases", "Temporada". */
@@ -45,6 +47,12 @@ export interface Taller {
   etiquetaPrecio: string | null;
   /** false = no se cobra en línea: el botón pide información. */
   reservaEnLinea: boolean;
+  /**
+   * Por dónde se aparta: 'taller' (checkout del taller), 'kids' (NUMA Kids,
+   * con nombre y edad de cada niño) o 'membresia' (es una clase de la
+   * membresía y se elige al contratarla).
+   */
+  flujo: 'taller' | 'kids' | 'membresia';
   duracionMin: number | null;
   incluye: string[];
   sesiones: Sesion[];
@@ -81,16 +89,27 @@ export interface Producto {
   demo: boolean;
 }
 
+/** customer = clienta con cuenta · admin = equipo de Casa Numa (panel). */
+export type Rol = 'customer' | 'admin';
+
 export interface Usuario {
   id: string;
   nombre: string;
   email: string;
   telefono: string;
   creadoEn: string;
+  rol: Rol;
 }
 
-export type EstadoReserva = 'pendiente_pago' | 'confirmada' | 'cancelada' | 'expirada';
-export type EstadoPago = 'pendiente' | 'pagado' | 'reembolsado';
+/**
+ * pendiente_pago: lugares apartados, el cobro no se ha confirmado.
+ * confirmada: el proveedor de pagos (o el equipo, si pagó en el estudio) confirmó el cobro.
+ * completada: la experiencia ya ocurrió.
+ * Preparados para después: reembolsada, no_asistio.
+ */
+export type EstadoReserva = 'pendiente_pago' | 'confirmada' | 'cancelada' | 'completada' | 'expirada';
+export type EstadoPago = 'pendiente' | 'pagado' | 'reembolsado' | 'fallido';
+export type MetodoPago = 'tarjeta' | 'transferencia' | 'efectivo' | 'otro';
 
 export interface Nino {
   nombre: string;
@@ -106,23 +125,35 @@ export interface SesionReservada {
 
 export interface Reserva {
   id: string;
-  codigo: string;
+  /** NUMA-00001… Lo asigna el backend cuando el pago se confirma. */
+  folio: string | null;
   tipo: TipoExperiencia;
   titulo: string;
   /** slug del taller o clave del mes de membresía. */
   referencia: string;
   sesiones: SesionReservada[];
   participantes: number;
+  /** NUMA Kids: solo nombre y edad, nada más del menor. */
   ninos?: Nino[];
   precioUnitario: number;
+  subtotal: number;
   total: number;
   estado: EstadoReserva;
   pago: EstadoPago;
-  /** Vencimiento del apartado mientras se paga. */
+  metodoPago: MetodoPago | null;
+  /** Id del cobro en el proveedor (Stripe) o referencia de la transferencia. */
+  referenciaPago: string | null;
+  pagadaEn: string | null;
+  /** Vencimiento del apartado mientras se paga (null en reservas del panel). */
   expiraEn: string | null;
   creadaEn: string;
-  usuarioId: string;
+  actualizadaEn: string;
+  /** null si el equipo la registró sin cuenta de la clienta. */
+  usuarioId: string | null;
   contacto: Contacto;
+  /** Solo las ve el equipo. */
+  notasInternas: string;
+  origen: 'web' | 'panel';
   demo: boolean;
 }
 
@@ -157,4 +188,115 @@ export interface Registro {
   password: string;
   /** Consentimiento separado y opcional para recibir novedades. */
   novedades: boolean;
+}
+
+// ===========================================================================
+// Panel administrativo
+// ===========================================================================
+
+export interface Pago {
+  id: string;
+  reservaId: string;
+  folio: string | null;
+  cliente: string;
+  proveedor: 'demo' | 'stripe' | 'manual';
+  referencia: string | null;
+  metodo: MetodoPago | null;
+  monto: number;
+  estado: EstadoPago;
+  creadoEn: string;
+  demo: boolean;
+}
+
+/** Aviso que salió (o saldría) por correo o WhatsApp. */
+export interface Aviso {
+  id: string;
+  canal: 'email' | 'whatsapp';
+  destinatario: 'equipo' | 'cliente';
+  /** null = falta configurar a quién (ADMIN_NOTIFICATION_EMAIL, API de WhatsApp). */
+  para: string | null;
+  asunto: string;
+  lineas: string[];
+  enlace: { texto: string; ruta: string } | null;
+  reservaId: string;
+  estado: 'enviado' | 'sin_destinatario' | 'pendiente_integracion';
+  creadoEn: string;
+}
+
+export interface Asistente {
+  reservaId: string;
+  folio: string | null;
+  nombre: string;
+  telefono: string;
+  personas: number;
+  estado: EstadoReserva;
+  pago: EstadoPago;
+  ninos?: Nino[];
+}
+
+/** Una sesión con quién va: la vista del calendario del equipo. */
+export interface SesionAdmin {
+  sesion: Sesion;
+  tipo: TipoExperiencia;
+  titulo: string;
+  slug: string | null;
+  /** Por persona; null = sin precio publicado ("Info DM"). */
+  precio: number | null;
+  etiquetaPrecio: string | null;
+  reservaEnLinea: boolean;
+  /** Lugares ocupados por reservas confirmadas y apartados vigentes. */
+  ocupados: number;
+  asistentes: Asistente[];
+}
+
+export interface ClaseMembresia {
+  numero: number;
+  sesion: SesionReservada | null;
+  estado: 'utilizada' | 'reservada' | 'disponible';
+}
+
+export interface MembresiaAdmin {
+  reserva: Reserva;
+  mes: string;
+  clases: ClaseMembresia[];
+  utilizadas: number;
+  reservadas: number;
+  restantes: number;
+}
+
+export interface ClienteAdmin {
+  email: string;
+  nombre: string;
+  telefono: string;
+  tieneCuenta: boolean;
+  reservas: number;
+  pagado: number;
+  ultima: string | null;
+  demo: boolean;
+}
+
+export interface ResumenAdmin {
+  reservasHoy: number;
+  personasHoy: number;
+  proximos7: number;
+  ingresosConfirmados: number;
+  pagosPendientes: number;
+  cupoBajo: number;
+  ultimas: Reserva[];
+  hoy: SesionAdmin[];
+}
+
+/** Reserva registrada por el equipo (p. ej. un taller "Info DM" apartado por mensaje). */
+export interface SolicitudManual {
+  sesionId: string;
+  participantes: number;
+  contacto: Contacto;
+  /** El equipo captura el importe: los talleres "Info DM" no tienen precio publicado. */
+  total: number;
+  metodoPago: MetodoPago;
+  pagado: boolean;
+  referenciaPago: string;
+  notasInternas: string;
+  ninos?: Nino[];
+  avisarCliente: boolean;
 }

@@ -70,7 +70,9 @@ src/
     secciones/              Ubicacion, Comunidad
     Header, MobileMenu, Footer, Hero, EditorialGallery, ExperienceCard,
     WorkshopCard, ProductCard, Testimonial, SectionHeading
-  paginas/                  una por ruta; el panel sigue en paginas/admin
+  paginas/                  una por ruta
+    panel/                  panel del equipo (/admin) sobre el mismo repositorio
+    admin/                  panel anterior, solo con VITE_FUENTE_DATOS=supabase
 ```
 
 - **React + TypeScript + Vite + Tailwind + Framer Motion** (con `LazyMotion`
@@ -109,6 +111,28 @@ src/
 - Mientras la fuente sea `demo`, todas las páginas llevan `noindex`.
 - Cuenta de demostración (membresía a la mitad): `ana@demo.casanuma.mx` ·
   `numa2026`.
+
+## 7b. Panel del equipo (`/admin`)
+
+Entrar: `/admin` pide correo y contraseña de una cuenta con rol admin; una
+cuenta de clienta se rechaza. En la demo: `equipo@demo.casanuma.mx` ·
+`numa-admin`.
+
+| Ruta | Para qué |
+|---|---|
+| `/admin` | Resumen: reservas hoy, personas hoy, próximos 7 días, ingresos confirmados, pagos pendientes, cupo bajo, últimas reservas, avisos. |
+| `/admin/reservas` | Tabla Folio · Cliente · Experiencia · Fecha · Hora · Personas · Total · Pago · Estado. Filtros (hoy, mañana, semana, fecha, experiencia, taller, estado, pago) y búsqueda por nombre, teléfono, correo o folio. |
+| `/admin/reservas/:id` | Detalle: cliente, experiencia, pago (subtotal, total, método, referencia), estado, notas internas, avisos enviados. Registrar pago, completar, cancelar, reembolsar. |
+| `/admin/reservas/nueva` | Reserva registrada por el equipo (transferencia, efectivo). |
+| `/admin/calendario` | Agenda por día con ocupación; cupo solo si es real, «Agotado» al llenarse, lista de asistentes. |
+| `/admin/talleres` | Cupo por sesión (talleres, NUMA Kids, membresía). Vacío = «Cupo limitado». |
+| `/admin/membresias` | 4 clases: utilizadas, reservadas, restantes. |
+| `/admin/clientes`, `/admin/pagos`, `/admin/avisos` | Clientes, pagos y los correos/WhatsApp que se enviarían. |
+
+El panel se actualiza solo: una reserva hecha en el sitio aparece en la
+tabla sin recargar (en la demo, entre pestañas del mismo navegador).
+Las reservas de ejemplo llevan la marca **DEMO**; los cupos de ejemplo no
+existen: todo cupo es «por confirmar» hasta que el equipo lo capture.
 
 ## 8. Pendientes de Casa Numa
 

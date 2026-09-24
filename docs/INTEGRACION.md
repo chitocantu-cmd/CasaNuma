@@ -1,47 +1,146 @@
 # Conectar el sitio rediseñado al backend real
 
-El sitio habla con los datos a través de un solo contrato:
-`src/datos/repositorio.ts`. Hoy lo cumple `src/datos/demo/repoDemo.ts`.
-Para producción hay que escribir `src/datos/supabase/repoSupabase.ts` y
-elegirlo en `src/datos/index.ts` cuando `VITE_FUENTE_DATOS=supabase`.
+El sitio habla con los datos a través de dos contratos en
+`src/datos/repositorio.ts`:
 
-Ningún componente cambia. Las reglas que la demo ya aplica (precio desde el
-catálogo, cupo verificado al apartar, 4 clases del mismo mes, edad mínima 7,
-apartado de 15 minutos) son las que el backend debe hacer cumplir en SQL.
+- `Repositorio`: sitio público y Mi cuenta.
+- `RepositorioAdmin`: panel `/admin`.
+
+Hoy los dos los cumple `src/datos/demo/repoDemo.ts`, con datos en el
+navegador. Para producción hay que escribir `src/datos/supabase/repoSupabase.ts`
+y elegirlo en `src/datos/index.ts` cuando `VITE_FUENTE_DATOS=supabase`.
+Ningún componente cambia.
+
+## El flujo de una reserva (igual en la demo y en el backend)
+
+1. **Apartar.** Se revisa el cupo *en el backend*, con las filas de las
+   sesiones bloqueadas, y se crea la reserva en `pending_payment` con
+   vencimiento (15 min en la web). El lugar ya no está disponible para nadie más.
+2. **Pagar.** El proveedor de pago confirma (webhook de Stripe →
+   `confirmar_pago`). El cupo **se vuelve a revisar** antes de confirmar; si
+   el apartado venció y alguien tomó el lugar, el pago queda en revisión y la
+   reserva **no** se confirma.
+3. **Confirmada.** La base asigna el folio consecutivo (`NUMA-00001`…) y
+   encola los avisos: correo a la clienta, correo al equipo
+   (`ADMIN_NOTIFICATION_EMAIL`) y WhatsApp al equipo (API oficial).
+4. La reserva aparece al instante en `/admin/reservas` y en Mi cuenta.
+
+Una reserva **no** está confirmada hasta que el proveedor de pago la confirma
+(o el equipo registra un pago en el panel).
 
 ## Qué ya existe en `supabase/`
 
-- `workshops` + vista `public_workshops` (cupo ya descontado).
-- `crear_reserva()` atómica, `create-reservation`, `create-checkout-session`,
-  `stripe-webhook` (única vía a `confirmed`), `reservation-status`.
-- Holds con vencimiento, cron, correos (Resend), Google Calendar, panel.
-- `site_settings` para WhatsApp, dirección, mapa y horarios.
+Migraciones v1 (en producción):
 
-## Qué falta, método por método
+- `workshops` + vista `public_workshops`, `crear_reserva()` atómica,
+  `create-reservation`, `create-checkout-session`, `stripe-webhook`,
+  `reservation-status`, holds con vencimiento, cron, correos (Resend),
+  Google Calendar, `admin_profiles` + `es_admin()` + RLS.
+
+Migraciones v2 (`20260924100000_estados_v2.sql`, `20260924100100_reservas_v2.sql`,
+`20260924100200_catalogo_agenda.sql`): **aplicadas a la base real el 24 sep 2026**.
+El sitio todavía no las usa: sigue en modo demo hasta el paso 5.
+
+| Entidad pedida | Tabla |
+|---|---|
+| users | `auth.users` (Supabase Auth) + `customers.user_id` + `admin_profiles` (rol admin) |
+| workshops | `workshops` (catálogo: título, descripción, foto, categoría) |
+| workshop_sessions | `workshop_sessions` — fecha, hora, `capacity` (NULL = sin confirmar), `price` (NULL = Info DM), tipo `taller` / `kids` / `membresia` |
+| reservations | `reservations` + `folio`, `experience_type`, `user_id`, `origin` (web/panel), `internal_notes` |
+| reservation_items | `reservation_items` — qué sesiones ocupa cada reserva |
+| payments | `payments` + `method` (tarjeta/transferencia/efectivo/otro) y `reference` |
+| memberships | `memberships` + `membership_plans` (4 clases, $3,200) + vista `membership_usage` (utilizadas/reservadas/restantes) |
+| NUMA Kids | `reservation_children` — **solo** nombre y edad; el tutor es el cliente |
+
+Estados: `pending_payment`, `confirmed`, `cancelled`, `completed`,
+`refunded`, `no_show` (y `expired` para apartados vencidos).
+
+Funciones (solo las llama el backend con `service_role`; el navegador no):
+
+- `crear_reserva_sesiones(tipo, sesiones[], personas, nombre, correo, teléfono, niños, usuario, origen)`
+- `confirmar_pago(...)`: misma firma que v1, ahora revalida por sesión.
+- `registrar_pago_manual(reserva, monto, método, referencia)`: transferencia o efectivo desde el panel.
+- `admin_actualizar_reserva(reserva, 'completed' | 'no_show', nota)`.
+- `datos_reserva(reserva)`: lo que usan los correos y el WhatsApp.
+- `siguiente_folio()` + trigger `asignar_folio`: ningún camino confirma sin folio.
+
+Pruebas: `npm run test:reservas` (65 pruebas, fechas relativas a hoy:
+cupo, AGOTADO, pago tardío, folio, membresía, NUMA Kids, panel y RLS).
+`npm test` (v1) tiene una semilla con fechas de septiembre de 2026 que ya
+pasaron; falla por eso, no por la v2.
+
+### Para activar v2
+
+1. Borrar los datos de ejemplo (`node dev/admin-db.mjs limpiar`), aplicar
+   las migraciones v2 en el SQL Editor —una por una, en orden— y regresar
+   el folio a cero (`node dev/admin-db.mjs folio-cero`). *Hecho el 24 sep 2026
+   (`estados_v2` y `reservas_v2`).*
+2. Aplicar `20260924100200_catalogo_agenda.sql` (cupo y hora de cierre
+   opcionales en `workshops`) y cargar la agenda:
+   `node dev/cargar-agenda.mjs` (simula) → `node dev/cargar-agenda.mjs --aplicar`.
+   La agenda (`src/datos/agenda.ts`) es la única fuente de fechas: talleres,
+   NUMA Kids (Tardes de Cerámica · Niños) y clases de membresía (Clases de
+   Cerámica). Agrega lo que falta, llena precios u horas vacías, cierra lo
+   que ya no está publicado (sin reservas vivas) y oculta los ejemplos; no
+   borra nada y nunca toca el cupo. *Octubre completo cargado el 24 sep 2026
+   (29 horarios).*
+   PENDIENTE: `crear_reserva_sesiones` exige edad ≥ 7 en NUMA Kids; el sitio
+   ya usa 10 a 14 años (Word de octubre). Se ajusta con la migración de las
+   funciones del servidor.
+3. Cambiar `create-reservation` para que llame `crear_reserva_sesiones`, y
+   **retirar** `crear_reserva` v1: las dos no deben aceptar reservas del mismo
+   taller a la vez, porque cada una cuenta su propio cupo.
+4. Configurar `ADMIN_NOTIFICATION_EMAIL` (y, si se quiere, WhatsApp).
+5. Escribir `repoSupabase.ts` y cambiar `VITE_FUENTE_DATOS=supabase`.
+
+## Método por método
 
 | Método | Hoy (demo) | Con Supabase |
 |---|---|---|
-| `talleres()` / `taller(slug)` | `src/datos/agenda.ts` (datos reales) | `public_workshops`. Cada registro de `agenda.ts` ya tiene la forma de la fila: `id, slug, title, description, date, sessions, category, image, price, price_type, price_label, capacity/available_spots/is_sold_out (por sesión), age_min, age_max, is_featured, is_active, booking_type`. Hoy la tabla es una fila por fecha y horario; para «un taller, varios horarios» agregar `workshop_sessions` o una columna `grupo`. `capacity`, `price` y `end_time` deben aceptar `null` (dato no publicado). |
-| `mesesMembresia()` | generado | **Nuevo:** tabla `class_sessions` (`tipo` = `membresia`/`kids`, fecha, inicio, fin, `capacity`, `status`) + vista pública con disponibles. |
-| `sesionesKids()` | generado | `class_sessions` con `tipo = 'kids'`. |
-| `productos()` / `producto(slug)` | `PRODUCTOS_SEMILLA` | **Nuevo:** tabla `products` (fotos en Cloudinary, `published`, `disponibilidad`) + vista pública. |
-| `apartar(solicitud)` | valida y guarda en localStorage | Extender `create-reservation`: para membresía y kids, **nuevo** RPC que bloquee las N sesiones con `FOR UPDATE` en orden fijo (evita deadlocks), valide 4 sesiones del mismo mes / edad ≥ 7, calcule el precio en SQL y cree la reserva con una tabla puente `reservation_sessions`. |
-| `pagar(id)` | confirma al instante | `create-checkout-session` → devolver `{ tipo: 'redireccion', url }`. El webhook confirma; la vuelta llega a `/pago/exitoso` (ya existe). |
-| `liberar(id)` | marca expirada | RPC que expire el hold propio (opcional: el cron ya lo hace). |
-| `misReservas()` | por usuario | **Nuevo:** vista `mis_reservas` filtrada por `auth.uid()` con RLS. |
-| `registrar` / `entrar` / `salir` | localStorage | Supabase Auth. **Hoy los registros públicos están desactivados a propósito** (solo el equipo tiene cuenta): hay que habilitarlos, confirmar correo, y ligar `customers.user_id → auth.users`. El panel sigue exigiendo `admin_profiles`. |
-| `recuperarPassword` | simulado | `supabase.auth.resetPasswordForEmail` + página de nueva contraseña. |
-| `actualizarPerfil` | localStorage | `update customers` con RLS sobre la propia fila. |
-| `suscribirNovedades` | localStorage | **Nuevo:** tabla `newsletter_subscribers` (correo, fecha y origen del consentimiento, baja). Independiente de la cuenta. |
+| `talleres()` / `taller(slug)` | `src/datos/agenda.ts` | `workshops` + `public_sessions` (lugares disponibles; NULL si el cupo no está confirmado). |
+| `mesesMembresia()` / `sesionesKids()` | filas de la agenda (Clases de Cerámica / Tardes de Cerámica · Niños) | `public_sessions` con `experience_type = 'membresia'` / `'kids'`. |
+| `disponibilidad(ids)` | cuenta en el navegador | `public_sessions.seats_available`. |
+| `apartar(solicitud)` | valida y guarda | `create-reservation` → `crear_reserva_sesiones`. |
+| `pagar(id)` | confirma al instante (DEMO) | `create-checkout-session` → `{ tipo: 'redireccion', url }`. El webhook confirma. |
+| `misReservas()` | por usuario | `select` sobre `reservations` con la sesión de la clienta: el RLS solo deja ver las suyas. |
+| `registrar` / `entrar` / `salir` | localStorage | Supabase Auth. Hoy los registros públicos están desactivados a propósito; habilitarlos y confirmar correo. |
+| `productos()` / `producto(slug)` | `PRODUCTOS_SEMILLA` | **Nuevo:** tabla `products`. |
+| `suscribirNovedades` | localStorage | **Nuevo:** tabla `newsletter_subscribers`. |
+
+Panel (`RepositorioAdmin`):
+
+| Método | Con Supabase |
+|---|---|
+| `entrarAdmin` / `adminActual` | Supabase Auth + fila en `admin_profiles`. Una clienta no entra. |
+| `resumen`, `reservas`, `reserva` | `select` con RLS de admin sobre `reservations`, `customers`, `payments`, `reservation_items`, `workshop_sessions`. |
+| `actualizarReserva` | Edge Function `admin-actions` → `admin_actualizar_reserva`, `cancelar_reserva`, `registrar_reembolso`, `registrar_pago_manual`. |
+| `crearReservaManual` | `admin-actions` → `crear_reserva_sesiones(..., origen = 'panel')` (+ `registrar_pago_manual` si ya pagó). |
+| `agenda(mes)`, `talleres()` | `workshop_sessions` + `lugares_ocupados_sesion`. |
+| `ajustarCupo` | `update workshop_sessions set capacity` (política de admin). |
+| `membresias()` | `membership_usage`. |
+| `avisos()` | `integration_jobs` (estado de cada correo / WhatsApp). |
+
+## Avisos
+
+- **Correo al equipo:** `ADMIN_NOTIFICATION_EMAIL`. Asunto
+  `Nueva reserva Casa Numa — {experiencia} — {DD Mmm}`, con cliente,
+  teléfono, correo, experiencia, fecha, hora, participantes, total, estado,
+  folio y botón **Ver reservación** (`APP_URL/admin/reservas/{id}`). Vacío a
+  propósito hasta que Casa Numa dé el correo: no se inventa.
+- **Correo a la clienta:** confirmación con folio y enlace a Mi cuenta.
+- **WhatsApp al equipo:** `supabase/functions/_shared/whatsapp.ts`, API de
+  WhatsApp Business Cloud con plantilla aprobada por Meta. No es un enlace
+  `wa.me`. Sin configurar, se omite sin error.
 
 ## Agenda sin precio o sin cupo
 
-- `price: null` + `booking_type: 'inquiry'` → la tarjeta muestra
-  `price_label` («Info DM») y un botón de «Solicitar información» (WhatsApp o
-  mensaje directo de Instagram). `create-reservation` debe rechazar estos
-  talleres aunque alguien llame a la función a mano.
-- `capacity: null` → «Cupo limitado»; no se cuenta cupo ni se rechaza por
-  lleno. En cuanto haya número, el conteo transaccional existente aplica.
+- `price: null` → «Info DM» y botón de «Solicitar información».
+  `crear_reserva_sesiones` rechaza esas sesiones aunque alguien llame a la
+  función a mano.
+- `capacity: null` → «Cupo limitado»; no se cuenta cupo, solo el tope por
+  reserva (6, pendiente de confirmar). En cuanto haya número, el conteo
+  transaccional aplica y el sitio muestra «Solo quedan N lugares» y
+  «Agotado».
 
 ## Configuración
 
@@ -49,14 +148,8 @@ apartado de 15 minutos) son las que el backend debe hacer cumplir en SQL.
 `site_settings`, basta con un hook que lea esa tabla y tenga prioridad
 sobre las variables.
 
-## Panel administrativo
-
-Para lo que pide el documento (sección 9) faltan pantallas de: sesiones de
-membresía y NUMA Kids (crear, cupo, bloquear fechas), membresías vendidas,
-productos de NUMA Store (crear, editar, marcar agotado) y testimonios.
-El panel actual ya cubre talleres, reservaciones, pagos y prospectos.
-
 ## Datos personales de menores
 
-NUMA Kids guarda nombre y edad de cada niño. Pedir solo eso, dejarlo fuera
-de cualquier vista pública y mencionarlo en el aviso de privacidad.
+NUMA Kids guarda solo nombre y edad de cada niño (la tabla no tiene más
+columnas). Fuera de cualquier vista pública; mencionarlo en el aviso de
+privacidad.

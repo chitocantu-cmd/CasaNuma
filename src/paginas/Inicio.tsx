@@ -14,7 +14,7 @@ import { Icono } from '../componentes/base/Iconos';
 import CeramicShape from '../componentes/marca/CeramicShape';
 import { PORTAFOLIO } from '../contenido/portafolio';
 import { TESTIMONIOS } from '../contenido/testimonios';
-import { MEMBRESIA, KIDS } from '../contenido/oferta';
+import { EDADES_KIDS, MEMBRESIA } from '../contenido/oferta';
 import { mostrarPendientes } from '../config/site';
 import { useProductos, useTalleres } from '../datos/hooks';
 import { pesosCortos } from '../lib/formato';
@@ -119,7 +119,7 @@ export default function Inicio() {
               <ExperienceCard
                 numero="03" titulo="NUMA Kids"
                 frase="Pequeñas manos, grandes creaciones."
-                detalle={`A partir de ${KIDS.edadMinima} años`} cta="Ver talleres infantiles" to="/numa-kids"
+                detalle={`De ${EDADES_KIDS}`} cta="Ver talleres infantiles" to="/numa-kids"
                 foto="exp-kids" silueta="tarro"
               />
             </Revelar>

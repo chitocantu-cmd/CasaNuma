@@ -16,9 +16,9 @@ import CeramicShape from '../../componentes/marca/CeramicShape';
 
 const TIPO: Record<Reserva['tipo'], string> = { taller: 'Taller', membresia: 'Membresía', kids: 'NUMA Kids' };
 const ESTADO: Record<Reserva['estado'], string> = {
-  confirmada: 'Confirmada', pendiente_pago: 'Pendiente de pago', cancelada: 'Cancelada', expirada: 'Expirada',
+  confirmada: 'Confirmada', pendiente_pago: 'Pendiente de pago', cancelada: 'Cancelada', completada: 'Completada', expirada: 'Expirada',
 };
-const PAGO: Record<Reserva['pago'], string> = { pagado: 'Pagado', pendiente: 'Pendiente', reembolsado: 'Reembolsado' };
+const PAGO: Record<Reserva['pago'], string> = { pagado: 'Pagado', pendiente: 'Pendiente', reembolsado: 'Reembolsado', fallido: 'Rechazado' };
 
 interface Fila {
   reserva: Reserva;
@@ -35,7 +35,7 @@ export default function Cuenta() {
   if (cargando) return <div className="min-h-[80vh]" aria-busy="true" />;
   if (!usuario) return <Navigate to="/cuenta/entrar" replace state={{ desde: '/cuenta' }} />;
 
-  const activas = (reservas ?? []).filter((r) => r.estado === 'confirmada' || r.estado === 'pendiente_pago');
+  const activas = (reservas ?? []).filter((r) => ['confirmada', 'pendiente_pago', 'completada'].includes(r.estado));
   const filas: Fila[] = activas.flatMap((r) =>
     r.sesiones.map((s, i) => ({ reserva: r, sesion: s, numero: r.sesiones.length > 1 ? `${i + 1}/${r.sesiones.length}` : undefined })),
   );
@@ -71,7 +71,8 @@ export default function Cuenta() {
         <div className="space-y-20 lg:col-span-7">
           {/* Próximas experiencias */}
           <section id="proximas" aria-labelledby="c-proximas" className="scroll-mt-28">
-            <h2 id="c-proximas" className="font-display text-t3 font-light">Próximas experiencias</h2>
+            <p className="eyebrow text-cafe/55">Mis reservas</p>
+            <h2 id="c-proximas" className="mt-2 font-display text-t3 font-light">Próximas</h2>
             {reservas === null ? (
               <div className="mt-6 h-32" aria-busy="true" />
             ) : proximas.length === 0 ? (
@@ -152,12 +153,15 @@ function FilaReserva({ fila: { reserva: r, sesion: s, numero } }: { fila: Fila }
       <div className="min-w-0">
         <p className="eyebrow text-[0.58rem] text-cafe/60">
           {TIPO[r.tipo]}{numero ? ` · clase ${numero}` : ''}
+          <span className="ml-2 text-cafe">{r.folio ?? 'Pago en proceso'}</span>
         </p>
         <p className="mt-1 font-display text-t4 font-light">{r.titulo}</p>
         <p className="mt-1 text-nota text-cafe/70 first-letter:uppercase">
           {fechaCompleta(s.fecha)} · {rango(s.inicio, s.fin)}
         </p>
-        {r.ninos && <p className="mt-1 text-[0.74rem] text-cafe/60">{r.ninos.map((n) => n.nombre).join(', ')}</p>}
+        <p className="mt-1 text-[0.74rem] text-cafe/60">
+          {r.ninos?.length ? r.ninos.map((n) => n.nombre).join(', ') : `${r.participantes} ${r.participantes === 1 ? 'persona' : 'personas'}`}
+        </p>
       </div>
       <div className="col-span-2 flex flex-wrap gap-2 sm:col-span-1 sm:flex-col sm:items-end">
         <span className={`eyebrow rounded-full px-2.5 py-1 text-[0.55rem] ${pendiente ? 'bg-naranja/20' : 'bg-verde/25'}`}>{ESTADO[r.estado]}</span>
@@ -212,7 +216,7 @@ function TarjetaMembresia({ reserva: r }: { reserva: Reserva }) {
           </ul>
         </>
       )}
-      <p className="mt-6 text-[0.72rem] text-crema/55">{pesosCortos(r.precioUnitario)} · {r.codigo}</p>
+      <p className="mt-6 text-[0.72rem] text-crema/55">{pesosCortos(r.precioUnitario)} · {r.folio ?? 'Pago en proceso'}</p>
       <Link to="/membresia/reservar" className="subrayado-fijo mt-5 inline-block pb-0.5 text-[0.78rem]">Reservar el siguiente mes</Link>
     </div>
   );

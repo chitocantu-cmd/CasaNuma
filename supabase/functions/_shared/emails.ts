@@ -35,6 +35,14 @@ export function pesos(monto: number | string, moneda = 'MXN'): string {
 }
 
 export interface DatosReserva {
+  /** Presentes desde reservas v2 (datos_reserva). */
+  id?: string;
+  folio?: string | null;
+  experience_type?: 'taller' | 'kids' | 'membresia';
+  paid?: boolean;
+  sessions?: { date: string; start_time: string; end_time: string | null }[];
+  children?: { name: string; age: number }[];
+
   reservation_code: string;
   quantity: number;
   total_amount: string | number;
@@ -43,7 +51,7 @@ export interface DatosReserva {
   customer: { full_name: string; email: string; phone: string | null };
   workshop: {
     slug: string; title: string; date: string;
-    start_time: string; end_time: string;
+    start_time: string; end_time: string | null;
     timezone: string | null; location: string | null;
   };
 }
@@ -58,6 +66,37 @@ export interface DatosLead {
 }
 
 export interface Correo { para: string; asunto: string; html: string; texto: string }
+
+/** "03 Oct" — para asuntos cortos. */
+export function fechaCorta(iso: string): string {
+  const [, m, d] = iso.split('-').map(Number);
+  const mes = MESES[m - 1].slice(0, 3);
+  return `${String(d).padStart(2, '0')} ${mes[0].toUpperCase()}${mes.slice(1)}`;
+}
+
+/** La hora de cierre puede no estar publicada todavía. */
+function horario(inicio: string, fin: string | null): string {
+  return fin ? `${hora12(inicio)} – ${hora12(fin)}` : hora12(inicio);
+}
+
+/** Filas de fecha/hora: una sesión, o la lista de clases de la membresía. */
+function cuando(r: DatosReserva): [string, string][] {
+  const sesiones = r.sessions?.length ? r.sessions : [{ date: r.workshop.date, start_time: r.workshop.start_time, end_time: r.workshop.end_time }];
+  if (sesiones.length === 1) {
+    return [['Fecha', fechaLarga(sesiones[0].date)], ['Hora', horario(sesiones[0].start_time, sesiones[0].end_time)]];
+  }
+  return sesiones.map((x, i) => [`Clase ${i + 1}`, `${fechaLarga(x.date)} · ${hora12(x.start_time)}`]);
+}
+
+function participantes(r: DatosReserva): [string, string][] {
+  if (r.children?.length) {
+    return [
+      ['Tutor', r.customer.full_name],
+      ['Niños', r.children.map((n) => `${n.name} (${n.age} años)`).join(', ')],
+    ];
+  }
+  return [['Participantes', String(r.quantity)]];
+}
 
 // ---------------------------------------------------------------------------
 // Envoltura visual
@@ -93,65 +132,80 @@ const TABLA_INI = `<table role="presentation" width="100%" cellpadding="0" cells
 // Confirmación al cliente
 // ---------------------------------------------------------------------------
 export function confirmacion(r: DatosReserva, appUrl: string): Correo {
-  const lugares = `${r.quantity} ${r.quantity === 1 ? 'lugar' : 'lugares'}`;
   const total = pesos(r.total_amount, r.currency);
-  const horario = `${hora12(r.workshop.start_time)} – ${hora12(r.workshop.end_time)}`;
+  const folio = r.folio ?? r.reservation_code;
+  const filas: [string, string][] = [
+    ['Folio', folio],
+    ['Experiencia', r.workshop.title],
+    ...cuando(r),
+    ...participantes(r),
+    ['Total', total],
+  ];
 
   return {
     para: r.customer.email,
-    asunto: 'Tu reservación en Casa Numa está confirmada',
+    asunto: `Tu lugar en Casa Numa está reservado — ${folio}`,
     html: envoltura(`
       <p style="margin:0 0 8px;font-size:19px;font-weight:600;">Hola ${r.customer.full_name},</p>
-      <p style="margin:0 0 24px;">Tu reservación está confirmada.</p>
+      <p style="margin:0 0 24px;">¡Tu lugar está reservado! Guarda tu folio: con él te ubicamos al llegar.</p>
       ${TABLA_INI}
-        ${fila('Taller', r.workshop.title)}
-        ${fila('Fecha', fechaLarga(r.workshop.date))}
-        ${fila('Horario', horario)}
-        ${fila('Lugares', lugares)}
-        ${fila('Total', total)}
-        ${fila('Código', r.reservation_code)}
+        ${filas.map(([k, v]) => fila(k, v)).join('')}
       </table>
       ${r.workshop.location ? `<p style="margin:0 0 24px;color:#5C554C;">${r.workshop.location}</p>` : ''}
       <p style="margin:0 0 24px;">
-        <a href="${appUrl}/reserva/${r.reservation_code}" style="display:inline-block;background:#C76749;color:#FBF9F5;text-decoration:none;padding:12px 24px;font-weight:600;">Agregar a mi calendario</a>
+        <a href="${appUrl}/cuenta" style="display:inline-block;background:#C76749;color:#FBF9F5;text-decoration:none;padding:12px 24px;font-weight:600;">Ver mis reservas</a>
       </p>
       <p style="margin:0;color:#5C554C;">Te esperamos en Casa Numa.</p>
     `),
     texto: [
       `Hola ${r.customer.full_name},`, '',
-      'Tu reservación está confirmada.', '',
-      r.workshop.title,
-      fechaLarga(r.workshop.date),
-      horario,
-      `${lugares}`, '',
-      `Total: ${total}`,
-      `Código: ${r.reservation_code}`, '',
-      `Agrégalo a tu calendario: ${appUrl}/reserva/${r.reservation_code}`, '',
+      '¡Tu lugar está reservado!', '',
+      ...filas.map(([k, v]) => `${k}: ${v}`), '',
+      `Mis reservas: ${appUrl}/cuenta`, '',
       'Te esperamos en Casa Numa.',
     ].join('\n'),
   };
 }
 
 // ---------------------------------------------------------------------------
-export function avisoAdminReserva(r: DatosReserva, para: string): Correo {
-  const wa = (r.customer.phone ?? '').replace(/\D/g, '');
+/**
+ * Aviso al equipo (ADMIN_NOTIFICATION_EMAIL). Pensado para que Casa Numa
+ * pueda contestar "sí, ya veo tu reserva" sin buscar transferencias ni
+ * capturas: todo lo necesario está en el correo y el botón abre la reserva
+ * en el panel.
+ */
+export function avisoAdminReserva(r: DatosReserva, para: string, appUrl = ''): Correo {
+  const primera = r.sessions?.[0]?.date ?? r.workshop.date;
+  const pagado = r.paid ?? true;
+  const filas: [string, string][] = [
+    ['Cliente', r.customer.full_name],
+    ['Teléfono', r.customer.phone ?? '—'],
+    ['Correo', r.customer.email],
+    ['Experiencia', r.workshop.title],
+    ...cuando(r),
+    ...participantes(r),
+    ['Total', pesos(r.total_amount, r.currency)],
+    ['Estado', pagado ? 'PAGADO' : 'PAGO PENDIENTE'],
+    ['Folio', r.folio ?? r.reservation_code],
+  ];
+  const enlace = appUrl && r.id ? `${appUrl}/admin/reservas/${r.id}` : '';
+
   return {
     para,
-    asunto: `Nueva reserva · ${r.workshop.title} · ${r.customer.full_name} (${r.quantity})`,
+    asunto: `Nueva reserva Casa Numa — ${r.workshop.title} — ${fechaCorta(primera)}`,
     html: envoltura(`
-      <p style="margin:0 0 24px;font-size:19px;font-weight:600;">Nueva reservación pagada</p>
+      <p style="margin:0 0 24px;font-size:19px;font-weight:600;">Nueva reservación confirmada</p>
       ${TABLA_INI}
-        ${fila('Taller', r.workshop.title)}
-        ${fila('Fecha', fechaLarga(r.workshop.date))}
-        ${fila('Cliente', r.customer.full_name)}
-        ${fila('Lugares', String(r.quantity))}
-        ${fila('Total', pesos(r.total_amount, r.currency))}
-        ${fila('Código', r.reservation_code)}
+        ${filas.map(([k, v]) => fila(k, v)).join('')}
       </table>
-      ${wa ? `<p style="margin:0;"><a href="https://wa.me/${wa}" style="color:#C76749;">Escribir por WhatsApp</a> &nbsp;·&nbsp; ${r.customer.email}</p>` : `<p style="margin:0;">${r.customer.email}</p>`}
-      ${r.companions ? `<p style="margin:16px 0 0;color:#5C554C;">Acompañantes: ${r.companions}</p>` : ''}
+      ${r.companions ? `<p style="margin:0 0 20px;color:#5C554C;">Acompañantes: ${r.companions}</p>` : ''}
+      ${enlace ? `<p style="margin:0;"><a href="${enlace}" style="display:inline-block;background:#27231F;color:#FBF9F5;text-decoration:none;padding:12px 24px;font-weight:600;">Ver reservación</a></p>` : ''}
     `),
-    texto: `Nueva reservación pagada\n\n${r.workshop.title}\n${fechaLarga(r.workshop.date)}\n${r.customer.full_name} — ${r.quantity}\n${pesos(r.total_amount, r.currency)}\n${r.reservation_code}\n${r.customer.email} · ${r.customer.phone ?? ''}`,
+    texto: [
+      'Nueva reservación confirmada.', '',
+      ...filas.map(([k, v]) => `${k}: ${v}`),
+      ...(enlace ? ['', `Ver reservación: ${enlace}`] : []),
+    ].join('\n'),
   };
 }
 

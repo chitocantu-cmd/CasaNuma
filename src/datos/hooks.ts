@@ -56,7 +56,7 @@ export function useConsulta<T>(clave: string | null, cargar: () => Promise<T>): 
 /** Tras reservar, lo que dependía del cupo debe volver a pedirse. */
 export function invalidarCupos() {
   for (const k of [...cache.keys()]) {
-    if (/^(talleres|taller:|membresia|kids|reservas)/.test(k)) cache.delete(k);
+    if (/^(talleres|taller:|membresia|kids|reservas|admin)/.test(k)) cache.delete(k);
   }
 }
 

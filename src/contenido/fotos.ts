@@ -15,7 +15,12 @@ import type { NombreSilueta } from '../componentes/marca/trazos';
 //     silueta NUMA. Así ninguna foto ajena se presenta como de Casa Numa.
 // ===========================================================================
 
-/** Recortes de las fotos del brandbook, en /public/fotos/referencia. */
+/**
+ * Fotos de referencia, en /public/fotos/referencia: recortes del brandbook e
+ * imágenes de inspiración que mandó Casa Numa (WeTransfer "web-numa", 24 sep
+ * 2026; `pin-*`). Ninguna es obra de Casa Numa: se muestran con la etiqueta
+ * "Referencia" y solo mientras `mostrarPendientes` esté activo.
+ */
 export const REFERENCIAS = {
   'mesa-piezas': [640, 1280, 1920],
   'manos-amasando': [640, 1280, 1920],
@@ -24,6 +29,25 @@ export const REFERENCIAS = {
   esmaltes: [640, 1280, 1920],
   'manos-pieza': [640, 1280, 1920],
   'mano-interior': [640, 1280, 1920],
+  'pin-taza-boo': [736],
+  'pin-taza-calabaza': [736],
+  'pin-taza-muertos': [736],
+  'pin-calabaza-blanca': [736],
+  'pin-calabazas-luz': [736],
+  'pin-calabazas-apiladas': [736],
+  'pin-calabazas-piedras': [736],
+  'pin-pintar-calabazas': [736],
+  'pin-lamparas-focos': [736],
+  'pin-lamparas-azules': [736],
+  'pin-lampara-gato': [736],
+  'pin-botes': [736],
+  'pin-juego-sake': [736],
+  'pin-organizador': [683],
+  'pin-jarrones': [736],
+  'pin-esculturas': [500],
+  'pin-bases': [640],
+  'pin-plato-lunares': [736],
+  'pin-tazas-ninos': [736],
 } as const;
 
 export type Referencia = keyof typeof REFERENCIAS;
@@ -33,8 +57,13 @@ export interface EntradaFoto {
   alt: string;
   /** Qué debe mostrar la foto definitiva. */
   encuadre: string;
-  /** Foto definitiva de Casa Numa. */
+  /**
+   * Foto definitiva de Casa Numa. Con `anchos`, es la ruta base en /public
+   * sin el sufijo: '/fotos/talleres/taza-van-gogh' → taza-van-gogh-1280.webp.
+   * Sin `anchos`, una ruta o URL completa (p. ej. Cloudinary).
+   */
   src?: string;
+  anchos?: readonly number[];
   referencia?: Referencia;
   tono?: Tono;
   silueta?: NombreSilueta;
@@ -66,8 +95,8 @@ export const FOTOS = {
   },
   'exp-kids': {
     alt: 'Niñas y niños modelando barro en NUMA Kids',
-    encuadre: 'Niños de 7+ años modelando barro en la mesa, manos y caras concentradas (con permiso de sus papás). Vertical.',
-    tono: 'amarillo', silueta: 'tarro',
+    encuadre: 'Niños de 10 a 14 años modelando barro en la mesa, manos y caras concentradas (con permiso de sus papás). Vertical.',
+    referencia: 'pin-tazas-ninos', tono: 'amarillo', silueta: 'tarro',
   },
   'eventos-grupo': {
     alt: 'Grupo celebrando alrededor de la mesa de trabajo',
@@ -109,29 +138,112 @@ export const FOTOS = {
 
   // --- Talleres (agenda) ------------------------------------------------------
   'taller-tardes-ninos': {
-    alt: 'Niñas y niños trabajando barro en Tardes de Cerámica',
+    alt: 'Tazas decoradas con dibujos hechos por niños',
     encuadre: 'Niñas y niños de 10 a 14 años modelando barro en la mesa (con permiso de sus papás). Horizontal 4:3.',
-    tono: 'amarillo', silueta: 'tarro',
+    referencia: 'pin-tazas-ninos', tono: 'amarillo', silueta: 'tarro',
   },
   'taller-tardes-adultos': {
-    alt: 'Piezas de bizcochito listas para pintar',
+    alt: 'Botes de cerámica pintados a rayas y a lunares',
     encuadre: 'Mesa de una tarde de cerámica: piezas de bizcochito, pinceles y pinturas. Horizontal 4:3.',
-    referencia: 'esmaltes', tono: 'terracota', silueta: 'cuenco',
+    referencia: 'pin-botes', tono: 'terracota', silueta: 'cuenco',
+  },
+  'taller-tardes-adultos-2': {
+    alt: 'Juego de sake de cerámica rosa sobre charola de madera',
+    encuadre: 'Pieza terminada en una Tarde de Cerámica. Horizontal 4:3.',
+    referencia: 'pin-juego-sake', tono: 'terracota', silueta: 'jarron',
+  },
+  'taller-tardes-adultos-3': {
+    alt: 'Organizador de cerámica blanca moteada con asas',
+    encuadre: 'Pieza terminada en una Tarde de Cerámica. Horizontal 4:3.',
+    referencia: 'pin-organizador', tono: 'crema', silueta: 'cuenco',
   },
   'taller-clases': {
-    alt: 'Manos trabajando una pieza durante una clase',
+    alt: 'Jarrones de cerámica de distintas formas y colores',
     encuadre: 'Alumna trabajando su proyecto con acompañamiento, plano de manos. Horizontal 4:3.',
-    referencia: 'manos-pieza', tono: 'terracota', silueta: 'guaje',
+    referencia: 'pin-jarrones', tono: 'terracota', silueta: 'guaje',
+  },
+  'taller-clases-2': {
+    alt: 'Dos esculturas de cerámica de figuras de pie',
+    encuadre: 'Proyecto de una alumna de las Clases de Cerámica. Horizontal 4:3.',
+    referencia: 'pin-esculturas', tono: 'crema', silueta: 'botellon',
+  },
+  'taller-clases-3': {
+    alt: 'Bases de cerámica en tono arena',
+    encuadre: 'Proyecto de una alumna de las Clases de Cerámica. Horizontal 4:3.',
+    referencia: 'pin-bases', tono: 'crema', silueta: 'cuenco',
   },
   'taller-halloween': {
-    alt: 'Tazas decoradas con motivos de Halloween',
+    alt: 'Tazas decoradas con motivos de Halloween: fantasmas, arañas y una calabaza',
     encuadre: 'Tazas terminadas del taller de Halloween sobre la mesa, luz cálida. Horizontal 4:3.',
-    tono: 'naranja', silueta: 'taza',
+    referencia: 'pin-taza-boo', tono: 'naranja', silueta: 'taza', posicion: '50% 45%',
   },
   'taller-halloween-pan': {
-    alt: 'Taza de Halloween junto a un pan de muerto',
+    alt: 'Taza naranja en forma de calabaza',
     encuadre: 'Taza de Halloween recién decorada junto a un pan de muerto sobre la mesa de trabajo. Horizontal 4:3.',
-    tono: 'naranja', silueta: 'tarro',
+    referencia: 'pin-taza-calabaza', tono: 'naranja', silueta: 'tarro',
+  },
+  'taller-calabazas': {
+    alt: 'Calabaza de cerámica blanca con cara de Halloween',
+    encuadre: 'Calabazas de cerámica terminadas en el taller, luz cálida de otoño. Horizontal 4:3.',
+    referencia: 'pin-calabaza-blanca', tono: 'naranja', silueta: 'olla', posicion: '50% 55%',
+  },
+  'taller-calabazas-2': {
+    alt: 'Calabazas de cerámica iluminadas por dentro',
+    encuadre: 'Calabazas de cerámica encendidas. Horizontal 4:3.',
+    referencia: 'pin-calabazas-luz', tono: 'naranja', silueta: 'olla', posicion: '50% 60%',
+  },
+  'taller-calabazas-3': {
+    alt: 'Tres calabazas de cerámica apiladas: blanca, negra y naranja',
+    encuadre: 'Calabazas de cerámica terminadas. Horizontal 4:3.',
+    referencia: 'pin-calabazas-apiladas', tono: 'naranja', silueta: 'olla',
+  },
+  'taller-ceramica-libre': {
+    alt: 'Plato de cerámica verde a lunares con patas de colores',
+    encuadre: 'Piezas distintas hechas en una sesión de Cerámica Libre, sobre la mesa del estudio. Horizontal 4:3.',
+    referencia: 'pin-plato-lunares', tono: 'verde', silueta: 'jarron',
+  },
+  'taller-catrina': {
+    alt: 'Taza rosa decorada con una calavera de Día de Muertos',
+    encuadre: 'Taza de Catrina terminada, con flores de cempasúchil alrededor. Horizontal 4:3.',
+    referencia: 'pin-taza-muertos', tono: 'amarillo', silueta: 'taza', posicion: '50% 45%',
+  },
+  'taller-pinta-calabaza': {
+    alt: 'Calabaza de cerámica pintada con hojas de otoño durante un taller',
+    encuadre: 'Manos pintando una calabaza de cerámica con pincel fino. Horizontal 4:3.',
+    referencia: 'pin-pintar-calabazas', tono: 'naranja', silueta: 'olla', posicion: '50% 70%',
+  },
+  'taller-pinta-calabaza-2': {
+    alt: 'Calabazas pintadas de colores con piedras brillantes',
+    encuadre: 'Calabazas pintadas terminadas. Horizontal 4:3.',
+    referencia: 'pin-calabazas-piedras', tono: 'naranja', silueta: 'olla',
+  },
+  'taller-lampara': {
+    alt: 'Lámparas de cerámica con focos encendidos',
+    encuadre: 'Lámpara de cerámica terminada y encendida (el taller no incluye foco ni cableado). Vertical.',
+    referencia: 'pin-lamparas-focos', tono: 'indigo', silueta: 'botellon', posicion: '50% 60%',
+  },
+  'taller-lampara-2': {
+    alt: 'Bases de lámpara de cerámica pintadas en azul',
+    encuadre: 'Lámparas de cerámica terminadas. Horizontal 4:3.',
+    referencia: 'pin-lamparas-azules', tono: 'indigo', silueta: 'botellon',
+  },
+  'taller-lampara-3': {
+    alt: 'Lámpara de cerámica en forma de gato con estrellas rojas',
+    encuadre: 'Lámpara de cerámica terminada. Horizontal 4:3.',
+    referencia: 'pin-lampara-gato', tono: 'indigo', silueta: 'botellon',
+  },
+  'taller-van-gogh': {
+    alt: 'Taza con espirales azules en relieve inspiradas en La noche estrellada de Van Gogh',
+    encuadre: 'Taza Van Gogh terminada sobre mesa de madera.',
+    // Foto de producción de Casa Numa (agosto 2026).
+    src: '/fotos/talleres/taza-van-gogh', anchos: [640, 1280, 1920],
+    tono: 'indigo', silueta: 'taza', posicion: '50% 55%',
+  },
+  'taller-van-gogh-2': {
+    alt: 'Taza Van Gogh con espirales azules en relieve, vista de lado',
+    encuadre: 'Taza Van Gogh terminada sobre mesa de madera.',
+    src: '/fotos/talleres/taza-van-gogh-2', anchos: [640, 1280, 1920],
+    tono: 'indigo', silueta: 'taza', posicion: '50% 50%',
   },
 
   // --- NUMA Kids -----------------------------------------------------------

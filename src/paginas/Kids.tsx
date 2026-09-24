@@ -7,7 +7,7 @@ import { Icono } from '../componentes/base/Iconos';
 import { Pendiente } from '../componentes/base/Pendiente';
 import CeramicShape from '../componentes/marca/CeramicShape';
 import { sinLugar, textoLugares } from '../lib/cupo';
-import { KIDS } from '../contenido/oferta';
+import { EDADES_KIDS, KIDS } from '../contenido/oferta';
 import { useSesionesKids } from '../datos/hooks';
 import { duracionTexto, fechaCompacta, hora } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
@@ -16,7 +16,7 @@ import { useSeo } from '../lib/seo';
 // Texto: documento de contenido, sección 4.
 
 const DATOS = [
-  { k: 'Edad', v: `A partir de ${KIDS.edadMinima} años` },
+  { k: 'Edad', v: `De ${EDADES_KIDS}` },
   { k: 'Modalidad', v: 'Taller individual por sesión, no membresía' },
   { k: 'Horario', v: `${KIDS.dia} · ${hora(KIDS.inicio)}` },
   { k: 'Duración', v: duracionTexto(KIDS.duracionMin) },

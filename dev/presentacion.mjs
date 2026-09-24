@@ -50,16 +50,19 @@ await build({
 const publico = join(raiz, 'public');
 const dataUri = (ruta, tipo) => `data:${tipo};base64,${readFileSync(join(publico, ruta)).toString('base64')}`;
 
-// Foto.tsx usa el segundo tamaño de cada referencia (1280, o 810 en jarrones).
+// Foto.tsx usa el segundo tamaño de cada foto (1280, o 810 en jarrones):
+// referencias del brandbook y fotos reales de /fotos/talleres.
 const recursos = {};
-const porFoto = new Map();
-for (const archivo of readdirSync(join(publico, 'fotos', 'referencia'))) {
-  const [, nombre, ancho] = archivo.match(/^(.+)-(\d+)\.webp$/) ?? [];
-  if (nombre) porFoto.set(nombre, [...(porFoto.get(nombre) ?? []), Number(ancho)].sort((a, b) => a - b));
-}
-for (const [nombre, anchos] of porFoto) {
-  const ruta = `/fotos/referencia/${nombre}-${anchos[Math.min(1, anchos.length - 1)]}.webp`;
-  recursos[ruta] = dataUri(ruta.slice(1), 'image/webp');
+for (const carpeta of ['referencia', 'talleres']) {
+  const porFoto = new Map();
+  for (const archivo of readdirSync(join(publico, 'fotos', carpeta))) {
+    const [, nombre, ancho] = archivo.match(/^(.+)-(\d+)\.webp$/) ?? [];
+    if (nombre) porFoto.set(nombre, [...(porFoto.get(nombre) ?? []), Number(ancho)].sort((a, b) => a - b));
+  }
+  for (const [nombre, anchos] of porFoto) {
+    const ruta = `/fotos/${carpeta}/${nombre}-${anchos[Math.min(1, anchos.length - 1)]}.webp`;
+    recursos[ruta] = dataUri(ruta.slice(1), 'image/webp');
+  }
 }
 const lino = dataUri('texturas/lino.webp', 'image/webp');
 recursos['/texturas/lino.webp'] = lino;

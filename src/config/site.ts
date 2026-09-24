@@ -52,6 +52,14 @@ export const siteConfig = {
   /** PENDIENTE · horario de atención del estudio (no confundir con horarios de clase). */
   horarios: [] as Horario[],
 
+  // --- Avisos al equipo -----------------------------------------------------
+  /**
+   * PENDIENTE · correo donde el equipo recibe cada reserva confirmada.
+   * En el backend real es ADMIN_NOTIFICATION_EMAIL (secreto de Supabase); esta
+   * copia pública solo sirve para que la demo muestre a quién se enviaría.
+   */
+  correoAvisosEquipo: (env.VITE_ADMIN_NOTIFICATION_EMAIL as string | undefined) ?? '',
+
   // --- Tipografía ----------------------------------------------------------
   /**
    * ID del kit web de Adobe Fonts con Ivy Mode (p. ej. "abc1def").

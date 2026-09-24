@@ -1,5 +1,5 @@
 import type { NombreSilueta } from '../componentes/marca/trazos';
-import { KIDS, MEMBRESIA } from './oferta';
+import { EDADES_KIDS, MEMBRESIA } from './oferta';
 import { pesosCortos } from '../lib/formato';
 
 export interface ItemNav {
@@ -37,7 +37,7 @@ export const OPCIONES_RESERVA: OpcionReserva[] = [
   },
   {
     titulo: 'NUMA Kids',
-    detalle: `Jueves 5:00 p.m. · desde ${KIDS.edadMinima} años`,
+    detalle: `Jueves 5:00 p.m. · ${EDADES_KIDS}`,
     to: '/numa-kids/reservar',
     silueta: 'tarro',
     canal: 'en línea',

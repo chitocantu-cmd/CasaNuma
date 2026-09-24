@@ -9,10 +9,18 @@ import { MEMBRESIA } from '../contenido/oferta';
 import { rango } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
 import { useSeo } from '../lib/seo';
+import { horariosMembresia, type HorarioMembresia } from '../lib/talleres';
+
+/** "viernes, sábados y domingos" */
+function listaDias(hs: HorarioMembresia[]): string {
+  const dias = [...new Set(hs.map((h) => h.dia.toLowerCase()))];
+  return dias.length > 1 ? `${dias.slice(0, -1).join(', ')} y ${dias[dias.length - 1]}` : dias[0] ?? '';
+}
 
 // Texto: documento de contenido, sección 3 ("texto final").
 
 export default function Membresia() {
+  const horarios = horariosMembresia();
   useSeo({
     titulo: 'Membresía de Cerámica | Casa Numa',
     descripcion:
@@ -133,13 +141,14 @@ export default function Membresia() {
             <SectionHeading numero="03" eyebrow="Horarios" titulo={<span id="t-horarios">Elige tus horarios.</span>} tamano="t2" />
             <Revelar retraso={0.1}>
               <p className="mt-8 max-w-lectura text-cuerpo-l text-cafe/85">
-                Puedes distribuir tus cuatro clases mensuales entre viernes, sábados y domingos, según la disponibilidad de
-                lugares en cada sesión. No es necesario asistir siempre el mismo día de la semana.
+                {horarios.length > 1
+                  ? `Puedes distribuir tus cuatro clases mensuales entre ${listaDias(horarios)}, según la disponibilidad de lugares en cada sesión. No es necesario asistir siempre el mismo día de la semana.`
+                  : `Tus cuatro clases del mes son los ${horarios[0]?.dia.toLowerCase() ?? ''}: eliges cuatro de las fechas publicadas, según la disponibilidad de lugares en cada sesión.`}
               </p>
             </Revelar>
           </div>
           <div className="grid gap-4 sm:grid-cols-3 lg:col-span-6 lg:col-start-7">
-            {MEMBRESIA.horarios.map((h, i) => (
+            {horarios.map((h, i) => (
               <Revelar key={h.dia} retraso={i * 0.06}>
                 <div className={`flex h-full flex-col justify-between rounded-suave border border-cafe/15 p-6 ${i === 1 ? 'sm:mt-10' : ''}`}>
                   <p className="cifra text-[2.6rem] leading-none tracking-[0.02em]">{h.dia}</p>

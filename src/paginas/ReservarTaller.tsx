@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTaller } from '../datos/hooks';
 import type { Contacto, Sesion, Taller } from '../datos/tipos';
-import CheckoutLayout, { useApartado } from '../componentes/reservas/CheckoutLayout';
+import CheckoutLayout, { comprobarCupo, useApartado } from '../componentes/reservas/CheckoutLayout';
 import BookingSummary, { type Fila } from '../componentes/reservas/BookingSummary';
 import TimeSlot from '../componentes/reservas/TimeSlot';
 import PasoCuenta from '../componentes/reservas/PasoCuenta';
@@ -20,12 +20,27 @@ import { mensajeInformacionTaller } from '../contenido/whatsapp';
 import { duracionTexto, fechaCompleta, rango } from '../lib/calendario';
 import { maximoPersonas, sinLugar, textoLugares } from '../lib/cupo';
 import { pesosCortos } from '../lib/formato';
-import { cuandoTaller, precioTaller, publicoTaller } from '../lib/talleres';
+import { cuandoTaller, precioTaller, publicoTaller, rutaReserva } from '../lib/talleres';
 import { ldEvento, useSeo } from '../lib/seo';
 
 const PASOS = ['Fecha y horario', 'Personas', 'Tus datos', 'Pago'];
 /** Tope por reserva mientras no haya cupo confirmado. PENDIENTE: confirmar con Casa Numa. */
 const MAX_PERSONAS = 6;
+
+/** Las demás fotos del taller, en miniatura. */
+function Galeria({ taller: t, className = '' }: { taller: Taller; className?: string }) {
+  const otras = t.galeria.filter((id) => id !== t.foto);
+  if (!otras.length) return null;
+  return (
+    <ul className={`grid grid-cols-3 gap-3 ${className}`} aria-label={`Más fotos de ${t.titulo}`}>
+      {otras.map((id) => (
+        <li key={id}>
+          <Foto id={id} className="aspect-square w-full rounded-[0.6rem]" sizes="(min-width:1024px) 14vw, 30vw" />
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /** Qué datos del taller faltan por publicar (para la nota de pendientes). */
 function faltantes(t: Taller): string[] {
@@ -39,6 +54,7 @@ function faltantes(t: Taller): string[] {
 
 export default function ReservarTaller() {
   const { slug } = useParams();
+  const [params] = useSearchParams();
   const { datos: taller, cargando } = useTaller(slug);
 
   useSeo({
@@ -65,6 +81,10 @@ export default function ReservarTaller() {
     );
   }
 
+  // Tardes de Cerámica (Niños) se aparta en NUMA Kids (nombre y edad de cada
+  // niño) y las Clases de Cerámica, con la membresía.
+  if (taller.flujo !== 'taller') return <Navigate to={rutaReserva(taller, params.get('sesion') ?? undefined)} replace />;
+
   return taller.reservaEnLinea ? <Checkout taller={taller} /> : <DetallePorMensaje taller={taller} />;
 }
 
@@ -82,8 +102,11 @@ function DetallePorMensaje({ taller: t }: { taller: Taller }) {
 
       <div className="mt-8 grid gap-12 lg:grid-cols-12 lg:gap-8">
         <Revelar className="relative lg:col-span-7">
-          <Foto id={t.foto} prioridad className="aspect-[4/3] w-full rounded-suave" sizes="(min-width:1024px) 55vw, 100vw" />
-          <SelloFecha fecha={t.sesiones[0].fecha} className="absolute left-4 top-4" />
+          <div className="relative">
+            <Foto id={t.foto} prioridad className="aspect-[4/3] w-full rounded-suave" sizes="(min-width:1024px) 55vw, 100vw" />
+            <SelloFecha fecha={t.sesiones[0].fecha} className="absolute left-4 top-4" />
+          </div>
+          <Galeria taller={t} className="mt-3" />
         </Revelar>
 
         <Revelar retraso={0.1} className="lg:col-span-4 lg:col-start-9">
@@ -142,6 +165,7 @@ function Checkout({ taller }: { taller: Taller }) {
   );
   const [personas, setPersonas] = useState(1);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [consultando, setConsultando] = useState(false);
   const { reserva, setReserva, error, setError, apartando, apartar } = useApartado();
 
   const precio = taller.precio ?? 0;
@@ -176,13 +200,21 @@ function Checkout({ taller }: { taller: Taller }) {
     else recargar();
   }
 
-  function siguiente() {
+  async function siguiente() {
     setAviso(null);
     if (paso === 0) {
       if (!sesion) return setAviso('Elige un horario para continuar.');
-      if (sinLugar(sesion)) return setAviso('Ese horario ya no tiene lugares. Elige otro.');
+      if (sinLugar(sesion)) return setAviso('Este horario ya está agotado. Elige otro.');
       setPaso(1);
-    } else if (paso === 1) {
+    } else if (paso === 1 && sesion) {
+      // Disponibilidad real justo antes de pedir datos y cobrar.
+      setConsultando(true);
+      const problema = await comprobarCupo([sesion.id], personas).finally(() => setConsultando(false));
+      if (problema) {
+        setAviso(problema);
+        recargar();
+        return;
+      }
       setPaso(2);
     }
   }
@@ -210,14 +242,14 @@ function Checkout({ taller }: { taller: Taller }) {
           filas={filas}
           sesiones={sesion ? [sesion] : []}
           total={sesion ? precio * personas : null}
-          accion={paso < 2 ? { texto: 'Continuar', onClick: siguiente, deshabilitada: paso === 0 && !sesion } : undefined}
+          accion={paso < 2 ? { texto: 'Continuar', onClick: siguiente, deshabilitada: paso === 0 && !sesion, cargando: consultando } : undefined}
           nota={taller.incluye.length ? `Incluye: ${taller.incluye.join(', ')}.` : undefined}
         />
       }
     >
       {reserva?.estado === 'confirmada' ? (
         <>
-          <Confirmacion reserva={reserva} titulo="Tu lugar está reservado." silueta="taza" />
+          <Confirmacion reserva={reserva} silueta="taza" volver={{ to: '/talleres', texto: 'Volver a talleres' }} />
           <Pendiente className="mx-auto mt-10 max-w-3xl">
             Plazo de entrega de las piezas y política de cancelación de talleres.
           </Pendiente>
@@ -236,6 +268,7 @@ function Checkout({ taller }: { taller: Taller }) {
               {taller.descripcion.map((p) => (
                 <p key={p} className="mt-4 max-w-lectura text-cuerpo text-cafe/75">{p}</p>
               ))}
+              <Galeria taller={taller} className="mt-6 max-w-lg" />
               <p className="mt-6 inline-flex items-baseline gap-3 rounded-full bg-naranja/15 px-4 py-2">
                 <span className="cifra text-[1.4rem] leading-none">{precioTaller(taller)}</span>
                 <span className="text-[0.78rem] text-cafe/75">por persona</span>
@@ -306,7 +339,7 @@ function Checkout({ taller }: { taller: Taller }) {
               </p>
               <p className="mt-2 text-nota text-cafe/60">
                 {sesion.disponibles !== null && sesion.disponibles <= MAX_PERSONAS
-                  ? `Quedan ${sesion.disponibles} ${sesion.disponibles === 1 ? 'lugar' : 'lugares'} en este horario.`
+                  ? `Solo ${sesion.disponibles === 1 ? 'queda 1 lugar disponible' : `quedan ${sesion.disponibles} lugares disponibles`}.`
                   : `Cupo limitado. Hasta ${MAX_PERSONAS} personas por reserva; si son más, escríbenos.`}
               </p>
               <button type="button" onClick={() => setPaso(0)} className="subrayado-fijo mt-10 pb-0.5 text-nota">

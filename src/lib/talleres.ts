@@ -1,5 +1,8 @@
 import type { CategoriaTaller, Taller } from '../datos/tipos';
+import { AGENDA, flujoAgenda } from '../datos/agenda';
+import { MEMBRESIA } from '../contenido/oferta';
 import { diaSemana, fechaCompleta, hora, partes, yaPaso } from './calendario';
+import { sinLugar } from './cupo';
 
 export const FILTROS: { id: CategoriaTaller | 'todos'; label: string }[] = [
   { id: 'todos', label: 'Todos' },
@@ -39,4 +42,48 @@ export function semanaDelMes(fecha: string): number {
   const [a, m, d] = partes(fecha);
   const desfase = (diaSemana(`${a}-${String(m).padStart(2, '0')}-01`) + 6) % 7;
   return Math.floor((d + desfase - 1) / 7) + 1;
+}
+
+/**
+ * A dónde lleva "Reservar": el checkout del taller, NUMA Kids (con la fecha
+ * ya elegida) o la membresía, según el camino del taller.
+ */
+export function rutaReserva(t: Taller, sesionId?: string): string {
+  if (t.flujo === 'membresia') return '/membresia/reservar';
+  if (t.flujo === 'kids') {
+    const id = sesionId ?? t.sesiones.find((s) => !sinLugar(s))?.id;
+    return `/numa-kids/reservar${id ? `?sesion=${id}` : ''}`;
+  }
+  return `/talleres/${t.slug}${sesionId ? `?sesion=${sesionId}` : ''}`;
+}
+
+export interface HorarioMembresia {
+  diaSemana: number;
+  /** "Viernes", "Sábados" */
+  dia: string;
+  inicio: string;
+  fin: string | null;
+}
+
+const DIAS_PLURAL = ['Domingos', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábados'];
+
+/**
+ * Días y horarios de la membresía según las Clases de Cerámica publicadas en
+ * la agenda, de hoy en adelante (en octubre 2026: solo viernes). Si todavía no
+ * hay clases publicadas, los del PDF.
+ */
+export function horariosMembresia(): HorarioMembresia[] {
+  const vistos = new Map<string, HorarioMembresia>();
+  for (const r of AGENDA) {
+    if (!r.is_active || flujoAgenda(r) !== 'membresia') continue;
+    for (const s of r.sessions) {
+      if (yaPaso(r.date, s.start_time)) continue;
+      const d = diaSemana(r.date);
+      const clave = `${d}|${s.start_time}|${s.end_time}`;
+      if (!vistos.has(clave)) vistos.set(clave, { diaSemana: d, dia: DIAS_PLURAL[d], inicio: s.start_time, fin: s.end_time });
+    }
+  }
+  const lista = vistos.size ? [...vistos.values()] : [...MEMBRESIA.horarios];
+  // Lunes primero: viernes, sábados, domingos.
+  return lista.sort((a, b) => (a.diaSemana + 6) % 7 - (b.diaSemana + 6) % 7 || a.inicio.localeCompare(b.inicio));
 }

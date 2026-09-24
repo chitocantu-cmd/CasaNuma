@@ -1,7 +1,9 @@
 import type {
-  MesMembresia, Producto, Registro, Reserva, ResultadoPago, Sesion,
+  Aviso, ClienteAdmin, EstadoPago, EstadoReserva, MembresiaAdmin, MesMembresia, Pago, Producto,
+  Registro, Reserva, ResultadoPago, ResumenAdmin, Sesion, SesionAdmin, SolicitudManual,
   SolicitudReserva, Taller, Usuario,
 } from './tipos';
+
 
 // ===========================================================================
 // Contrato de datos del sitio
@@ -21,6 +23,8 @@ export interface Repositorio {
   producto(slug: string): Promise<Producto | null>;
 
   // --- Reservas ------------------------------------------------------------
+  /** Cupo actual de unas sesiones: se vuelve a preguntar justo antes de pagar. */
+  disponibilidad(sesionIds: string[]): Promise<Sesion[]>;
   /** Valida cupo y aparta los lugares mientras se paga. Requiere sesión. */
   apartar(solicitud: SolicitudReserva): Promise<Reserva>;
   /** Cobra un apartado. En producción puede devolver una redirección a Stripe. */
@@ -41,6 +45,43 @@ export interface Repositorio {
   suscribirNovedades(email: string): Promise<void>;
 }
 
+// ===========================================================================
+// Panel de Casa Numa
+// ---------------------------------------------------------------------------
+// Separado del contrato público: cada método exige una sesión con rol
+// 'admin' y puede ver datos de todas las clientas. En Supabase se cumple con
+// RLS (es_admin()) y Edge Functions con verificación de rol en el servidor.
+// ===========================================================================
+
+export interface CambiosReserva {
+  estado?: EstadoReserva;
+  pago?: EstadoPago;
+  notasInternas?: string;
+}
+
+export interface RepositorioAdmin {
+  adminActual(): Promise<Usuario | null>;
+  entrarAdmin(email: string, password: string): Promise<Usuario>;
+  salirAdmin(): Promise<void>;
+
+  resumen(): Promise<ResumenAdmin>;
+  reservas(): Promise<Reserva[]>;
+  reserva(id: string): Promise<Reserva | null>;
+  actualizarReserva(id: string, cambios: CambiosReserva): Promise<Reserva>;
+  crearReservaManual(solicitud: SolicitudManual): Promise<Reserva>;
+
+  /** Sesiones del mes con sus asistentes (talleres, NUMA Kids y membresía). */
+  agenda(mes: string): Promise<SesionAdmin[]>;
+  /** Talleres de la agenda y sesiones próximas de NUMA Kids y membresía, con ocupación y cupo. */
+  talleres(): Promise<SesionAdmin[]>;
+  /** Cupo de una sesión; null = sin confirmar. */
+  ajustarCupo(sesionId: string, cupo: number | null): Promise<void>;
+  membresias(): Promise<MembresiaAdmin[]>;
+  clientes(): Promise<ClienteAdmin[]>;
+  pagos(): Promise<Pago[]>;
+  avisos(reservaId?: string): Promise<Aviso[]>;
+}
+
 export type CodigoError =
   | 'SIN_CUPO'
   | 'SIN_RESERVA_EN_LINEA'
@@ -53,7 +94,8 @@ export type CodigoError =
   | 'CORREO_REGISTRADO'
   | 'APARTADO_VENCIDO'
   | 'NO_ENCONTRADO'
-  | 'NO_CONECTADO';
+  | 'NO_CONECTADO'
+  | 'SIN_ACCESO';
 
 /** Error con mensaje ya escrito para la persona: se puede mostrar tal cual. */
 export class ErrorDatos extends Error {

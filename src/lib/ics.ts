@@ -111,15 +111,15 @@ function descargar(contenido: string, nombre: string) {
 /** Reserva del sitio rediseñado: una o varias sesiones. */
 export function descargarIcsReserva(r: Reserva, lugar: string): void {
   const eventos = r.sesiones.map((s, i) => ({
-    uid: `${r.codigo}-${i + 1}`,
+    uid: `${r.folio ?? r.id}-${i + 1}`,
     fecha: s.fecha,
     inicio: s.inicio,
     fin: s.fin,
     titulo: r.sesiones.length > 1 ? `Casa Numa — ${r.titulo} (${i + 1}/${r.sesiones.length})` : `Casa Numa — ${r.titulo}`,
     lugar,
-    descripcion: `Reservación ${r.codigo}`,
+    descripcion: `Reservación ${r.folio ?? ''}`.trim(),
   }));
-  descargar(construirIcsEventos(eventos), `casa-numa-${r.codigo.toLowerCase()}.ics`);
+  descargar(construirIcsEventos(eventos), `casa-numa-${(r.folio ?? r.id).toLowerCase()}.ics`);
 }
 
 export function descargarIcs(r: EstadoReserva): void {

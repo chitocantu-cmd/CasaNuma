@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSesionesKids } from '../datos/hooks';
 import type { Contacto, Nino } from '../datos/tipos';
-import CheckoutLayout, { useApartado } from '../componentes/reservas/CheckoutLayout';
+import CheckoutLayout, { comprobarCupo, useApartado } from '../componentes/reservas/CheckoutLayout';
 import BookingSummary from '../componentes/reservas/BookingSummary';
 import TimeSlot from '../componentes/reservas/TimeSlot';
 import PasoCuenta from '../componentes/reservas/PasoCuenta';
@@ -11,7 +11,7 @@ import Confirmacion from '../componentes/reservas/Confirmacion';
 import { Aviso, Campo } from '../componentes/base/Campos';
 import { Icono } from '../componentes/base/Iconos';
 import { Pendiente } from '../componentes/base/Pendiente';
-import { KIDS } from '../contenido/oferta';
+import { EDADES_KIDS, KIDS } from '../contenido/oferta';
 import { duracionTexto, fechaCompleta, rango } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
 import { maximoPersonas, sinLugar } from '../lib/cupo';
@@ -39,6 +39,7 @@ export default function ReservarKids() {
   const [ninos, setNinos] = useState<NinoForm[]>([{ nombre: '', edad: '' }]);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [aviso, setAviso] = useState<string | null>(null);
+  const [consultando, setConsultando] = useState(false);
   const { reserva, setReserva, error, setError, apartando, apartar } = useApartado();
 
   const sesion = useMemo(() => sesiones?.find((s) => s.id === sesionId) ?? null, [sesiones, sesionId]);
@@ -69,20 +70,29 @@ export default function ReservarKids() {
       if (!n.nombre.trim()) errs[`nombre${i}`] = 'Escribe su nombre.';
       const edad = Number(n.edad);
       if (!n.edad || !Number.isFinite(edad)) errs[`edad${i}`] = 'Escribe su edad.';
-      else if (edad < KIDS.edadMinima) errs[`edad${i}`] = `NUMA Kids es a partir de ${KIDS.edadMinima} años.`;
+      else if (edad < KIDS.edadMinima || edad > KIDS.edadMaxima) errs[`edad${i}`] = `NUMA Kids es para niñas y niños de ${EDADES_KIDS}.`;
     });
     setErrores(errs);
     if (Object.keys(errs).length) return null;
     return ninos.map((n) => ({ nombre: n.nombre.trim(), edad: Number(n.edad) }));
   }
 
-  function siguiente() {
+  async function siguiente() {
     setAviso(null);
     if (paso === 0) {
       if (!sesion) return setAviso('Elige un jueves para continuar.');
+      if (sinLugar(sesion)) return setAviso('Ese jueves ya está agotado. Elige otro.');
       setPaso(1);
-    } else if (paso === 1) {
-      if (validarNinos()) setPaso(2);
+    } else if (paso === 1 && sesion) {
+      if (!validarNinos()) return;
+      setConsultando(true);
+      const problema = await comprobarCupo([sesion.id], ninos.length).finally(() => setConsultando(false));
+      if (problema) {
+        setAviso(problema);
+        recargar();
+        return;
+      }
+      setPaso(2);
     }
   }
 
@@ -103,7 +113,6 @@ export default function ReservarKids() {
       volver={{ to: '/numa-kids', texto: 'NUMA Kids' }}
       eyebrow="Taller infantil"
       titulo="Reservar NUMA Kids"
-      demo
       pasos={PASOS}
       paso={confirmada ? PASOS.length : paso}
       resumen={
@@ -117,14 +126,14 @@ export default function ReservarKids() {
           ]}
           sesiones={sesion ? [sesion] : []}
           total={sesion ? KIDS.precio * ninos.length : null}
-          accion={paso < 2 ? { texto: 'Continuar', onClick: siguiente, deshabilitada: paso === 0 && !sesion } : undefined}
+          accion={paso < 2 ? { texto: 'Continuar', onClick: siguiente, deshabilitada: paso === 0 && !sesion, cargando: consultando } : undefined}
           nota="Incluye arcilla, materiales, uso de herramientas, pintura, vidriado y horneado."
         />
       }
     >
       {confirmada && reserva ? (
         <>
-          <Confirmacion reserva={reserva} titulo="¡Nos vemos el jueves!" silueta="tarro">
+          <Confirmacion reserva={reserva} titulo="¡Nos vemos el jueves!" silueta="tarro" volver={{ to: '/numa-kids', texto: 'Volver a NUMA Kids' }}>
             Las piezas requieren secado, horneado y acabado, por lo que no se entregan el mismo día del taller.
           </Confirmacion>
           <Pendiente className="mx-auto mt-10 max-w-3xl">Plazo estimado de entrega de piezas y política de cancelación.</Pendiente>
@@ -137,7 +146,7 @@ export default function ReservarKids() {
             <section aria-labelledby="k-fecha">
               <h2 id="k-fecha" className="font-display text-t3 font-light">Elige el jueves</h2>
               <p className="mt-3 text-cuerpo text-cafe/75">
-                {KIDS.dia}s · {rango(KIDS.inicio, KIDS.fin)} · a partir de {KIDS.edadMinima} años
+                {KIDS.dia} · {rango(KIDS.inicio, KIDS.fin)} · {EDADES_KIDS}
               </p>
               <div className="mt-8 grid gap-2.5 sm:grid-cols-2">
                 {(sesiones ?? []).map((s) => (
@@ -150,7 +159,7 @@ export default function ReservarKids() {
                   />
                 ))}
               </div>
-              <Pendiente className="mt-8">Cupo por sesión de NUMA Kids (aquí 10 de ejemplo).</Pendiente>
+              <Pendiente className="mt-8">Cupo por sesión de NUMA Kids.</Pendiente>
             </section>
           )}
 
@@ -185,7 +194,7 @@ export default function ReservarKids() {
                       error={errores[`nombre${i}`]} autoComplete="off"
                     />
                     <Campo
-                      id={`edad-${i}`} label="Edad" type="number" inputMode="numeric" min={KIDS.edadMinima} max={17} value={n.edad}
+                      id={`edad-${i}`} label="Edad" type="number" inputMode="numeric" min={KIDS.edadMinima} max={KIDS.edadMaxima} value={n.edad}
                       onChange={(e) => setNinos((v) => v.map((x, j) => (j === i ? { ...x, edad: e.target.value } : x)))}
                       error={errores[`edad${i}`]}
                     />

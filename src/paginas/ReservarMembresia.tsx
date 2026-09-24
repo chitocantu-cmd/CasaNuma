@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMesesMembresia } from '../datos/hooks';
 import type { Contacto, MesMembresia, Sesion } from '../datos/tipos';
-import CheckoutLayout, { useApartado } from '../componentes/reservas/CheckoutLayout';
+import CheckoutLayout, { comprobarCupo, useApartado } from '../componentes/reservas/CheckoutLayout';
 import BookingSummary from '../componentes/reservas/BookingSummary';
 import Calendar from '../componentes/reservas/Calendar';
 import TimeSlot from '../componentes/reservas/TimeSlot';
@@ -12,6 +12,7 @@ import { Aviso } from '../componentes/base/Campos';
 import { Icono } from '../componentes/base/Iconos';
 import { Pendiente } from '../componentes/base/Pendiente';
 import { MEMBRESIA } from '../contenido/oferta';
+import { horariosMembresia } from '../lib/talleres';
 import { diaSemana, fechaCompleta, rango, yaPaso } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
 import { sinLugar } from '../lib/cupo';
@@ -47,6 +48,7 @@ export default function ReservarMembresia() {
   }, []);
   const [dia, setDia] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [consultando, setConsultando] = useState(false);
   const { reserva, setReserva, error, setError, apartando, apartar } = useApartado();
 
   useEffect(() => {
@@ -90,7 +92,7 @@ export default function ReservarMembresia() {
     if (del.length === 1) alternar(del[0]);
   }
 
-  function siguiente() {
+  async function siguiente() {
     setAviso(null);
     if (paso === 0) {
       if (!mes) return setAviso('Elige el mes de tu membresía.');
@@ -99,6 +101,14 @@ export default function ReservarMembresia() {
       if (elegidas.length !== CLASES) return setAviso(`Te faltan ${CLASES - elegidas.length} ${CLASES - elegidas.length === 1 ? 'clase' : 'clases'} por elegir.`);
       setPaso(2);
     } else if (paso === 2) {
+      setConsultando(true);
+      const problema = await comprobarCupo(elegidas, 1).finally(() => setConsultando(false));
+      if (problema) {
+        setAviso('Una de tus clases se acaba de llenar. Elige otra fecha.');
+        recargar();
+        setPaso(1);
+        return;
+      }
       setPaso(3);
     }
   }
@@ -148,6 +158,7 @@ export default function ReservarMembresia() {
           accion={paso < 3 ? {
             texto: paso === 2 ? 'Continuar' : paso === 1 ? `Continuar (${elegidas.length}/${CLASES})` : 'Continuar',
             onClick: siguiente,
+            cargando: consultando,
             deshabilitada: (paso === 1 && elegidas.length !== CLASES) || (paso === 0 && !mes),
           } : undefined}
           nota="Incluye materiales, herramientas, pintura, vidriado, horneado y acompañamiento."
@@ -156,7 +167,7 @@ export default function ReservarMembresia() {
     >
       {confirmada && reserva ? (
         <>
-          <Confirmacion reserva={reserva} titulo="Tu membresía está lista." silueta="guaje">
+          <Confirmacion reserva={reserva} titulo="¡Tu membresía está lista!" silueta="guaje" volver={{ to: '/talleres', texto: 'Volver a talleres' }}>
             Tus cuatro clases ya están en tu cuenta. Trae ganas de ensuciarte las manos.
           </Confirmacion>
           <Pendiente className="mx-auto mt-10 max-w-3xl">Reglas de reprogramación y vigencia de clases.</Pendiente>
@@ -217,7 +228,7 @@ export default function ReservarMembresia() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-2 text-[0.74rem]">
-                {MEMBRESIA.horarios.map((h) => (
+                {horariosMembresia().map((h) => (
                   <span key={h.dia} className="rounded-full border border-cafe/15 px-3 py-1.5 text-cafe/75">
                     {h.dia} · {rango(h.inicio, h.fin)}
                     {(porDia.get(h.diaSemana) ?? 0) > 0 && (
