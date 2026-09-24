@@ -5,8 +5,18 @@ Sitio y sistema de reservas de **Casa Numa** — talleres creativos y cerámica 
 Cupos con control transaccional real, pagos verificados en el backend,
 confirmación por correo y agenda administrativa en Google Calendar.
 
-**Stack:** React + TypeScript + Vite + Tailwind · Supabase (PostgreSQL, Auth,
-RLS, RPC, Edge Functions, Cron) · Stripe · Resend · Cloudinary · Vercel.
+**Stack:** React + TypeScript + Vite + Tailwind + Framer Motion · Supabase
+(PostgreSQL, Auth, RLS, RPC, Edge Functions, Cron) · Stripe · Resend ·
+Cloudinary · Vercel.
+
+> **Rediseño 2026.** El sitio público se rehízo
+> con la identidad del brandbook: Inicio, Talleres, Membresía (con reserva de
+> 4 clases), NUMA Kids, Eventos, NUMA Store, Nosotras y Mi cuenta. Por ahora
+> corre en **modo demo** (`VITE_FUENTE_DATOS=demo`): reservas, cuentas y pagos
+> son simulados en el navegador. El backend de abajo sigue intacto y el panel
+> funciona igual. Decisiones y pendientes: [`docs/REDISENO.md`](docs/REDISENO.md).
+> Cómo conectarlo al backend real: [`docs/INTEGRACION.md`](docs/INTEGRACION.md).
+> Datos por confirmar de Casa Numa: [`src/config/site.ts`](src/config/site.ts).
 
 ---
 
@@ -45,16 +55,23 @@ npm run dev                    # http://localhost:5173
 
 ```
 src/
-  lib/supabase/client.ts   cliente con la anon key
-  lib/formato.ts           fechas, dinero, cupo, WhatsApp
+  config/site.ts           datos pendientes de Casa Numa (WhatsApp, dirección…)
+  contenido/               oferta confirmada, fotos, portafolio, navegación
+  datos/                   contrato de datos + implementación demo
+  features/cuenta/         sesión de la clienta
+  componentes/             marca/, base/, reservas/, secciones/ y
+                           Header, Footer, Hero, tarjetas…
+  paginas/                 público + paginas/admin/ (panel, sin cambios)
+  lib/supabase/client.ts   cliente con la anon key (solo panel y pagos)
+  lib/formato.ts           dinero, cupo, validaciones
+  lib/calendario.ts        fechas sin pasar por UTC
   lib/ics.ts               calendario del cliente (.ics)
+  lib/seo.ts               title, OpenGraph, canonical, JSON-LD
   services/                api, workshops, reservations, forms, cloudinary
   features/
-    workshops/hooks.ts     useWorkshops, useWorkshop, useTitulo
-    reservations/          pantalla de estado de reserva
+    workshops/hooks.ts     useTitulo (panel)
+    reservations/          pantalla de estado de reserva (Stripe)
     admin/auth.tsx         sesión de admin y guardián de rutas
-  componentes/             layout, UI, tarjeta, modal, tabla
-  paginas/                 público + paginas/admin/
 supabase/
   migrations/              esquema, funciones, RLS, cron
   functions/               7 Edge Functions

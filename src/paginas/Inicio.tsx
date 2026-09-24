@@ -1,173 +1,260 @@
-import { useState } from 'react';
-import { useWorkshops, useTitulo } from '../features/workshops/hooks';
-import type { Workshop } from '../tipos';
-import ModalReserva from '../componentes/ModalReserva';
-import TarjetaTaller from '../componentes/TarjetaTaller';
-import { BotonEnlace, ImagenPendiente, Cargando } from '../componentes/ui';
+import Hero from '../componentes/Hero';
+import SectionHeading from '../componentes/SectionHeading';
+import EditorialGallery from '../componentes/EditorialGallery';
+import ExperienceCard from '../componentes/ExperienceCard';
+import ProductCard from '../componentes/ProductCard';
+import Testimonial from '../componentes/Testimonial';
+import Ubicacion from '../componentes/secciones/Ubicacion';
+import Comunidad from '../componentes/secciones/Comunidad';
+import Foto from '../componentes/base/Foto';
+import Revelar from '../componentes/base/Revelar';
+import { BotonEnlace, EnlaceFlecha } from '../componentes/base/Boton';
+import { Icono } from '../componentes/base/Iconos';
+import CeramicShape from '../componentes/marca/CeramicShape';
+import { PORTAFOLIO } from '../contenido/portafolio';
+import { TESTIMONIOS } from '../contenido/testimonios';
+import { MEMBRESIA, KIDS } from '../contenido/oferta';
+import { mostrarPendientes } from '../config/site';
+import { useProductos } from '../datos/hooks';
+import { pesosCortos } from '../lib/formato';
+import { ldNegocio, useSeo } from '../lib/seo';
 
-const EXPERIENCIAS = [
-  {
-    titulo: 'Empiezas con las manos limpias',
-    texto: 'y terminas con barro hasta los codos.',
-    encuadre: 'manos amasando arcilla, luz lateral',
-    tono: 'terracota',
-  },
-  {
-    titulo: 'Mesa larga, gente que vuelve',
-    texto: 'Las mejores ideas salen viendo lo que hace la de al lado.',
-    encuadre: 'mesa larga con varias personas trabajando',
-    tono: 'olivo',
-  },
-  {
-    titulo: 'Nada sale perfecto la primera vez',
-    texto: 'y esa es justo la parte buena.',
-    encuadre: 'piezas imperfectas secándose en repisa',
-    tono: 'arcilla',
-  },
-];
+const OCASIONES = ['Cumpleaños', 'Baby shower', 'Despedidas', 'Tardes entre amigas', 'Eventos empresariales', 'Reuniones privadas'];
 
 export default function Inicio() {
-  useTitulo(
-    'Talleres creativos y cerámica',
-    'Un espacio para crear. Talleres, cerámica y experiencias para reconectar con tu lado creativo.',
-  );
+  useSeo({
+    titulo: 'Casa Numa | Taller de cerámica en San Pedro Garza García',
+    descripcion:
+      'Estudio de cerámica en el Casco de San Pedro Garza García. Talleres de fin de semana, membresía, NUMA Kids, eventos privados y piezas hechas a mano.',
+    jsonLd: ldNegocio(),
+  });
 
-  const { datos, cargando, recargar } = useWorkshops();
-  // Tambien se reserva desde la portada, sin dar un solo clic de mas.
-  const [reservando, setReservando] = useState<Workshop | null>(null);
-  const proximos = (datos ?? []).slice(0, 3);
+  const { datos: productos } = useProductos();
+  const hayTestimonios = TESTIMONIOS.length > 0 || mostrarPendientes;
 
   return (
-    <div className="pb-24">
-      {/* Portada */}
-      <section className="contenedor pt-32 sm:pt-40">
-        <h1 className="titular max-w-5xl">
-          Un lugar
-          <br />
-          para hacer
-          <br />
-          con las manos.
-        </h1>
+    <>
+      <Hero />
 
-        <div className="mt-12 grid gap-8 lg:grid-cols-12">
-          <div className="lg:col-span-7">
-            <ImagenPendiente
-              encuadre="manos trabajando el barro en el torno"
-              tono="terracota"
-              alt="Manos trabajando el barro"
-              className="aspect-[16/11] w-full"
+      {/* 01 · Portafolio ------------------------------------------------ */}
+      <section id="portafolio" className="contenedor py-seccion" aria-label="Portafolio NUMA">
+        <EditorialGallery
+          piezas={PORTAFOLIO}
+          encabezado={
+            <SectionHeading
+              numero="01"
+              eyebrow="Portafolio NUMA"
+              titulo="Hecho a mano, hecho con intención."
+              intro={
+                <p>
+                  Descubre las piezas que nacen en nuestro estudio. Cada forma, textura y detalle refleja nuestra pasión por
+                  la cerámica y el valor de crear con nuestras propias manos.
+                </p>
+              }
             />
-          </div>
-          <div className="flex flex-col justify-end lg:col-span-4 lg:col-start-9">
-            <p className="text-[1.05rem] leading-relaxed text-tinta/75">
-              Casa Numa es un estudio de cerámica y talleres creativos. Vienes,
-              te sientas en la mesa larga, y sales con algo hecho por ti.
+          }
+          nota={
+            <Revelar className="border-l border-cafe/20 pl-6">
+              <CeramicShape nombre="olla" className="h-10 w-auto" />
+              <p className="mt-5 max-w-[30ch] text-nota text-cafe/75">
+                El portafolio es inspiración. Las piezas disponibles y los encargos viven en NUMA Store.
+              </p>
+              <EnlaceFlecha to="/numa-store" className="mt-5">Ir a NUMA Store</EnlaceFlecha>
+            </Revelar>
+          }
+        />
+      </section>
+
+      {/* 02 · Experiencias ---------------------------------------------- */}
+      <section className="py-seccion-s" aria-labelledby="titulo-experiencias">
+        <div className="contenedor flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <SectionHeading
+            numero="02"
+            eyebrow="Experiencias"
+            titulo={<span id="titulo-experiencias">Encuentra tu forma de crear.</span>}
+          />
+          <Revelar retraso={0.1} className="max-w-[26rem] lg:pb-3">
+            <p className="flex gap-3 text-nota text-cafe/75">
+              <Icono.candado tam={18} className="mt-0.5 shrink-0 text-terracota" />
+              Talleres de fin de semana, membresía y NUMA Kids se reservan y pagan en línea.
             </p>
-            <div className="mt-8">
-              <BotonEnlace to="/talleres">Ver fechas y reservar</BotonEnlace>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Próximos talleres */}
-      <section className="contenedor mt-24">
-        <div className="mb-10 flex items-end justify-between border-b border-tinta/12 pb-4">
-          <h2 className="font-display text-[2rem] leading-none">Próximos talleres</h2>
-          <BotonEnlace to="/talleres" variante="secundario" className="hidden px-5 py-2 sm:inline-flex">
-            Ver todos
-          </BotonEnlace>
+          </Revelar>
         </div>
 
-        {cargando ? (
-          <Cargando texto="Cargando talleres…" />
-        ) : (
-          <div className="grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
-            {proximos.map((t) => (
-              <TarjetaTaller key={t.id} taller={t} onReservar={setReservando} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Cómo se siente */}
-      <section className="contenedor mt-24">
-        <div className="grid gap-10 sm:grid-cols-3">
-          {EXPERIENCIAS.map((e) => (
-            <article key={e.titulo}>
-              <ImagenPendiente
-                encuadre={e.encuadre}
-                tono={e.tono}
-                className="aspect-[4/5] w-full"
+        {/* Móvil: carril táctil. Escritorio: tres columnas, la central desfasada. */}
+        <div className="carril mt-14 flex gap-5 overflow-x-auto px-canal pb-4 lg:contenedor lg:grid lg:grid-cols-3 lg:gap-8 lg:overflow-visible">
+          <div className="w-[82vw] max-w-[24rem] shrink-0 lg:w-auto lg:max-w-none">
+            <Revelar className="h-full">
+              <ExperienceCard
+                numero="01" titulo="Clases de fin de semana"
+                frase="Cada fin de semana, una nueva experiencia para crear con tus manos."
+                detalle="Reserva en línea" cta="Ver agenda" to="/talleres" foto="exp-talleres" silueta="taza"
               />
-              <h3 className="mt-5 font-display text-[1.3rem] leading-tight">{e.titulo}</h3>
-              <p className="mt-2 text-[0.95rem] leading-relaxed text-tinta/65">{e.texto}</p>
-            </article>
+            </Revelar>
+          </div>
+          <div className="w-[82vw] max-w-[24rem] shrink-0 lg:mt-24 lg:w-auto lg:max-w-none">
+            <Revelar retraso={0.08} className="h-full">
+              <ExperienceCard
+                numero="02" titulo="Membresía NUMA"
+                frase="Haz de la cerámica parte de tu rutina."
+                detalle={`${pesosCortos(MEMBRESIA.precio)} al mes`} cta="Conocer membresía" to="/membresia"
+                foto="exp-membresia" silueta="guaje" forma="rounded-arco"
+              />
+            </Revelar>
+          </div>
+          <div className="w-[82vw] max-w-[24rem] shrink-0 lg:w-auto lg:max-w-none">
+            <Revelar retraso={0.16} className="h-full">
+              <ExperienceCard
+                numero="03" titulo="NUMA Kids"
+                frase="Pequeñas manos, grandes creaciones."
+                detalle={`A partir de ${KIDS.edadMinima} años`} cta="Ver talleres infantiles" to="/numa-kids"
+                foto="exp-kids" silueta="tarro"
+              />
+            </Revelar>
+          </div>
+        </div>
+      </section>
+
+      {/* 03 · Eventos especiales ---------------------------------------- */}
+      <section data-fondo="oscuro" className="relative mt-seccion-s overflow-hidden bg-cafe py-seccion text-crema" aria-labelledby="titulo-eventos">
+        <div className="contenedor grid gap-14 lg:grid-cols-12 lg:gap-8">
+          <div className="lg:col-span-5 lg:py-6">
+            <SectionHeading
+              numero="03"
+              eyebrow="Eventos especiales"
+              titulo={<span id="titulo-eventos">Hay momentos que merecen celebrarse de una forma diferente.</span>}
+              intro={
+                <p>
+                  En Casa Numa creamos experiencias privadas de cerámica para compartir, celebrar y crear recuerdos únicos.
+                  Tú nos cuentas qué tienes en mente y nosotros te ayudamos a darle forma.
+                </p>
+              }
+              claro
+              tamano="t2"
+            />
+            <Revelar retraso={0.1}>
+              <ul className="mt-10 flex flex-wrap gap-2">
+                {OCASIONES.map((o) => (
+                  <li key={o} className="rounded-full border border-crema/25 px-4 py-2 text-[0.8rem] text-crema/90">{o}</li>
+                ))}
+              </ul>
+              <div className="mt-10 flex flex-wrap items-center gap-5">
+                <BotonEnlace to="/eventos" variante="claro" flecha>Cotiza tu evento</BotonEnlace>
+                <span className="flex items-center gap-2 text-[0.78rem] text-crema/70">
+                  <Icono.whatsapp tam={16} /> Cotización personalizada por WhatsApp
+                </span>
+              </div>
+            </Revelar>
+          </div>
+          <Revelar retraso={0.1} className="relative lg:col-span-6 lg:col-start-7">
+            <Foto id="eventos-grupo" className="aspect-[4/5] w-full rounded-foto sm:aspect-[5/4] lg:aspect-[4/5]" sizes="(min-width:1024px) 45vw, 100vw" zoom />
+            <CeramicShape nombre="doble" className="absolute -left-6 -top-8 h-16 w-auto sm:h-20" />
+          </Revelar>
+        </div>
+      </section>
+
+      {/* 04 · NUMA Store ------------------------------------------------ */}
+      <section className="contenedor py-seccion" aria-labelledby="titulo-store">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <SectionHeading
+            numero="04"
+            eyebrow="NUMA Store"
+            titulo={<span id="titulo-store">Piezas únicas, hechas con nuestras manos.</span>}
+            intro={
+              <p>
+                Descubre nuestra colección de cerámica artesanal: tazas, vajillas, objetos decorativos y creaciones
+                especiales que combinan diseño, creatividad y el encanto de lo hecho a mano.
+              </p>
+            }
+          />
+          <Revelar retraso={0.1} className="shrink-0 lg:pb-3">
+            <BotonEnlace to="/numa-store" variante="secundario" flecha>Explorar NUMA Store</BotonEnlace>
+          </Revelar>
+        </div>
+
+        <div className="mt-14 grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-4 lg:gap-x-8">
+          {(productos ?? []).slice(0, 4).map((p, i) => (
+            <Revelar key={p.id} retraso={i * 0.06} className={i % 2 === 1 ? 'lg:mt-14' : ''}>
+              <ProductCard producto={p} />
+            </Revelar>
           ))}
         </div>
+
+        <p className="mt-12 flex items-center gap-3 border-t border-cafe/15 pt-6 text-nota text-cafe/75">
+          <Icono.whatsapp tam={18} className="shrink-0 text-terracota" />
+          Compras y encargos se atienden por WhatsApp, directo con el estudio.
+        </p>
       </section>
 
-      {/* Nosotras · vivia en su propia pagina; se movio aqui para que el
-          menu tenga menos lugares donde perderse. */}
-      <section className="contenedor mt-24" id="nosotras">
-        <div className="grid gap-10 border-t border-tinta/15 pt-14 lg:grid-cols-12">
+      {/* 05 · ¡Hola! Somos Casa Numa ------------------------------------ */}
+      <section className="contenedor pb-seccion pt-seccion-s" aria-labelledby="titulo-hola">
+        <div className="grid items-center gap-16 lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-5">
-            <p className="dato text-tinta/45">Nosotras</p>
-            <h2 className="mt-4 font-display text-[2.4rem] leading-tight">
-              Una casa hecha para crear.
-            </h2>
-            <p className="mt-6 text-[1.02rem] leading-relaxed text-tinta/75">
-              Casa Numa empezó como una mesa, un costal de barro y ganas de que
-              más gente probara hacer algo con las manos.
-            </p>
-            <p className="mt-4 text-[1.02rem] leading-relaxed text-tinta/70">
-              [PENDIENTE: reemplazar con la historia real — cómo nació, quién la
-              fundó y por qué el nombre.]
-            </p>
+            <Revelar>
+              <p className="eyebrow flex items-center gap-4 text-cafe/70">
+                <span className="cifra text-[1.35rem] leading-none tracking-[0.04em]">05</span>
+                <span className="h-px w-10 bg-cafe/30" aria-hidden="true" />
+                Nosotras
+              </p>
+              <h2 id="titulo-hola" className="mt-6 font-display font-light">
+                <span className="block text-[clamp(4rem,11vw,9.5rem)] leading-[0.85] text-terracota">¡Hola!</span>
+                <span className="mt-3 block text-t2 text-cafe">Somos Casa Numa.</span>
+              </h2>
+            </Revelar>
+            <Revelar retraso={0.1}>
+              <p className="mt-8 max-w-lectura text-cuerpo-l text-cafe/85">
+                Un espacio donde las ideas toman forma y las manos cuentan historias. Nacimos del amor por la cerámica y de
+                las ganas de compartir un lugar donde crear, aprender y disfrutar del proceso.
+              </p>
+              <p className="mt-5 max-w-lectura text-cuerpo-l text-cafe/85">
+                Aquí creemos que no necesitas ser artista para hacer algo extraordinario. Solo necesitas curiosidad y ganas
+                de ensuciarte las manos.
+              </p>
+              <div className="mt-10">
+                <BotonEnlace to="/nosotras" flecha>Conoce nuestra historia</BotonEnlace>
+              </div>
+            </Revelar>
           </div>
-          <div className="lg:col-span-6 lg:col-start-7">
-            <ImagenPendiente
-              encuadre="plano amplio del estudio vacío, luz de mañana"
-              tono="arcilla"
-              alt="El estudio de Casa Numa"
-              className="aspect-[16/11] w-full"
-            />
+
+          <div className="relative lg:col-span-6 lg:col-start-7">
+            <Revelar className="ml-auto w-[80%] sm:w-[70%]">
+              <Foto id="hola-estudio" className="aspect-[4/5] w-full rounded-u" sizes="(min-width:1024px) 34vw, 80vw" />
+            </Revelar>
+            <Revelar retraso={0.15} className="absolute -bottom-10 left-0 w-[55%] sm:w-[48%]">
+              <Foto id="hola-fundadoras" className="aspect-[4/3] w-full rounded-foto ring-[6px] ring-crema" sizes="(min-width:1024px) 22vw, 55vw" />
+              <p className="mt-4 font-display text-[1.35rem] font-light italic text-cafe/80">Mónica & Gloria</p>
+            </Revelar>
+            <CeramicShape nombre="jarron" className="absolute right-[4%] top-[-2.5rem] h-14 w-auto" />
           </div>
         </div>
       </section>
 
-      {/* Membresía */}
-      <section className="contenedor mt-24">
-        <div className="grid gap-10 bg-tinta p-10 text-crema sm:p-14 lg:grid-cols-2">
-          <div>
-            <p className="dato text-crema/45">Membresía</p>
-            <h2 className="mt-4 font-display text-[2.4rem] leading-tight">
-              Para quien vuelve cada semana.
-            </h2>
-          </div>
-          <div className="flex flex-col justify-between gap-8">
-            <p className="text-[1.02rem] leading-relaxed text-crema/70">
-              Sesiones abiertas cada semana para que la práctica no dependa de
-              encontrar un hueco en la agenda, con prioridad cuando abrimos fechas
-              nuevas.
-            </p>
-            <div>
-              <BotonEnlace
-                to="/membresia"
-                className="border border-crema/30 bg-transparent text-crema hover:border-crema hover:bg-crema hover:text-tinta"
-              >
-                Conocer la membresía
-              </BotonEnlace>
+      {/* 06 · Testimonios ------------------------------------------------ */}
+      {hayTestimonios && (
+        <section className="border-y border-cafe/10 bg-cafe/[0.035] py-seccion" aria-labelledby="titulo-testimonios">
+          <div className="contenedor">
+            <SectionHeading
+              numero="06"
+              eyebrow="Testimonios"
+              titulo={<span id="titulo-testimonios">Lo que se vive en NUMA, se comparte.</span>}
+              intro={
+                <p>
+                  Cada persona que llega a nuestro estudio crea algo diferente, pero todas se llevan mucho más que una pieza
+                  de cerámica.
+                </p>
+              }
+              tamano="t2"
+            />
+            <div className="mt-14">
+              <Testimonial testimonios={TESTIMONIOS} />
             </div>
           </div>
-        </div>
-      </section>
-      <ModalReserva
-        taller={reservando}
-        abierto={reservando !== null}
-        onCerrar={() => setReservando(null)}
-        onCupoAgotado={recargar}
-      />
-    </div>
+        </section>
+      )}
+
+      {/* 07 · Ubicación · 08 · Comunidad ---------------------------------- */}
+      <Ubicacion numero={hayTestimonios ? '07' : '06'} />
+      <Comunidad numero={hayTestimonios ? '08' : '07'} />
+    </>
   );
 }

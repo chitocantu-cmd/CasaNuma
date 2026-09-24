@@ -2,47 +2,156 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+   Tokens de marca · CASA NUMA - BRANDBOOK 2.pdf, p. 10
+   Canales RGB para poder usar opacidad (bg-cafe/10) sin inventar tonos.
+   --------------------------------------------------------------------------- */
+:root {
+  --numa-crema: 245 239 230;      /* #F5EFE6 */
+  --numa-terracota: 181 121 94;   /* #B5795E */
+  --numa-cafe: 96 47 22;          /* #602F16 */
+  --numa-indigo: 77 87 178;       /* #4D57B2 */
+  --numa-naranja: 255 149 44;     /* #FF952C */
+  --numa-amarillo: 237 173 59;    /* #EDAD3B */
+  --numa-verde: 154 188 70;       /* #9ABC46 */
+
+  --ease-numa: cubic-bezier(.22, 1, .36, 1);
+  --canal: clamp(1.25rem, 4vw, 3.5rem);
+
+  color-scheme: light;
+}
+
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background: rgb(var(--numa-crema));
+    scroll-padding-top: 6rem;
   }
 
   body {
-    @apply bg-papel font-sans text-tinta antialiased;
+    @apply bg-transparent font-sans text-cuerpo font-normal text-cafe;
   }
 
-  /* Foco visible en todo lo interactivo. El demo no lo tenía y es un
-     requisito de accesibilidad básico para quien navega con teclado. */
+  /* Textura de lino del brandbook (p. 26), casi imperceptible. Va detrás del
+     contenido: las secciones con fondo propio la tapan. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: url('/texturas/lino.webp') repeat;
+    background-size: 360px;
+    opacity: 0.07;
+    mix-blend-mode: multiply;
+  }
+
+  ::selection {
+    background: rgb(var(--numa-terracota) / 0.3);
+    color: rgb(var(--numa-cafe));
+  }
+
+  h1, h2, h3, h4 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Foco visible siempre. Índigo porque contrasta con crema, terracota y café. */
   :focus-visible {
-    @apply outline-none ring-2 ring-terracota ring-offset-2 ring-offset-papel;
+    outline: 2px solid rgb(var(--numa-indigo));
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  [data-fondo='oscuro'] :focus-visible {
+    outline-color: rgb(var(--numa-crema));
   }
 }
 
 @layer components {
   .contenedor {
-    @apply mx-auto w-full max-w-[82rem] px-5 sm:px-8 lg:px-12;
+    @apply mx-auto w-full max-w-contenedor px-canal;
   }
 
-  /* Titular gigante de la portada. Los valores vienen del demo. */
-  .titular {
-    @apply font-display font-normal;
-    font-size: clamp(2.6rem, 8vw, 6.5rem);
-    line-height: 0.92;
-    letter-spacing: -0.03em;
-    text-wrap: balance;
+  /* Etiqueta superior: Poppins espaciada, como los separadores del brandbook
+     ("L O G O", "P A L E T A  D E  C O L O R"). */
+  .eyebrow {
+    @apply font-sans text-etiqueta font-medium uppercase;
   }
 
-  /* Etiqueta pequeña en versalitas: se usa por todo el sitio. */
-  .dato {
-    @apply font-sans text-[0.72rem] font-semibold uppercase tracking-[0.18em];
+  .cifra {
+    @apply font-bebas font-normal;
   }
 
-  .entrada-pagina {
-    @apply animate-entrada;
+  /* Subrayado que se dibuja de izquierda a derecha. */
+  .subrayado {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size 450ms var(--ease-numa);
+  }
+  .subrayado:hover,
+  .subrayado:focus-visible,
+  .subrayado[aria-current='page'] {
+    background-size: 100% 1px;
+  }
+
+  /* Subrayado presente que se retira y vuelve al pasar. */
+  .subrayado-fijo {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 100% 1px;
+    background-position: 100% 100%;
+    background-repeat: no-repeat;
+    transition: background-size 450ms var(--ease-numa);
+  }
+  .subrayado-fijo:hover {
+    background-size: 0% 1px;
+  }
+
+  /* Zoom editorial de fotografía: máximo 1.035. */
+  .zoom-suave img {
+    transition: transform 900ms var(--ease-numa);
+  }
+  .zoom-suave:hover img,
+  .zoom-suave:focus-visible img {
+    transform: scale(1.035);
   }
 
   .salto-contenido {
-    @apply absolute left-4 top-4 z-[100] -translate-y-24 bg-tinta px-4 py-2 text-crema transition-transform focus:translate-y-0;
+    @apply absolute left-4 top-4 z-[100] -translate-y-24 rounded-full bg-cafe px-5 py-2 text-nota text-crema transition-transform focus:translate-y-0;
+  }
+
+  /* Carrusel táctil: se desliza con el dedo y se detiene en cada tarjeta. */
+  .carril {
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .carril::-webkit-scrollbar {
+    display: none;
+  }
+  .carril > * {
+    scroll-snap-align: start;
+  }
+
+  /* Legado: clases del panel administrativo. */
+  .titular {
+    @apply font-display font-light;
+    font-size: clamp(2.6rem, 7vw, 5.5rem);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+  }
+  .dato {
+    @apply font-sans text-[0.7rem] font-medium uppercase tracking-[0.18em];
+  }
+  .entrada-pagina {
+    @apply animate-entrada;
   }
 }
 
@@ -53,5 +162,6 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

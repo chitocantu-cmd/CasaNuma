@@ -119,3 +119,8 @@ export function fechaHoraCorta(iso: string): string {
     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   });
 }
+
+/** "$3,200 MXN" sin decimales ni "Sobre cotización": para precios fijos del sitio. */
+export function pesosCortos(monto: number): string {
+  return `$${new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 }).format(monto)} MXN`;
+}

@@ -1,4 +1,5 @@
 import type { EstadoReserva } from '../tipos';
+import type { Reserva } from '../datos/tipos';
 
 const ZONA = 'America/Monterrey';
 
@@ -33,12 +34,18 @@ function esc(texto: string): string {
     .replace(/\n/g, '\\n');
 }
 
-export function construirIcs(r: EstadoReserva): string {
-  const inicio = marcaLocal(r.workshop.date, r.workshop.start_time);
-  const fin = marcaLocal(r.workshop.date, r.workshop.end_time);
-  const personas = `${r.quantity} ${r.quantity === 1 ? 'persona' : 'personas'}`;
-  const lugar = r.workshop.location ?? 'Casa Numa';
+interface EventoIcs {
+  uid: string;
+  fecha: string;
+  inicio: string;
+  fin: string;
+  titulo: string;
+  lugar: string;
+  descripcion: string;
+}
 
+/** Un archivo, N eventos: la membresía son cuatro clases en un solo .ics. */
+function construirIcsEventos(eventos: EventoIcs[]): string {
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -55,36 +62,67 @@ export function construirIcs(r: EstadoReserva): string {
     'TZNAME:CST',
     'END:STANDARD',
     'END:VTIMEZONE',
-    'BEGIN:VEVENT',
-    `UID:${r.reservation_code}@casanuma`,
-    `DTSTAMP:${ahoraUTC()}`,
-    `DTSTART;TZID=${ZONA}:${inicio}`,
-    `DTEND;TZID=${ZONA}:${fin}`,
-    `SUMMARY:${esc(`Casa Numa — ${r.workshop.title}`)}`,
-    `LOCATION:${esc(lugar)}`,
-    `DESCRIPTION:${esc(
-      `Tu reservación en Casa Numa está confirmada.\nReservación ${r.reservation_code}\n${personas}`,
-    )}`,
-    'BEGIN:VALARM',
-    'TRIGGER:-PT2H',
-    'ACTION:DISPLAY',
-    'DESCRIPTION:Tu taller en Casa Numa es en 2 horas',
-    'END:VALARM',
-    'END:VEVENT',
+    ...eventos.flatMap((e) => [
+      'BEGIN:VEVENT',
+      `UID:${e.uid}@casanuma`,
+      `DTSTAMP:${ahoraUTC()}`,
+      `DTSTART;TZID=${ZONA}:${marcaLocal(e.fecha, e.inicio)}`,
+      `DTEND;TZID=${ZONA}:${marcaLocal(e.fecha, e.fin)}`,
+      `SUMMARY:${esc(e.titulo)}`,
+      `LOCATION:${esc(e.lugar)}`,
+      `DESCRIPTION:${esc(e.descripcion)}`,
+      'BEGIN:VALARM',
+      'TRIGGER:-PT2H',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:Tu clase en Casa Numa es en 2 horas',
+      'END:VALARM',
+      'END:VEVENT',
+    ]),
     'END:VCALENDAR',
   ].join('\r\n');
 }
 
-export function descargarIcs(r: EstadoReserva): void {
-  const blob = new Blob([construirIcs(r)], { type: 'text/calendar;charset=utf-8' });
+export function construirIcs(r: EstadoReserva): string {
+  const personas = `${r.quantity} ${r.quantity === 1 ? 'persona' : 'personas'}`;
+  return construirIcsEventos([{
+    uid: r.reservation_code,
+    fecha: r.workshop.date,
+    inicio: r.workshop.start_time,
+    fin: r.workshop.end_time,
+    titulo: `Casa Numa — ${r.workshop.title}`,
+    lugar: r.workshop.location ?? 'Casa Numa',
+    descripcion: `Tu reservación en Casa Numa está confirmada.\nReservación ${r.reservation_code}\n${personas}`,
+  }]);
+}
+
+function descargar(contenido: string, nombre: string) {
+  const blob = new Blob([contenido], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `casa-numa-${r.workshop.slug}.ics`;
+  a.download = nombre;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/** Reserva del sitio rediseñado: una o varias sesiones. */
+export function descargarIcsReserva(r: Reserva, lugar: string): void {
+  const eventos = r.sesiones.map((s, i) => ({
+    uid: `${r.codigo}-${i + 1}`,
+    fecha: s.fecha,
+    inicio: s.inicio,
+    fin: s.fin,
+    titulo: r.sesiones.length > 1 ? `Casa Numa — ${r.titulo} (${i + 1}/${r.sesiones.length})` : `Casa Numa — ${r.titulo}`,
+    lugar,
+    descripcion: `Reservación ${r.codigo}`,
+  }));
+  descargar(construirIcsEventos(eventos), `casa-numa-${r.codigo.toLowerCase()}.ics`);
+}
+
+export function descargarIcs(r: EstadoReserva): void {
+  descargar(construirIcs(r), `casa-numa-${r.workshop.slug}.ics`);
 }
 
 /** Alternativa para quien usa Google Calendar en el navegador. */

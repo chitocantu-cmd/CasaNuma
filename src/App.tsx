@@ -1,88 +1,103 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from './componentes/Layout';
-import { AuthProvider, RequiereAdmin } from './features/admin/auth';
-import { configurado } from './lib/supabase/client';
+import { lazy, Suspense, type ReactNode } from 'react';
+import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { LazyMotion, MotionConfig, domAnimation } from 'framer-motion';
+import Layout from './componentes/layout/Layout';
+import { SesionProvider } from './features/cuenta/sesion';
 import SinConfigurar from './paginas/SinConfigurar';
-
 import Inicio from './paginas/Inicio';
-import Talleres from './paginas/Talleres';
-import TallerDetalle from './paginas/TallerDetalle';
-import Membresia from './paginas/Membresia';
-import Contacto from './paginas/Contacto';
-import Reserva from './paginas/Reserva';
-import PagoExitoso from './paginas/PagoExitoso';
-import PagoCancelado from './paginas/PagoCancelado';
-import NoEncontrado from './paginas/NoEncontrado';
 
 // ---------------------------------------------------------------------------
-// El panel se carga aparte, solo cuando alguien entra a /admin.
+// La portada va en el bundle principal; todo lo demás se carga al entrar.
+// Quien abre el sitio desde Instagram en su teléfono no descarga el flujo de
+// membresía, la tienda ni el panel hasta que los necesita.
 // ---------------------------------------------------------------------------
-// Es un tercio del codigo de la aplicacion y lo usan dos o tres personas. Sin
-// esta separacion, cada clienta que abre la agenda desde su telefono descarga
-// tambien las tablas de reservaciones, el formulario de talleres y el cliente
-// de Cloudinary — codigo que nunca va a ejecutar.
-// ---------------------------------------------------------------------------
-const AdminLayout = lazy(() => import('./paginas/admin/AdminLayout'));
-const AdminLogin = lazy(() => import('./paginas/admin/AdminLogin'));
-const AdminDashboard = lazy(() => import('./paginas/admin/AdminDashboard'));
-const AdminTalleres = lazy(() => import('./paginas/admin/AdminTalleres'));
-const AdminTallerForm = lazy(() => import('./paginas/admin/AdminTallerForm'));
-const AdminReservaciones = lazy(() => import('./paginas/admin/AdminReservaciones'));
-const AdminPagos = lazy(() => import('./paginas/admin/AdminPagos'));
-const AdminProspectos = lazy(() => import('./paginas/admin/AdminProspectos'));
+const Talleres = lazy(() => import('./paginas/Talleres'));
+const ReservarTaller = lazy(() => import('./paginas/ReservarTaller'));
+const Membresia = lazy(() => import('./paginas/Membresia'));
+const ReservarMembresia = lazy(() => import('./paginas/ReservarMembresia'));
+const Kids = lazy(() => import('./paginas/Kids'));
+const ReservarKids = lazy(() => import('./paginas/ReservarKids'));
+const Eventos = lazy(() => import('./paginas/Eventos'));
+const Tienda = lazy(() => import('./paginas/Tienda'));
+const Producto = lazy(() => import('./paginas/Producto'));
+const Nosotras = lazy(() => import('./paginas/Nosotras'));
+const Cuenta = lazy(() => import('./paginas/cuenta/Cuenta'));
+const Acceso = lazy(() => import('./paginas/cuenta/Acceso'));
+const Legal = lazy(() => import('./paginas/Legal'));
+const NoEncontrado = lazy(() => import('./paginas/NoEncontrado'));
 
-function CargandoPanel() {
-  return (
-    <div className="contenedor py-32 text-center">
-      <p className="dato text-tinta/45">Cargando panel…</p>
-    </div>
-  );
+// La presentación de un solo archivo (npm run presentacion) no tiene servidor:
+// usa rutas con # y deja fuera todo lo que necesita Supabase.
+const SIN_BACKEND = import.meta.env.VITE_SIN_BACKEND === 'true';
+const Router = import.meta.env.VITE_ROUTER === 'hash' ? HashRouter : BrowserRouter;
+
+// Estado de pago con Stripe (backend real). Siguen vivas porque los correos
+// de confirmación y Stripe redirigen aquí.
+const Reserva = SIN_BACKEND ? null : lazy(() => import('./paginas/Reserva'));
+const PagoExitoso = SIN_BACKEND ? null : lazy(() => import('./paginas/PagoExitoso'));
+const PagoCancelado = SIN_BACKEND ? null : lazy(() => import('./paginas/PagoCancelado'));
+
+// Panel administrativo: aparte, solo para el equipo, con Supabase adentro.
+const PanelAdmin = SIN_BACKEND ? null : lazy(() => import('./paginas/admin/PanelAdmin'));
+
+// Se lee de las variables en vez de importar el cliente de Supabase: así el
+// cliente (y su peso) solo se descarga en las rutas que lo usan.
+const configurado = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
+
+function Cargando() {
+  return <div className="min-h-[80vh]" aria-busy="true" />;
+}
+
+/** Lo que depende de Supabase explica qué falta en vez de fallar en blanco. */
+function ConBackend({ children }: { children: ReactNode }) {
+  return configurado ? <>{children}</> : <SinConfigurar />;
 }
 
 export default function App() {
-  // Sin las variables de Supabase no hay nada que mostrar: mejor decir qué
-  // falta que servir una pagina en blanco.
-  if (!configurado) return <SinConfigurar />;
-
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Suspense fallback={<CargandoPanel />}>
-        <Routes>
-          {/* Sitio público. Los clientes NUNCA crean cuenta. */}
-          <Route element={<Layout />}>
-            <Route path="/" element={<Inicio />} />
-            <Route path="/talleres" element={<Talleres />} />
-            <Route path="/talleres/:slug" element={<TallerDetalle />} />
-            <Route path="/membresia" element={<Membresia />} />
-            {/* /nosotras ya no existe como pagina: su contenido vive en
-                Inicio. Se redirige para no romper enlaces viejos. */}
-            <Route path="/nosotras" element={<Navigate to="/#nosotras" replace />} />
-            <Route path="/contacto" element={<Contacto />} />
-            <Route path="/reserva/:code" element={<Reserva />} />
-            <Route path="/pago/exitoso" element={<PagoExitoso />} />
-            <Route path="/pago/cancelado" element={<PagoCancelado />} />
-            <Route path="*" element={<NoEncontrado />} />
-          </Route>
+    <Router>
+      <LazyMotion features={domAnimation} strict>
+        <MotionConfig reducedMotion="user">
+          <SesionProvider>
+            <Suspense fallback={<Cargando />}>
+              <Routes>
+                <Route element={<Layout />}>
+                  <Route path="/" element={<Inicio />} />
+                  <Route path="/talleres" element={<Talleres />} />
+                  <Route path="/talleres/:slug" element={<ReservarTaller />} />
+                  <Route path="/membresia" element={<Membresia />} />
+                  <Route path="/membresia/reservar" element={<ReservarMembresia />} />
+                  <Route path="/numa-kids" element={<Kids />} />
+                  <Route path="/numa-kids/reservar" element={<ReservarKids />} />
+                  <Route path="/eventos" element={<Eventos />} />
+                  <Route path="/numa-store" element={<Tienda />} />
+                  <Route path="/numa-store/:slug" element={<Producto />} />
+                  <Route path="/nosotras" element={<Nosotras />} />
+                  <Route path="/cuenta" element={<Cuenta />} />
+                  <Route path="/cuenta/entrar" element={<Acceso modo="entrar" />} />
+                  <Route path="/cuenta/registro" element={<Acceso modo="registro" />} />
+                  <Route path="/cuenta/recuperar" element={<Acceso modo="recuperar" />} />
+                  <Route path="/aviso-de-privacidad" element={<Legal documento="privacidad" />} />
+                  <Route path="/terminos" element={<Legal documento="terminos" />} />
+                  <Route path="/politica-de-reservaciones" element={<Legal documento="reservaciones" />} />
 
-          {/* Panel. El login queda fuera del guardián, por razones obvias. */}
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route
-            path="/admin"
-            element={<RequiereAdmin><AdminLayout /></RequiereAdmin>}
-          >
-            <Route index element={<AdminDashboard />} />
-            <Route path="talleres" element={<AdminTalleres />} />
-            <Route path="talleres/nuevo" element={<AdminTallerForm />} />
-            <Route path="talleres/:id" element={<AdminTallerForm />} />
-            <Route path="reservaciones" element={<AdminReservaciones />} />
-            <Route path="pagos" element={<AdminPagos />} />
-            <Route path="prospectos" element={<AdminProspectos />} />
-          </Route>
-        </Routes>
-        </Suspense>
-      </AuthProvider>
-    </BrowserRouter>
+                  {/* Direcciones del sitio anterior */}
+                  <Route path="/contacto" element={<Navigate to="/#ubicacion" replace />} />
+                  <Route path="/kids" element={<Navigate to="/numa-kids" replace />} />
+                  <Route path="/tienda" element={<Navigate to="/numa-store" replace />} />
+
+                  {Reserva && <Route path="/reserva/:code" element={<ConBackend><Reserva /></ConBackend>} />}
+                  {PagoExitoso && <Route path="/pago/exitoso" element={<ConBackend><PagoExitoso /></ConBackend>} />}
+                  {PagoCancelado && <Route path="/pago/cancelado" element={<ConBackend><PagoCancelado /></ConBackend>} />}
+                  <Route path="*" element={<NoEncontrado />} />
+                </Route>
+
+                {PanelAdmin && <Route path="/admin/*" element={<ConBackend><PanelAdmin /></ConBackend>} />}
+              </Routes>
+            </Suspense>
+          </SesionProvider>
+        </MotionConfig>
+      </LazyMotion>
+    </Router>
   );
 }
