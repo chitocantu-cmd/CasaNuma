@@ -37,9 +37,10 @@ Migraciones v1 (en producción):
   `reservation-status`, holds con vencimiento, cron, correos (Resend),
   Google Calendar, `admin_profiles` + `es_admin()` + RLS.
 
-Migraciones v2 (`20260924100000_estados_v2.sql`, `20260924100100_reservas_v2.sql`,
-`20260924100200_catalogo_agenda.sql`): **aplicadas a la base real el 24 sep 2026**.
-El sitio todavía no las usa: sigue en modo demo hasta el paso 5.
+Migraciones v2 (`20260924100000_estados_v2.sql` … `20260924100400_pago_stripe_una_fila.sql`):
+**aplicadas a la base real el 24 sep 2026**, con las Edge Functions ya
+desplegadas y probadas con un pago real de Stripe en modo prueba. El sitio
+público todavía no las usa: sigue en modo demo hasta el paso 5.
 
 | Entidad pedida | Tabla |
 |---|---|
@@ -84,13 +85,20 @@ pasaron; falla por eso, no por la v2.
    que ya no está publicado (sin reservas vivas) y oculta los ejemplos; no
    borra nada y nunca toca el cupo. *Octubre completo cargado el 24 sep 2026
    (29 horarios).*
-   PENDIENTE: `crear_reserva_sesiones` exige edad ≥ 7 en NUMA Kids; el sitio
-   ya usa 10 a 14 años (Word de octubre). Se ajusta con la migración de las
-   funciones del servidor.
-3. Cambiar `create-reservation` para que llame `crear_reserva_sesiones`, y
-   **retirar** `crear_reserva` v1: las dos no deben aceptar reservas del mismo
-   taller a la vez, porque cada una cuenta su propio cupo.
-4. Configurar `ADMIN_NOTIFICATION_EMAIL` (y, si se quiere, WhatsApp).
+3. *Hecho el 24 sep 2026.* `create-reservation` llama `crear_reserva_sesiones`
+   (acepta el formato v1 `{ slug }` y lo traduce a la sesión: v1 ya no aparta).
+   `create-checkout-session` cobra lo que calculó la base, también para NUMA
+   Kids y membresía. `admin-actions` suma registrar pago, completar / no
+   asistió / notas, reserva manual y cupo. NUMA Kids 10 a 14 años en la base.
+   Webhook de Stripe (modo prueba) creado con 4 eventos; su secreto está en
+   `dev/secretos.env` y en Supabase. `node dev/desplegar.mjs` solo sube
+   valores reales (omite vacíos y los idénticos al ejemplo).
+   Prueba de punta a punta: `node dev/prueba-pago-tmp.mjs` (no se versiona;
+   crea reservas `@ejemplo.com` que se borran con `admin-db.mjs limpiar` y
+   `folio-cero`).
+4. Configurar `ADMIN_NOTIFICATION_EMAIL` y Resend (`RESEND_API_KEY`,
+   `RESEND_FROM_EMAIL` con dominio verificado); si se quiere, WhatsApp.
+   Mientras tanto los correos quedan en la cola y fallan con aviso claro.
 5. Escribir `repoSupabase.ts` y cambiar `VITE_FUENTE_DATOS=supabase`.
 
 ## Método por método

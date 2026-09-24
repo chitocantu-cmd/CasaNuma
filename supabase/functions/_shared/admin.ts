@@ -24,11 +24,16 @@ export interface Admin {
   email: string;
 }
 
+export interface Usuario {
+  userId: string;
+  email: string;
+}
+
 /**
- * Devuelve el admin autenticado, o null si el token falta, es inválido, o el
- * usuario no está en admin_profiles.
+ * La cuenta con sesión iniciada que hace la petición, o null. Con la anon key
+ * sola (visitante sin cuenta) también devuelve null: getUser() falla.
  */
-export async function adminDe(req: Request): Promise<Admin | null> {
+export async function usuarioDe(req: Request): Promise<Usuario | null> {
   const auth = req.headers.get('Authorization');
   if (!auth?.startsWith('Bearer ')) return null;
 
@@ -45,16 +50,26 @@ export async function adminDe(req: Request): Promise<Admin | null> {
 
   const { data: { user }, error } = await comoUsuario.auth.getUser();
   if (error || !user) return null;
+  return { userId: user.id, email: user.email ?? '' };
+}
+
+/**
+ * Devuelve el admin autenticado, o null si el token falta, es inválido, o el
+ * usuario no está en admin_profiles.
+ */
+export async function adminDe(req: Request): Promise<Admin | null> {
+  const usuario = await usuarioDe(req);
+  if (!usuario) return null;
 
   // La pertenencia se consulta con service_role para no depender de las
   // políticas de RLS de admin_profiles.
   const { data: perfil } = await db
     .from('admin_profiles')
     .select('user_id')
-    .eq('user_id', user.id)
+    .eq('user_id', usuario.userId)
     .maybeSingle();
 
   if (!perfil) return null;
 
-  return { userId: user.id, email: user.email ?? '' };
+  return usuario;
 }

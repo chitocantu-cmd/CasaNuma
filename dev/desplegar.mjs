@@ -12,7 +12,8 @@
 // ===========================================================================
 
 import { execSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -62,22 +63,37 @@ try {
 console.log('  Sesión de Supabase: OK');
 
 // --- 2. Secretos -----------------------------------------------------------
+// Solo se suben los valores REALES: se omiten los vacíos, los marcadores
+// (sk_test_..., re_...) y los que siguen idénticos al ejemplo
+// (secretos.env.example). Así un correo de ejemplo nunca llega a producción
+// como si fuera el de Casa Numa.
 let definidos = new Set();
 if (existsSync(SECRETOS)) {
-  const texto = readFileSync(SECRETOS, 'utf8');
-  for (const linea of texto.split('\n')) {
-    const m = linea.match(/^\s*([A-Z_]+)\s*=\s*(.+)\s*$/);
-    // Se ignoran los que siguen con el valor de ejemplo.
-    if (m && !/^(\.\.\.|sk_test_\.\.\.|re_\.\.\.|cambia|TU_|xxx)/i.test(m[2].trim())) {
-      definidos.add(m[1]);
-    }
-  }
+  const leer = (ruta) => Object.fromEntries(
+    readFileSync(ruta, 'utf8').split(/\r?\n/)
+      .map((l) => l.match(/^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/))
+      .filter(Boolean)
+      .map((m) => [m[1], m[2].replace(/^"(.*)"$/, '$1')]),
+  );
+  const reales = leer(SECRETOS);
+  const ejemplo = existsSync(`${SECRETOS}.example`) ? leer(`${SECRETOS}.example`) : {};
+  const subir = Object.entries(reales).filter(([n, v]) =>
+    v && !/^(\.\.\.|sk_test_\.\.\.|re_\.\.\.|cambia|TU_|xxx)/i.test(v) && v !== ejemplo[n]);
+  definidos = new Set(subir.map(([n]) => n));
+  const omitidos = Object.keys(reales).filter((n) => !definidos.has(n));
   console.log(`  Secretos con valor real: ${definidos.size}`);
+  if (omitidos.length) console.log(`  Se omiten (vacíos o de ejemplo): ${omitidos.join(', ')}`);
+
+  // Archivo temporal solo con lo que se sube; se borra aunque falle.
+  const temporal = join(tmpdir(), `numa-secretos-${process.pid}.env`);
   try {
-    sh(`npx supabase secrets set --env-file "${SECRETOS}" --project-ref ${PROJECT_REF}`, true);
+    writeFileSync(temporal, subir.map(([n, v]) => `${n}=${v}`).join('\n') + '\n', { mode: 0o600 });
+    sh(`npx supabase secrets set --env-file "${temporal}" --project-ref ${PROJECT_REF}`, true);
     console.log('  Secretos cargados a Supabase: OK');
   } catch (e) {
     console.error('  No se pudieron cargar los secretos:', e.message.slice(0, 200));
+  } finally {
+    rmSync(temporal, { force: true });
   }
 } else {
   console.log(`

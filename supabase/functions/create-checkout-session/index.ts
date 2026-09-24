@@ -5,8 +5,8 @@
 // lee de la base de datos.
 //
 // Aunque alguien manipule React o DevTools y mande un total distinto, no hay
-// ningún parámetro de monto en esta API: Stripe cobra lo que dice
-// workshops.price × reservations.quantity, recalculado en el servidor.
+// ningún parámetro de monto en esta API: Stripe cobra el precio que calculó
+// la base al apartar (sesión o plan de membresía) × lugares.
 //
 // Se usa Stripe Checkout (página alojada), no Elements ni formulario propio:
 // los datos de tarjeta nunca tocan este código, lo que mantiene a Casa Numa
@@ -15,6 +15,7 @@
 
 import { preflight, json } from '../_shared/cors.ts';
 import { db, getStripe, traducirError, logError, APP_URL } from '../_shared/clients.ts';
+import { fechaCorta } from '../_shared/emails.ts';
 
 // Stripe exige que expires_at esté al menos a 30 minutos. El hold dura menos
 // (10 por omisión), así que el webhook revalida el cupo antes de confirmar.
@@ -43,7 +44,7 @@ Deno.serve(async (req: Request) => {
 
   // ---------------------------------------------------------------------
   // Valida que la reserva exista, siga pending_payment y no haya expirado.
-  // Devuelve el precio recalculado desde workshops.
+  // Devuelve el precio, el nombre y las fechas desde la base.
   // ---------------------------------------------------------------------
   const { data: r, error } = await db.rpc('reserva_para_pago', {
     p_reservation_id: reservationId,
@@ -67,6 +68,20 @@ Deno.serve(async (req: Request) => {
     // exacto y aquí se redondea una sola vez.
     const unitAmountCents = Math.round(Number(r.unit_price) * 100);
 
+    // "sáb 3 oct · 11:00" — una línea por clase en la membresía.
+    const sesiones = (r.sessions ?? []) as { date: string; start_time: string }[];
+    const fechas = sesiones.length
+      ? sesiones.map((x) => `${fechaCorta(x.date)} · ${String(x.start_time).slice(0, 5)} h`).join(', ')
+      : `${r.workshop_date} · ${String(r.workshop_start).slice(0, 5)} h`;
+
+    // Stripe rechaza metadatos nulos: solo va lo que existe.
+    const metadata: Record<string, string> = {
+      reservation_id: r.reservation_id,
+      reservation_code: r.reservation_code,
+      experience_type: r.experience_type ?? 'taller',
+    };
+    if (r.workshop_id) metadata.workshop_id = r.workshop_id;
+
     const sesion = await getStripe().checkout.sessions.create(
       {
         mode: 'payment',
@@ -79,24 +94,14 @@ Deno.serve(async (req: Request) => {
             unit_amount: unitAmountCents,
             product_data: {
               name: r.workshop_title,
-              description: `${r.workshop_date} · ${String(r.workshop_start).slice(0, 5)} h`,
+              description: fechas,
             },
           },
         }],
         // Los metadatos son el hilo que amarra el pago con la reserva cuando
         // el webhook llegue, minutos después y sin el cliente presente.
-        metadata: {
-          reservation_id: r.reservation_id,
-          workshop_id: r.workshop_id,
-          reservation_code: r.reservation_code,
-        },
-        payment_intent_data: {
-          metadata: {
-            reservation_id: r.reservation_id,
-            workshop_id: r.workshop_id,
-            reservation_code: r.reservation_code,
-          },
-        },
+        metadata,
+        payment_intent_data: { metadata },
         success_url: successUrl.replace('{CODE}', r.reservation_code),
         cancel_url: cancelUrl.replace('{CODE}', r.reservation_code),
       },

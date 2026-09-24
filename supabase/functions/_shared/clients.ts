@@ -74,6 +74,12 @@ export const ERRORES: Record<string, { status: number; code: string; mensaje: st
   CN007: { status: 409, code: 'RESERVATION_EXPIRED',     mensaje: 'Tu reserva expiró.' },
 };
 
+/** hint de crear_reserva_sesiones(): [{ session_id, available }]. En v1 era texto. */
+function sesionesSinLugar(hint?: string): unknown {
+  if (!hint) return undefined;
+  try { return JSON.parse(hint); } catch { return undefined; }
+}
+
 export function traducirError(error: { code?: string; details?: string; hint?: string }) {
   const conocido = ERRORES[error.code ?? ''];
   if (!conocido) return null;
@@ -82,8 +88,10 @@ export function traducirError(error: { code?: string; details?: string; hint?: s
     body: {
       error: conocido.code,
       message: conocido.mensaje,
-      // Para INSUFFICIENT_CAPACITY, `details` trae los lugares disponibles.
+      // Para INSUFFICIENT_CAPACITY, `details` trae los lugares disponibles
+      // (el mínimo, si son varias sesiones) y `hint`, cuántos quedan en cada una.
       available: error.code === 'CN001' ? Number(error.details ?? 0) : undefined,
+      sessions: error.code === 'CN001' ? sesionesSinLugar(error.hint) : undefined,
       detail: error.code !== 'CN001' ? (error.details ?? undefined) : undefined,
     },
   };

@@ -143,7 +143,7 @@ seccion('Reglas del catálogo');
   ok('taller "Info DM" (sin precio) no se reserva en línea', !a.ok && a.code === 'CN003', a.error);
   const b = await reservar(db, { tipo: 'taller', sesiones: [S.pasada], personas: 1 });
   ok('una sesión pasada no se reserva', !b.ok && b.code === 'CN006', b.error);
-  const c = await reservar(db, { tipo: 'kids', sesiones: [S.halloween], personas: 1, ninos: [{ name: 'Ana', age: 8 }] });
+  const c = await reservar(db, { tipo: 'kids', sesiones: [S.halloween], personas: 1, ninos: [{ name: 'Ana', age: 11 }] });
   ok('no se mezcla el tipo de experiencia con la sesión', !c.ok && c.code === 'CN002', c.error);
   const d = await reservar(db, { tipo: 'taller', sesiones: [S.halloween], personas: 1, tel: '123' });
   ok('teléfono inválido se rechaza en el backend', !d.ok && d.code === 'CN004', d.error);
@@ -152,14 +152,21 @@ seccion('Reglas del catálogo');
 // ---------------------------------------------------------------------------
 seccion('NUMA Kids (cupo sin confirmar)');
 {
-  const ninos = Array.from({ length: 7 }, (_, i) => ({ name: `Niña ${i}`, age: 8 }));
+  const ninos = Array.from({ length: 7 }, (_, i) => ({ name: `Niña ${i}`, age: 11 }));
   const a = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 7, ninos });
   ok('cupo sin confirmar: aplica el tope por reserva (6)', !a.ok && a.code === 'CN004', a.error);
-  const b = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 2, ninos: [{ name: 'Emilio', age: 8 }] });
+  const b = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 2, ninos: [{ name: 'Emilio', age: 11 }] });
   ok('un nombre y edad por cada lugar', !b.ok && b.code === 'CN004', b.error);
   const b2 = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 1, ninos: [{ name: 'Sofía', age: 5 }] });
-  ok('edad mínima 7 también en el backend', !b2.ok && b2.code === 'CN004' && /7 años/.test(b2.detail ?? ''), b2.error);
-  const c = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 1, ninos: [{ name: 'Emilio', age: 8, alergias: 'x', escuela: 'y' }],
+  ok('menores de la edad mínima se rechazan en el backend', !b2.ok && b2.code === 'CN004', b2.error);
+  const b3 = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 1, ninos: [{ name: 'Sofía', age: 8 }] });
+  ok('NUMA Kids: 8 años no (10 a 14)', !b3.ok && b3.code === 'CN004' && /10 a 14/.test(b3.detail ?? ''), b3.error);
+  const b4 = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 1, ninos: [{ name: 'Sofía', age: 15 }] });
+  ok('NUMA Kids: 15 años no (10 a 14)', !b4.ok && b4.code === 'CN004', b4.error);
+  const { rows: [{ sueltos }] } = await db.query(`select count(*)::int sueltos from reservations r
+     where r.experience_type = 'kids' and not exists (select 1 from reservation_children c where c.reservation_id = r.id)`);
+  ok('una edad rechazada no deja reservas a medias', sueltos === 0, String(sueltos));
+  const c = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 1, ninos: [{ name: 'Emilio', age: 11, alergias: 'x', escuela: 'y' }],
     nombre: 'Tutora Kids', correo: 'tutora@ejemplo.com' });
   ok('reserva de NUMA Kids', c.ok, c.error);
   ok('precio del backend: $680', Number(c.rows?.[0].r.total_amount) === 680);
@@ -225,6 +232,86 @@ seccion('Panel: reserva manual y pago por transferencia');
   ok('una completada sigue contando en el cupo', o === 2, String(o));
   const n = await intentar(db, `select admin_actualizar_reserva($1, 'confirmed')`, [r.reservation_id]);
   ok('solo acepta completada / no asistió', !n.ok && n.code === 'CN004', n.error);
+}
+
+// ---------------------------------------------------------------------------
+seccion('Pago y consulta de NUMA Kids y membresía');
+{
+  const k = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 1, ninos: [{ name: 'Mateo', age: 12 }],
+    nombre: 'Tutor Pago', correo: 'tutor-pago@ejemplo.com' });
+  ok('reserva de NUMA Kids para pagar', k.ok, k.error);
+  const { rows: [{ p }] } = await db.query(`select reserva_para_pago($1) p`, [k.rows[0].r.reservation_id]);
+  ok('reserva_para_pago: NUMA Kids $680 sin taller ligado',
+     p.workshop_title === 'NUMA Kids' && Number(p.unit_price) === 680 && Number(p.total_amount) === 680
+     && p.workshop_id === null && p.sessions.length === 1 && p.customer_email === 'tutor-pago@ejemplo.com', JSON.stringify(p));
+
+  const sesMem = [];
+  for (const d of [2, 9, 16, 23]) {
+    sesMem.push(await sesion(`insert into workshop_sessions (experience_type, date, start_time, end_time)
+      values ('membresia', (date_trunc('month', now()) + interval '4 months')::date + ${d - 1}, '10:00', '13:00')`));
+  }
+  const m = await reservar(db, { tipo: 'membresia', sesiones: sesMem, nombre: 'Alumna Pago', correo: 'alumna-pago@ejemplo.com' });
+  ok('membresía para pagar', m.ok, m.error);
+  const { rows: [{ q }] } = await db.query(`select reserva_para_pago($1) q`, [m.rows[0].r.reservation_id]);
+  ok('reserva_para_pago: membresía $3,200 con sus 4 clases',
+     q.workshop_title === 'Membresía NUMA' && Number(q.total_amount) === 3200 && q.quantity === 1 && q.sessions.length === 4, JSON.stringify(q));
+
+  await pagar(db, m.rows[0].r.reservation_id, 9);
+  const { rows: [{ c }] } = await db.query(`select consultar_reserva($1, 'alumna-pago@ejemplo.com') c`, [m.rows[0].r.reservation_code]);
+  ok('consultar_reserva: membresía confirmada, con folio y sus 4 clases',
+     c && c.status === 'confirmed' && /^NUMA-\d{5}$/.test(c.folio ?? '') && c.sessions.length === 4 && c.payment_status === 'paid', JSON.stringify(c));
+  ok('consultar_reserva no expone los datos del cliente', c && !('customer' in c));
+  const { rows: [{ x }] } = await db.query(`select consultar_reserva($1, 'otra@ejemplo.com') x`, [m.rows[0].r.reservation_code]);
+  ok('consultar_reserva con otro correo no devuelve nada', x === null);
+
+  const venc = await intentar(db, `select reserva_para_pago($1)`, [m.rows[0].r.reservation_id]);
+  ok('una reserva ya pagada no se vuelve a cobrar', !venc.ok && venc.code === 'CN007', venc.error);
+}
+
+// ---------------------------------------------------------------------------
+seccion('Pago real de Stripe: fila pendiente → pagada');
+{
+  const s4 = await sesion(`insert into workshop_sessions (experience_type, workshop_id, date, start_time, capacity, price)
+                            values ('taller', '${taller}', current_date + 41, '11:00', 4, 800)`);
+  const a = await reservar(db, { tipo: 'taller', sesiones: [s4], personas: 2, correo: 'stripe@ejemplo.com' });
+  const id = a.rows[0].r.reservation_id;
+  // create-checkout-session deja la fila pendiente con la sesión de Stripe.
+  await db.query(`select guardar_checkout_session($1, 'cs_flujo', 1600, 'mxn')`, [id]);
+  const w = await intentar(db, `select confirmar_pago($1, 'cs_flujo', 'pi_flujo', 1600, 'mxn', 'paid') s`, [id]);
+  ok('el webhook confirma sobre la fila pendiente (sin choque de índice)', w.ok && w.rows[0].s === 'confirmed', w.error);
+  const f = await intentar(db, `select confirmar_pago($1, 'cs_flujo', 'pi_flujo', 1600, 'mxn', 'paid') s`, [id]);
+  ok('el respaldo llega después: already_confirmed', f.ok && f.rows[0].s === 'already_confirmed', f.error);
+  const { rows: pagos } = await db.query(`select status::text, stripe_payment_intent_id i, method from payments where reservation_id = $1`, [id]);
+  ok('una sola fila de pago, pagada, con el cobro de Stripe',
+     pagos.length === 1 && pagos[0].status === 'paid' && pagos[0].i === 'pi_flujo' && pagos[0].method === 'tarjeta', JSON.stringify(pagos));
+
+  // Pago tardío sin cupo, también con fila pendiente previa.
+  const b = await reservar(db, { tipo: 'taller', sesiones: [s4], personas: 2, correo: 'tarde@ejemplo.com' });
+  const idB = b.rows[0].r.reservation_id;
+  await db.query(`select guardar_checkout_session($1, 'cs_tarde', 1600, 'mxn')`, [idB]);
+  await db.query(`update reservations set expires_at = now() - interval '1 minute' where id = $1`, [idB]);
+  await reservar(db, { tipo: 'taller', sesiones: [s4], personas: 2, correo: 'gana@ejemplo.com' });
+  const t = await intentar(db, `select confirmar_pago($1, 'cs_tarde', 'pi_tarde', 1600, 'mxn', 'paid') s`, [idB]);
+  ok('pago tardío sin cupo → needs_review (con fila pendiente previa)', t.ok && t.rows[0].s === 'needs_review', t.error);
+  const { rows: [pt] } = await db.query(`select count(*)::int n, bool_and(needs_review) r, min(status::text) st from payments where reservation_id = $1`, [idB]);
+  ok('…una sola fila, pagada y marcada para revisión', pt.n === 1 && pt.r === true && pt.st === 'paid', JSON.stringify(pt));
+}
+
+// ---------------------------------------------------------------------------
+seccion('Cupo desde el panel');
+{
+  const s3 = await sesion(`insert into workshop_sessions (experience_type, workshop_id, date, start_time, capacity, price)
+                            values ('taller', '${taller}', current_date + 40, '11:00', null, 800)`);
+  const a = await reservar(db, { tipo: 'taller', sesiones: [s3], personas: 3, correo: 'cupo@ejemplo.com' });
+  ok('reserva de 3 con cupo sin confirmar', a.ok, a.error);
+  const bajo = await intentar(db, `select admin_ajustar_cupo($1, 2)`, [s3]);
+  ok('no deja poner un cupo menor a lo reservado', !bajo.ok && bajo.code === 'CN004' && /3 lugares/.test(bajo.detail ?? ''), bajo.error);
+  const bien = await intentar(db, `select (admin_ajustar_cupo($1, 5)).capacity c`, [s3]);
+  ok('cupo 5 con 3 reservados', bien.ok && bien.rows[0].c === 5, bien.error);
+  const { rows: [pub] } = await db.query(`select seats_available from public_sessions where id = $1`, [s3]);
+  ok('el sitio ve 2 disponibles', pub.seats_available === 2, String(pub.seats_available));
+  const nulo = await intentar(db, `select (admin_ajustar_cupo($1, null)).capacity c`, [s3]);
+  ok('se puede regresar a «cupo sin confirmar»', nulo.ok && nulo.rows[0].c === null, nulo.error);
 }
 
 // ---------------------------------------------------------------------------

@@ -4,9 +4,13 @@
 // Acciones administrativas que no pueden ser un simple UPDATE desde el
 // navegador, porque implican reglas de negocio, bitácora y efectos en cola:
 //
-//   · cancel_reservation  — libera cupo, avisa al cliente, actualiza Calendar
-//   · sync_calendar       — fuerza la sincronización de un taller
-//   · retry_job           — reintenta un trabajo que quedó en 'failed'
+//   · cancel_reservation        — libera cupo, avisa al cliente, actualiza Calendar
+//   · register_payment          — pago recibido por transferencia o efectivo
+//   · update_reservation        — completada / no asistió / notas internas
+//   · create_manual_reservation — reserva que registra el equipo (y su pago)
+//   · set_capacity              — cupo de una sesión (nunca menor a lo reservado)
+//   · sync_calendar             — fuerza la sincronización de un taller
+//   · retry_job                 — reintenta un trabajo que quedó en 'failed'
 //
 // Todas verifican en el SERVIDOR que quien llama sea admin. Ocultar un botón
 // en React no es seguridad: cualquiera puede llamar al endpoint directamente.
@@ -60,6 +64,109 @@ Deno.serve(async (req: Request) => {
         });
         if (error) throw error;
         return json({ ok: true, result: data }, 200, origin);
+      }
+
+      // ---------------------------------------------------------------------
+      // Registrar un pago recibido (transferencia, efectivo…)
+      // ---------------------------------------------------------------------
+      // Confirma la reserva, le pone folio si no tenía y encola los avisos.
+      // Si el apartado ya había vencido, la base vuelve a medir el cupo.
+      // ---------------------------------------------------------------------
+      case 'register_payment': {
+        const id = String(body.reservation_id ?? '');
+        const monto = Number(body.amount);
+        if (!id || !Number.isFinite(monto)) return json({ error: 'INVALID_INPUT' }, 400, origin);
+
+        const { data, error } = await db.rpc('registrar_pago_manual', {
+          p_reservation_id: id,
+          p_amount: monto,
+          p_method: String(body.method ?? 'transferencia'),
+          p_reference: body.reference ? String(body.reference) : null,
+          p_avisar_cliente: body.notify_client !== false,
+          p_actor: admin.email || admin.userId,
+        });
+        if (error) throw error;
+        return json({ ok: true, result: data }, 200, origin);
+      }
+
+      // ---------------------------------------------------------------------
+      // Completada / no asistió / notas internas
+      // ---------------------------------------------------------------------
+      case 'update_reservation': {
+        const id = String(body.reservation_id ?? '');
+        if (!id) return json({ error: 'INVALID_INPUT' }, 400, origin);
+
+        const { data, error } = await db.rpc('admin_actualizar_reserva', {
+          p_reservation_id: id,
+          p_status: body.status ? String(body.status) : null,
+          p_internal_notes: typeof body.internal_notes === 'string' ? body.internal_notes : null,
+          p_actor: admin.email || admin.userId,
+        });
+        if (error) throw error;
+        return json({ ok: true, reservation: data }, 200, origin);
+      }
+
+      // ---------------------------------------------------------------------
+      // Reserva registrada por el equipo
+      // ---------------------------------------------------------------------
+      // Pasa por la misma función que la web: mismo cupo, mismas reglas. Queda
+      // con folio desde que se crea y aparta hasta la hora de la clase.
+      // ---------------------------------------------------------------------
+      case 'create_manual_reservation': {
+        const sesiones = Array.isArray(body.session_ids) ? body.session_ids.map(String) : [];
+        const ninos = Array.isArray(body.children)
+          ? (body.children as Record<string, unknown>[]).map((n) => ({ name: String(n?.name ?? ''), age: Number(n?.age) }))
+          : [];
+
+        const { data: r, error } = await db.rpc('crear_reserva_sesiones', {
+          p_tipo: String(body.tipo ?? ''),
+          p_session_ids: sesiones,
+          p_quantity: Number(body.quantity),
+          p_full_name: String(body.full_name ?? ''),
+          p_email: String(body.email ?? ''),
+          p_phone: String(body.phone ?? ''),
+          p_children: ninos,
+          p_origin: 'panel',
+          p_notes: body.notes ? String(body.notes) : null,
+        });
+        if (error) throw error;
+
+        if (body.paid === true) {
+          const { error: e2 } = await db.rpc('registrar_pago_manual', {
+            p_reservation_id: r.reservation_id,
+            p_amount: Number(r.total_amount),
+            p_method: String(body.method ?? 'transferencia'),
+            p_reference: body.reference ? String(body.reference) : null,
+            p_avisar_cliente: body.notify_client !== false,
+            p_actor: admin.email || admin.userId,
+          });
+          if (e2) throw e2;
+        }
+        if (typeof body.internal_notes === 'string' && body.internal_notes.trim()) {
+          await db.rpc('admin_actualizar_reserva', {
+            p_reservation_id: r.reservation_id,
+            p_internal_notes: body.internal_notes,
+            p_actor: admin.email || admin.userId,
+          });
+        }
+        return json({ ok: true, reservation: r }, 200, origin);
+      }
+
+      // ---------------------------------------------------------------------
+      // Cupo de una sesión (null = sin confirmar, "Cupo limitado")
+      // ---------------------------------------------------------------------
+      case 'set_capacity': {
+        const id = String(body.session_id ?? '');
+        const cupo = body.capacity === null || body.capacity === '' ? null : Number(body.capacity);
+        if (!id || (cupo !== null && !Number.isInteger(cupo))) return json({ error: 'INVALID_INPUT' }, 400, origin);
+
+        const { data, error } = await db.rpc('admin_ajustar_cupo', {
+          p_session_id: id,
+          p_capacity: cupo,
+          p_actor: admin.email || admin.userId,
+        });
+        if (error) throw error;
+        return json({ ok: true, session: data }, 200, origin);
       }
 
       // ---------------------------------------------------------------------
