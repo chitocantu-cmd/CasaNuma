@@ -1,14 +1,12 @@
 // ===========================================================================
 // DATOS DE DEMOSTRACIÓN — MOCK DATA
 // ---------------------------------------------------------------------------
-// Nada de este archivo está confirmado por Casa Numa salvo lo que viene de
-// src/contenido/oferta.ts (precio, días y horarios de membresía y NUMA Kids).
+// Los talleres ya NO salen de aquí: la agenda real vive en src/datos/agenda.ts.
 //
-// · Talleres: los tres ejemplos que Casa Numa comunicó (documento, sección 5),
-//   con fechas, precios, duraciones, inclusiones y cupos INVENTADOS para que
-//   el flujo de reserva se pueda probar. La agenda real la carga el panel.
-// · Cupos de membresía y NUMA Kids: pendientes; aquí 8 y 10 de ejemplo.
-// · Productos: fichas de ejemplo; Casa Numa subirá las reales.
+// Lo que sigue siendo de ejemplo:
+// · Fechas concretas y cupos de membresía y NUMA Kids (8 y 10 de ejemplo):
+//   los días, horarios y precios sí vienen de src/contenido/oferta.ts.
+// · Productos de NUMA Store: fichas de ejemplo; Casa Numa subirá las reales.
 //
 // Las fechas se generan respecto a hoy para que la demo nunca "caduque".
 // ===========================================================================
@@ -17,9 +15,9 @@ import { KIDS, MEMBRESIA } from '../../contenido/oferta';
 import {
   claveMes, diaSemana, diasDelMes, etiquetaMes, hoy, proximoDia, sumarDias, sumarMeses,
 } from '../../lib/calendario';
-import type { MesMembresia, Producto, Sesion, Taller } from '../tipos';
+import type { MesMembresia, Producto, Sesion } from '../tipos';
+import { AGENDA } from '../agenda';
 
-const CUPO_TALLER = 12;
 const CUPO_MEMBRESIA = 8;
 const CUPO_KIDS = 10;
 
@@ -39,86 +37,7 @@ export function ocupacionInicial(id: string, cupo: number): number {
 }
 
 function sesion(id: string, fecha: string, inicio: string, fin: string, cupo: number): Sesion {
-  return { id, fecha, inicio, fin, cupo, disponibles: cupo };
-}
-
-// ---------------------------------------------------------------------------
-// Talleres de fin de semana
-// ---------------------------------------------------------------------------
-// Documento: "Tazas de Halloween: sábado, 11:00 a.m. y 4:00 p.m. · Tazas de
-// Catrina: domingo, 11:00 a.m. · Cerámica libre: sábado del siguiente fin de
-// semana, 11:00 a.m. y 4:00 p.m." Se anclan al fin de semana del 24 de
-// octubre de 2026 y se recorren semanas completas si esa fecha ya pasó.
-// ---------------------------------------------------------------------------
-function anclaTalleres(): string {
-  const base = '2026-10-24';
-  const minimo = sumarDias(hoy(), 2);
-  let f = base;
-  while (f < minimo) f = sumarDias(f, 7);
-  return f;
-}
-
-export function talleresSemilla(): Taller[] {
-  const sabado = anclaTalleres();
-  const domingo = sumarDias(sabado, 1);
-  const sabadoSiguiente = sumarDias(sabado, 7);
-
-  return [
-    {
-      id: 'demo-halloween',
-      slug: 'tazas-de-halloween',
-      titulo: 'Tazas de Halloween',
-      resumen: 'Decora tu propia taza con motivos de Halloween y llévatela terminada.',
-      descripcion: [
-        'Una tarde para pintar tu taza con calabazas, fantasmas o lo que se te ocurra.',
-        'No necesitas experiencia: te guiamos desde el primer trazo.',
-      ],
-      foto: 'taller-halloween',
-      precio: 650,
-      duracionMin: 120,
-      incluye: ['Taza de cerámica', 'Pinturas y pinceles', 'Vidriado y horneado'],
-      sesiones: [
-        sesion(`hal-${sabado}-1100`, sabado, '11:00', '13:00', CUPO_TALLER),
-        sesion(`hal-${sabado}-1600`, sabado, '16:00', '18:00', CUPO_TALLER),
-      ],
-      demo: true,
-    },
-    {
-      id: 'demo-catrina',
-      slug: 'tazas-de-catrina',
-      titulo: 'Tazas de Catrina',
-      resumen: 'Pinta una taza inspirada en la Catrina para celebrar Día de Muertos.',
-      descripcion: [
-        'Flores, calaveras y color: una taza con la fiesta más nuestra.',
-        'Trabajas a tu ritmo, con el acompañamiento del equipo NUMA.',
-      ],
-      foto: 'taller-catrina',
-      precio: 690,
-      duracionMin: 120,
-      incluye: ['Taza de cerámica', 'Pinturas y pinceles', 'Vidriado y horneado'],
-      sesiones: [sesion(`cat-${domingo}-1100`, domingo, '11:00', '13:00', CUPO_TALLER)],
-      demo: true,
-    },
-    {
-      id: 'demo-libre',
-      slug: 'ceramica-libre',
-      titulo: 'Cerámica libre',
-      resumen: 'Elige tu proyecto y dale forma con tus manos, sin guion fijo.',
-      descripcion: [
-        'Modela la pieza que tengas en mente con las técnicas de construcción a mano.',
-        'Ideal si ya viniste antes o si quieres experimentar con libertad.',
-      ],
-      foto: 'taller-libre',
-      precio: 600,
-      duracionMin: 150,
-      incluye: ['Arcilla', 'Herramientas del estudio', 'Vidriado y horneado'],
-      sesiones: [
-        sesion(`lib-${sabadoSiguiente}-1100`, sabadoSiguiente, '11:00', '13:30', CUPO_TALLER),
-        sesion(`lib-${sabadoSiguiente}-1600`, sabadoSiguiente, '16:00', '18:30', CUPO_TALLER),
-      ],
-      demo: true,
-    },
-  ];
+  return { id, fecha, inicio, fin, cupo, disponibles: cupo, agotada: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -144,11 +63,17 @@ export function mesesMembresiaSemilla(): MesMembresia[] {
 // NUMA Kids: jueves a las 5:00 p.m., las próximas diez semanas
 // ---------------------------------------------------------------------------
 export function sesionesKidsSemilla(): Sesion[] {
+  // Si la agenda real ya tiene un taller de niños ese jueves a la misma hora
+  // (p. ej. "Tardes de Cerámica (Niños)" del 1 de octubre), manda la agenda:
+  // no se ofrece además una sesión de NUMA Kids de ejemplo en el mismo horario.
+  const ocupados = new Set(
+    AGENDA.filter((t) => t.is_active && t.category === 'kids' && t.sessions.some((x) => x.start_time === KIDS.inicio))
+      .map((t) => t.date),
+  );
   const primero = proximoDia(hoy(), KIDS.diaSemana);
-  return Array.from({ length: 10 }, (_, i) => {
-    const fecha = sumarDias(primero, i * 7);
-    return sesion(`kids-${fecha}`, fecha, KIDS.inicio, KIDS.fin, CUPO_KIDS);
-  });
+  return Array.from({ length: 10 }, (_, i) => sumarDias(primero, i * 7))
+    .filter((fecha) => !ocupados.has(fecha))
+    .map((fecha) => sesion(`kids-${fecha}`, fecha, KIDS.inicio, KIDS.fin, CUPO_KIDS));
 }
 
 // ---------------------------------------------------------------------------

@@ -15,11 +15,17 @@ export interface Sesion {
   id: string;
   fecha: string;
   inicio: string;
-  fin: string;
-  cupo: number;
-  /** Ya descuenta reservas confirmadas y apartados vigentes. */
-  disponibles: number;
+  /** null = Casa Numa no ha dado la hora de término. */
+  fin: string | null;
+  /** null = cupo sin confirmar: se muestra "Cupo limitado" y no se cuenta. */
+  cupo: number | null;
+  /** Ya descuenta reservas confirmadas y apartados vigentes. null si no hay cupo. */
+  disponibles: number | null;
+  /** Cerrada a mano aunque no haya número de cupo. */
+  agotada: boolean;
 }
+
+export type CategoriaTaller = 'adultos' | 'ninos' | 'temporada';
 
 export interface Taller {
   id: string;
@@ -28,11 +34,21 @@ export interface Taller {
   resumen: string;
   descripcion: string[];
   foto: IdFoto;
-  /** Precio por persona, MXN. Cada taller tiene el suyo: no hay precio global. */
-  precio: number;
-  duracionMin: number;
+  /** Filtros de la agenda. */
+  categoria: CategoriaTaller;
+  /** Texto corto de público o tipo: "Niños", "Adultos", "Clases", "Temporada". */
+  etiqueta: string;
+  edad: { min: number; max: number } | null;
+  /** Precio por persona, MXN. null = sin precio publicado (se pide por mensaje). */
+  precio: number | null;
+  /** Lo que se muestra cuando no hay precio, tal como lo publica Casa Numa. */
+  etiquetaPrecio: string | null;
+  /** false = no se cobra en línea: el botón pide información. */
+  reservaEnLinea: boolean;
+  duracionMin: number | null;
   incluye: string[];
   sesiones: Sesion[];
+  destacado: boolean;
   /** true = dato de demostración, no confirmado por Casa Numa. */
   demo: boolean;
 }
@@ -85,7 +101,7 @@ export interface SesionReservada {
   id: string;
   fecha: string;
   inicio: string;
-  fin: string;
+  fin: string | null;
 }
 
 export interface Reserva {

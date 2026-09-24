@@ -83,8 +83,16 @@ export function hora(hhmm: string): string {
   return `${h12}:${dos(m)} ${h >= 12 ? 'p.m.' : 'a.m.'}`;
 }
 
-export function rango(inicio: string, fin: string): string {
-  return `${hora(inicio)} – ${hora(fin)}`;
+/** "5:00 p.m. – 6:30 p.m.", o solo el inicio si no hay hora de término. */
+export function rango(inicio: string, fin: string | null): string {
+  return fin ? `${hora(inicio)} – ${hora(fin)}` : hora(inicio);
+}
+
+/** Minutos entre dos horas 'HH:MM'. */
+export function minutosEntre(inicio: string, fin: string): number {
+  const [hi, mi] = inicio.split(':').map(Number);
+  const [hf, mf] = fin.split(':').map(Number);
+  return hf * 60 + mf - (hi * 60 + mi);
 }
 
 export function duracionTexto(minutos: number): string {

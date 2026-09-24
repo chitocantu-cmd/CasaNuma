@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { fuenteDatos, siteConfig } from '../config/site';
+import { enlaceInstagram, fuenteDatos, siteConfig } from '../config/site';
 
 // ---------------------------------------------------------------------------
 // SEO por página: title, description, OpenGraph, canonical y JSON-LD.
@@ -42,7 +42,7 @@ export function useSeo({
     meta('meta[name="description"]', 'name', 'description', descripcion);
     meta('meta[property="og:title"]', 'property', 'og:title', titulo);
     meta('meta[property="og:description"]', 'property', 'og:description', descripcion);
-    // La demo (talleres y precios de ejemplo) no se indexa en buscadores.
+    // La demo (pagos simulados, cupos y productos de ejemplo) no se indexa.
     const publicable = indexar && fuenteDatos !== 'demo';
     meta('meta[name="robots"]', 'name', 'robots', publicable ? 'index, follow' : 'noindex, nofollow');
 
@@ -86,14 +86,15 @@ export function ldNegocio(): JsonLd | null {
       addressCountry: 'MX',
     },
     ...(siteConfig.url ? { url: siteConfig.url } : {}),
+    ...(enlaceInstagram() ? { sameAs: [enlaceInstagram()] } : {}),
     ...(siteConfig.whatsapp ? { telephone: `+${siteConfig.whatsapp.replace(/\D/g, '')}` } : {}),
   };
 }
 
 /** Event: solo para talleres con datos definitivos y dirección confirmada. */
 export function ldEvento(e: {
-  nombre: string; descripcion: string; fecha: string; inicio: string; fin: string;
-  precio: number; disponibles: number; demo: boolean;
+  nombre: string; descripcion: string; fecha: string; inicio: string; fin: string | null;
+  precio: number | null; agotado: boolean; demo: boolean;
 }): JsonLd | null {
   if (e.demo || !siteConfig.direccion) return null;
   return {
@@ -102,16 +103,21 @@ export function ldEvento(e: {
     name: e.nombre,
     description: e.descripcion,
     startDate: `${e.fecha}T${e.inicio}:00-06:00`,
-    endDate: `${e.fecha}T${e.fin}:00-06:00`,
+    ...(e.fin ? { endDate: `${e.fecha}T${e.fin}:00-06:00` } : {}),
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     eventStatus: 'https://schema.org/EventScheduled',
     location: { '@type': 'Place', name: siteConfig.nombre, address: `${siteConfig.direccion}, ${siteConfig.zona}` },
-    offers: {
-      '@type': 'Offer',
-      price: e.precio,
-      priceCurrency: 'MXN',
-      availability: e.disponibles > 0 ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
-    },
+    // Sin precio publicado no se declara oferta: sería un precio inventado.
+    ...(e.precio !== null
+      ? {
+          offers: {
+            '@type': 'Offer',
+            price: e.precio,
+            priceCurrency: 'MXN',
+            availability: e.agotado ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+          },
+        }
+      : {}),
   };
 }
 

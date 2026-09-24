@@ -21,7 +21,7 @@ apartado de 15 minutos) son las que el backend debe hacer cumplir en SQL.
 
 | Método | Hoy (demo) | Con Supabase |
 |---|---|---|
-| `talleres()` / `taller(slug)` | `semilla.ts` | `public_workshops`. El esquema actual es una fila por fecha; para «un taller, varios horarios» agregar una columna `grupo` (o tabla `workshop_series`) y agrupar. |
+| `talleres()` / `taller(slug)` | `src/datos/agenda.ts` (datos reales) | `public_workshops`. Cada registro de `agenda.ts` ya tiene la forma de la fila: `id, slug, title, description, date, sessions, category, image, price, price_type, price_label, capacity/available_spots/is_sold_out (por sesión), age_min, age_max, is_featured, is_active, booking_type`. Hoy la tabla es una fila por fecha y horario; para «un taller, varios horarios» agregar `workshop_sessions` o una columna `grupo`. `capacity`, `price` y `end_time` deben aceptar `null` (dato no publicado). |
 | `mesesMembresia()` | generado | **Nuevo:** tabla `class_sessions` (`tipo` = `membresia`/`kids`, fecha, inicio, fin, `capacity`, `status`) + vista pública con disponibles. |
 | `sesionesKids()` | generado | `class_sessions` con `tipo = 'kids'`. |
 | `productos()` / `producto(slug)` | `PRODUCTOS_SEMILLA` | **Nuevo:** tabla `products` (fotos en Cloudinary, `published`, `disponibilidad`) + vista pública. |
@@ -33,6 +33,15 @@ apartado de 15 minutos) son las que el backend debe hacer cumplir en SQL.
 | `recuperarPassword` | simulado | `supabase.auth.resetPasswordForEmail` + página de nueva contraseña. |
 | `actualizarPerfil` | localStorage | `update customers` con RLS sobre la propia fila. |
 | `suscribirNovedades` | localStorage | **Nuevo:** tabla `newsletter_subscribers` (correo, fecha y origen del consentimiento, baja). Independiente de la cuenta. |
+
+## Agenda sin precio o sin cupo
+
+- `price: null` + `booking_type: 'inquiry'` → la tarjeta muestra
+  `price_label` («Info DM») y un botón de «Solicitar información» (WhatsApp o
+  mensaje directo de Instagram). `create-reservation` debe rechazar estos
+  talleres aunque alguien llame a la función a mano.
+- `capacity: null` → «Cupo limitado»; no se cuenta cupo ni se rechaza por
+  lleno. En cuanto haya número, el conteo transaccional existente aplica.
 
 ## Configuración
 

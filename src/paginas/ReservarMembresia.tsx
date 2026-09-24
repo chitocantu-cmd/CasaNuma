@@ -14,6 +14,7 @@ import { Pendiente } from '../componentes/base/Pendiente';
 import { MEMBRESIA } from '../contenido/oferta';
 import { diaSemana, fechaCompleta, rango, yaPaso } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
+import { sinLugar } from '../lib/cupo';
 import { useSeo } from '../lib/seo';
 
 const PASOS = ['Mes', 'Tus 4 clases', 'Resumen', 'Tus datos', 'Pago'];
@@ -21,7 +22,7 @@ const CLASES = MEMBRESIA.clasesPorMes;
 
 /** Un mes se ofrece si todavía caben 4 clases con lugar. */
 function reservable(m: MesMembresia) {
-  return m.sesiones.filter((s) => s.disponibles > 0 && !yaPaso(s.fecha, s.inicio)).length >= CLASES;
+  return m.sesiones.filter((s) => !sinLugar(s)).length >= CLASES;
 }
 
 export default function ReservarMembresia() {
@@ -59,7 +60,7 @@ export default function ReservarMembresia() {
 
   // Si al recargar el cupo una clase elegida se llenó, se quita y se avisa.
   useEffect(() => {
-    const llenas = seleccion.filter((s) => s.disponibles <= 0);
+    const llenas = seleccion.filter(sinLugar);
     if (llenas.length && paso <= 2) {
       setElegidas((v) => v.filter((id) => !llenas.some((s) => s.id === id)));
       setAviso(`${llenas.length === 1 ? 'Una de tus clases se llenó' : 'Algunas de tus clases se llenaron'}. Elige otra fecha.`);
@@ -74,7 +75,7 @@ export default function ReservarMembresia() {
       setElegidas(actual.filter((x) => x !== s.id));
       return;
     }
-    if (s.disponibles <= 0) return setAviso('Esa sesión está llena. Elige otra fecha.');
+    if (sinLugar(s)) return setAviso('Esa sesión está llena. Elige otra fecha.');
     if (yaPaso(s.fecha, s.inicio)) return setAviso('Esa fecha ya pasó.');
     if (actual.length >= CLASES) {
       return setAviso(`Ya elegiste tus ${CLASES} clases. Quita una para cambiarla.`);
@@ -176,7 +177,7 @@ export default function ReservarMembresia() {
               )}
               <div className="mt-8 grid gap-3 sm:grid-cols-2">
                 {disponibles.map((m) => {
-                  const libres = m.sesiones.filter((s) => s.disponibles > 0 && !yaPaso(s.fecha, s.inicio)).length;
+                  const libres = m.sesiones.filter((s) => !sinLugar(s)).length;
                   const activo = m.clave === clave;
                   return (
                     <button

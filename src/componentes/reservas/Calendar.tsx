@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { Sesion } from '../../datos/tipos';
 import { diaSemana, diasDelMes, etiquetaMes, fechaCompleta, partes, yaPaso } from '../../lib/calendario';
+import { pocosLugares, sinLugar } from '../../lib/cupo';
 import { Icono } from '../base/Iconos';
 
 const ENCABEZADO = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
@@ -87,9 +88,13 @@ export default function Calendar({
               </span>
             );
           }
-          const lugares = del.reduce((n, s) => n + s.disponibles, 0);
-          const lleno = lugares === 0;
-          const pocos = !lleno && del.every((s) => s.disponibles <= 3);
+          const abiertas = del.filter((s) => !sinLugar(s));
+          const lleno = abiertas.length === 0;
+          const pocos = !lleno && abiertas.every(pocosLugares);
+          // Si alguna sesión no tiene cupo confirmado, no se suma nada.
+          const lugares = abiertas.every((s) => s.disponibles !== null)
+            ? abiertas.reduce((n, s) => n + (s.disponibles ?? 0), 0)
+            : null;
           const elegido = del.some((s) => seleccionadas.includes(s.id));
           const activo = diaActivo === fecha;
 
@@ -101,7 +106,11 @@ export default function Calendar({
               disabled={lleno && !elegido}
               aria-pressed={elegido || activo}
               aria-label={`${fechaCompleta(fecha)}: ${
-                lleno ? 'sin lugares' : `${del.length > 1 ? `${del.length} horarios, ` : ''}${lugares} ${lugares === 1 ? 'lugar' : 'lugares'}`
+                lleno
+                  ? 'sin lugares'
+                  : `${del.length > 1 ? `${del.length} horarios, ` : ''}${
+                      lugares === null ? 'cupo limitado' : `${lugares} ${lugares === 1 ? 'lugar' : 'lugares'}`
+                    }`
               }${elegido ? ', elegido' : ''}`}
               className={`relative flex aspect-square min-h-11 flex-col items-center justify-center rounded-full text-[0.92rem] transition-colors duration-rapida ${
                 elegido

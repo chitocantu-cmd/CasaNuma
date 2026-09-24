@@ -6,7 +6,7 @@ import { BotonEnlace } from '../componentes/base/Boton';
 import { Icono } from '../componentes/base/Iconos';
 import { Pendiente } from '../componentes/base/Pendiente';
 import CeramicShape from '../componentes/marca/CeramicShape';
-import { textoLugares } from '../componentes/reservas/TimeSlot';
+import { sinLugar, textoLugares } from '../lib/cupo';
 import { KIDS } from '../contenido/oferta';
 import { useSesionesKids } from '../datos/hooks';
 import { duracionTexto, fechaCompacta, hora } from '../lib/calendario';
@@ -125,7 +125,7 @@ export default function Kids() {
           </div>
           <ul className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {proximas.map((s, i) => {
-              const lleno = s.disponibles <= 0;
+              const lleno = sinLugar(s);
               return (
                 <Revelar key={s.id} como="li" retraso={i * 0.05}>
                   <Link
@@ -137,7 +137,7 @@ export default function Kids() {
                   >
                     <span className={`cifra text-[2.2rem] leading-none capitalize ${lleno ? 'line-through' : ''}`}>{fechaCompacta(s.fecha)}</span>
                     <span className="flex items-center justify-between text-nota">
-                      <span>{hora(s.inicio)} · {textoLugares(s.disponibles)}</span>
+                      <span>{hora(s.inicio)} · {textoLugares(s)}</span>
                       {!lleno && <Icono.flecha tam={17} className="transition-transform group-hover:translate-x-1" />}
                     </span>
                   </Link>

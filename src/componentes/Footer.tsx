@@ -95,10 +95,10 @@ export default function Footer() {
               </li>
             )}
           </ul>
-          {(!instagram || !whatsapp || !siteConfig.direccion) && (
+          {(!instagram || !whatsapp || siteConfig.direccionProvisional) && (
             <Pendiente claro className="mt-5">
               Falta confirmar:{' '}
-              {[!siteConfig.direccion && 'dirección', !instagram && 'Instagram', !whatsapp && 'WhatsApp']
+              {[siteConfig.direccionProvisional && 'dirección definitiva', !instagram && 'Instagram', !whatsapp && 'WhatsApp']
                 .filter(Boolean).join(', ')}.
             </Pendiente>
           )}

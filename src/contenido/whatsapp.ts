@@ -23,6 +23,11 @@ export function mensajeEvento(d: Partial<DatosEvento> = {}): string {
   ].join('\n');
 }
 
+/** Talleres sin precio publicado ("Info DM"): pedir información. */
+export function mensajeInformacionTaller(titulo: string, cuando: string): string {
+  return `Hola Casa Numa, quiero información sobre «${titulo}» (${cuando}): precio y lugares disponibles.`;
+}
+
 export function mensajePieza(nombre: string): string {
   return `Hola Casa Numa, me interesa comprar la pieza «${nombre}» de NUMA Store. ¿Sigue disponible?`;
 }

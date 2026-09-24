@@ -43,6 +43,7 @@ export interface Repositorio {
 
 export type CodigoError =
   | 'SIN_CUPO'
+  | 'SIN_RESERVA_EN_LINEA'
   | 'SESION_INVALIDA'
   | 'LIMITE_SESIONES'
   | 'EDAD_MINIMA'

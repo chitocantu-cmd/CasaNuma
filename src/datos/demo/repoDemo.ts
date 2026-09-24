@@ -12,7 +12,9 @@
 // ===========================================================================
 
 import { KIDS, MEMBRESIA } from '../../contenido/oferta';
-import { claveMes, etiquetaMes, hoy, sumarDias, yaPaso } from '../../lib/calendario';
+import { claveMes, etiquetaMes, hoy, minutosEntre, sumarDias, yaPaso } from '../../lib/calendario';
+import { sinLugar } from '../../lib/cupo';
+import { AGENDA, type RegistroTaller } from '../agenda';
 import { correoValido, soloDigitos } from '../../lib/formato';
 import { ErrorDatos, type Repositorio } from '../repositorio';
 import type {
@@ -20,10 +22,12 @@ import type {
 } from '../tipos';
 import {
   PRODUCTOS_SEMILLA, mesesMembresiaSemilla, ocupacionInicial, sesionesKidsSemilla,
-  sesionesMembresiaDelMes, talleresSemilla,
+  sesionesMembresiaDelMes,
 } from './semilla';
 
-const CLAVE = 'numa:demo:v1';
+// v2: la agenda de ejemplo se reemplazó por la real; lo guardado con la
+// agenda vieja (reservas de talleres que ya no existen) se descarta.
+const CLAVE = 'numa:demo:v2';
 const MINUTOS_APARTADO = 15;
 const MAX_PERSONAS_TALLER = 6;
 const MAX_NINOS = 4;
@@ -125,32 +129,76 @@ function ocupadosPorReservas(e: Estado, sesionId: string): number {
     .reduce((n, r) => n + r.participantes, 0);
 }
 
-function conDisponibles(e: Estado, s: Sesion): Sesion {
-  const ocupados = ocupacionInicial(s.id, s.cupo) + ocupadosPorReservas(e, s.id);
+/**
+ * Lugares libres de una sesión. Sin cupo confirmado (null) no se cuenta nada:
+ * la sesión sigue abierta y se muestra "Cupo limitado". La ocupación inicial
+ * simulada solo se aplica a sesiones de ejemplo, nunca a la agenda real.
+ */
+function conDisponibles(e: Estado, s: Sesion, simularOcupacion: boolean): Sesion {
+  if (s.cupo === null) return { ...s, disponibles: null };
+  const ocupados = (simularOcupacion ? ocupacionInicial(s.id, s.cupo) : 0) + ocupadosPorReservas(e, s.id);
   const disponibles = yaPaso(s.fecha, s.inicio) ? 0 : Math.max(0, s.cupo - ocupados);
   return { ...s, disponibles };
 }
 
 // --- Catálogo con cupo calculado ----------------------------------------------
 
+/** Fila de la agenda (forma de la tabla `workshops`) → taller de la interfaz. */
+function aTaller(r: RegistroTaller): Taller {
+  const primera = r.sessions[0];
+  return {
+    id: r.id,
+    slug: r.slug,
+    titulo: r.title,
+    resumen: r.description[0] ?? '',
+    descripcion: r.description.slice(1),
+    foto: r.image,
+    categoria: r.category === 'kids' ? 'ninos' : r.category === 'adults' ? 'adultos' : 'temporada',
+    etiqueta: r.label ?? (r.category === 'kids' ? 'Niños' : r.category === 'adults' ? 'Adultos' : 'Temporada'),
+    edad: r.age_min !== null && r.age_max !== null ? { min: r.age_min, max: r.age_max } : null,
+    precio: r.price,
+    etiquetaPrecio: r.price_label,
+    // Sin precio publicado no hay cobro en línea, diga lo que diga el registro.
+    reservaEnLinea: r.booking_type === 'online' && r.price !== null,
+    duracionMin: primera?.end_time ? minutosEntre(primera.start_time, primera.end_time) : null,
+    incluye: r.includes,
+    sesiones: r.sessions.map((x) => ({
+      id: `${r.id}-${x.start_time.replace(':', '')}`,
+      fecha: r.date,
+      inicio: x.start_time,
+      fin: x.end_time,
+      cupo: x.capacity,
+      disponibles: x.available_spots,
+      agotada: x.is_sold_out,
+    })),
+    destacado: r.is_featured,
+    demo: false,
+  };
+}
+
 function catalogoTalleres(e: Estado): Taller[] {
-  return talleresSemilla().map((t) => ({ ...t, sesiones: t.sesiones.map((s) => conDisponibles(e, s)) }));
+  return AGENDA.filter((r) => r.is_active)
+    .map(aTaller)
+    .map((t) => ({ ...t, sesiones: t.sesiones.map((s) => conDisponibles(e, s, false)) }))
+    .sort((a, b) =>
+      (a.sesiones[0].fecha + a.sesiones[0].inicio).localeCompare(b.sesiones[0].fecha + b.sesiones[0].inicio),
+    );
 }
 
 function catalogoMeses(e: Estado): MesMembresia[] {
   return mesesMembresiaSemilla().map((m) => ({
     ...m,
-    sesiones: m.sesiones.map((s) => conDisponibles(e, s)),
+    sesiones: m.sesiones.map((s) => conDisponibles(e, s, true)),
   }));
 }
 
 function catalogoKids(e: Estado): Sesion[] {
-  return sesionesKidsSemilla().map((s) => conDisponibles(e, s));
+  return sesionesKidsSemilla().map((s) => conDisponibles(e, s, true));
 }
 
 // --- Cuenta demo precargada -----------------------------------------------------
 // Para que "Mi cuenta" se pueda recorrer sin reservar primero: una alumna con
-// su membresía a la mitad (2 de 4 clases) y un taller en el historial.
+// su membresía a la mitad (2 de 4 clases).
 
 export const CUENTA_DEMO = { email: 'ana@demo.casanuma.mx', password: 'numa2026' };
 
@@ -189,17 +237,7 @@ async function asegurarCuentaDemo(e: Estado): Promise<Estado> {
     creadaEn: new Date(Date.now() - 20 * 864e5).toISOString(), usuarioId: usuario.id, contacto, demo: true,
   };
 
-  const pasado = sumarDias(hoyIso, -38);
-  const historial: Reserva = {
-    id: 'res_demo_hist', codigo: 'NUMA-DEMO02', tipo: 'taller',
-    titulo: 'Cerámica libre', referencia: 'ceramica-libre',
-    sesiones: [{ id: `lib-${pasado}-1100`, fecha: pasado, inicio: '11:00', fin: '13:30' }],
-    participantes: 2, precioUnitario: 600, total: 1200,
-    estado: 'confirmada', pago: 'pagado', expiraEn: null,
-    creadaEn: new Date(Date.now() - 45 * 864e5).toISOString(), usuarioId: usuario.id, contacto, demo: true,
-  };
-
-  const nuevo = { ...e, usuarios: [...e.usuarios, usuario], reservas: [...e.reservas, membresia, historial] };
+  const nuevo = { ...e, usuarios: [...e.usuarios, usuario], reservas: [...e.reservas, membresia] };
   guardar(nuevo);
   return nuevo;
 }
@@ -229,6 +267,9 @@ function resolver(e: Estado, s: SolicitudReserva): Resuelto {
   if (s.tipo === 'taller') {
     const t = catalogoTalleres(e).find((x) => x.slug === s.referencia);
     if (!t) throw new ErrorDatos('NO_ENCONTRADO', 'Este taller ya no está disponible.');
+    if (!t.reservaEnLinea || t.precio === null) {
+      throw new ErrorDatos('SIN_RESERVA_EN_LINEA', 'Este taller se aparta por mensaje. Escríbenos para pedir información.');
+    }
     if (unicos.length !== 1) throw new ErrorDatos('SESION_INVALIDA', 'Elige una fecha y un horario.');
     if (s.participantes > MAX_PERSONAS_TALLER) {
       throw new ErrorDatos('DATOS_INVALIDOS', `Para grupos de más de ${MAX_PERSONAS_TALLER} personas, escríbenos y lo organizamos.`);
@@ -335,13 +376,17 @@ export const repoDemo: Repositorio = {
     // Verificación de cupo en el mismo paso que el apartado: no hay una
     // ventana entre "sí hay lugar" y "ya lo tomé" (en el backend real, esto
     // es una transacción en crear_reserva()).
-    const llenas = r.sesiones.filter((s) => s.disponibles < solicitud.participantes);
+    // Con cupo sin confirmar (null) no se puede contar: solo se rechaza lo
+    // agotado o lo que ya pasó.
+    const llenas = r.sesiones.filter(
+      (s) => sinLugar(s) || (s.disponibles !== null && s.disponibles < solicitud.participantes),
+    );
     if (llenas.length) {
       const una = llenas[0];
       throw new ErrorDatos(
         'SIN_CUPO',
-        una.disponibles === 0
-          ? 'Una de las fechas que elegiste acaba de llenarse. Elige otra.'
+        sinLugar(una) || una.disponibles === null
+          ? 'Una de las fechas que elegiste ya no tiene lugares. Elige otra.'
           : `Solo ${una.disponibles === 1 ? 'queda 1 lugar' : `quedan ${una.disponibles} lugares`} en ese horario.`,
         llenas.map((s) => s.id),
       );

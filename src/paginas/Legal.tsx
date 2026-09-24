@@ -1,4 +1,4 @@
-import { enlaceInstagram, enlaceWhatsapp, siteConfig } from '../config/site';
+import { enlaceInstagramDM, enlaceWhatsapp, siteConfig } from '../config/site';
 import { Pendiente } from '../componentes/base/Pendiente';
 import { useSeo } from '../lib/seo';
 
@@ -31,7 +31,7 @@ const DOCUMENTOS = {
 export default function Legal({ documento }: { documento: keyof typeof DOCUMENTOS }) {
   const d = DOCUMENTOS[documento];
   useSeo({ titulo: `${d.titulo} | Casa Numa`, descripcion: `${d.titulo} de Casa Numa.` });
-  const contacto = enlaceWhatsapp() ?? enlaceInstagram() ?? (siteConfig.email ? `mailto:${siteConfig.email}` : null);
+  const contacto = enlaceWhatsapp() ?? enlaceInstagramDM() ?? (siteConfig.email ? `mailto:${siteConfig.email}` : null);
 
   return (
     <section className="contenedor min-h-[70vh] pb-seccion pt-[calc(theme(spacing.header)+3rem)]">

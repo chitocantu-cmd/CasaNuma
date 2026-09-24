@@ -115,10 +115,20 @@ src/
 Nada de esto se inventó; todo vive en `src/config/site.ts` o en
 `src/contenido/`:
 
-- WhatsApp oficial, correo, Instagram.
-- Dirección exacta, enlace y mapa de Google Maps, horario de atención.
-- Agenda completa de octubre: fechas, precios, duración, inclusiones y cupos
-  de cada taller (los tres talleres actuales son de demostración).
+- WhatsApp oficial y correo. (Instagram confirmado: @casanumamx.)
+- Dirección: provisional «Los Aldama 345A» (publicación de octubre); falta
+  confirmar la ficha de Google Maps y el horario de atención.
+- Agenda: la Semana 1 de octubre ya es real (`src/datos/agenda.ts`). Faltan
+  las semanas 2 a 4, el precio de las tardes y clases de cerámica (publicado
+  como «Info DM»), el cupo de cada taller y la hora de término de los talleres
+  de Halloween.
+- Tope de personas por reserva de taller (hoy 6, provisional).
+- ¿«Tardes de Cerámica (Niños)» (jueves 5:00 p.m., 10 a 14 años, «Info DM») es
+  la sesión de NUMA Kids de esa semana (desde 7 años, $680)? Mientras tanto, la
+  agenda manda: ese jueves no se ofrece una sesión de NUMA Kids aparte.
+- ¿«Clases de Cerámica» del viernes 10:00 es la sesión de membresía? ¿Y los
+  talleres de Halloween del sábado y domingo 11:00 comparten espacio con la
+  membresía de esas horas?
 - Cupo por sesión de membresía y de NUMA Kids.
 - Reglas de reprogramación y vigencia de la membresía.
 - Plazo de entrega de piezas.
@@ -127,8 +137,6 @@ Nada de esto se inventó; todo vive en `src/config/site.ts` o en
 - Testimonios reales con permiso.
 - Revisión de las biografías con Mónica y Gloria.
 - Kit de Adobe Fonts con Ivy Mode (mientras tanto: Noto Serif Display).
-- ¿La sesión de membresía del sábado 11:00 comparte espacio y cupo con los
-  talleres de fin de semana de la misma hora?
 
 ## 9. Guion de la sesión de fotos
 
@@ -149,7 +157,7 @@ publicar una foto basta con poner su `src`.
 | membresia-hero | Alumna modelando una pieza, plano medio. Horizontal amplia. |
 | membresia-proyecto-clase | Varias piezas pequeñas, una por clase. Cuadrada. |
 | membresia-gran-formato | Pieza de gran formato en proceso. Vertical. |
-| taller-halloween · taller-catrina · taller-libre | Una por taller, horizontal 4:3. |
+| taller-tardes-ninos · taller-tardes-adultos · taller-clases · taller-halloween · taller-halloween-pan | Una por taller de la agenda, horizontal 4:3. |
 | kids-hero · kids-mesa | Niña o niño con su pieza; la mesa desde arriba. |
 | eventos-hero · eventos-detalle | Mesa puesta para evento; varias manos trabajando. |
 | store-hero | Repisa con piezas a la venta, fondo limpio. |

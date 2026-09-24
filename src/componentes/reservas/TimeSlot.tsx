@@ -1,13 +1,6 @@
 import type { Sesion } from '../../datos/tipos';
-import { estadoCupo } from '../../lib/formato';
 import { hora, rango } from '../../lib/calendario';
-
-export function textoLugares(disponibles: number): string {
-  if (disponibles <= 0) return 'Lleno';
-  if (disponibles === 1) return 'Último lugar';
-  if (disponibles <= 3) return `Últimos ${disponibles} lugares`;
-  return `${disponibles} lugares`;
-}
+import { pocosLugares, sinLugar, textoLugares } from '../../lib/cupo';
 
 /**
  * Un horario reservable. Botón real con aria-pressed; lleno = deshabilitado,
@@ -27,8 +20,8 @@ export default function TimeSlot({
   etiqueta?: string;
   deshabilitada?: boolean;
 }) {
-  const estado = estadoCupo(sesion.disponibles);
-  const lleno = estado === 'lleno';
+  const lleno = sinLugar(sesion);
+  const pocos = pocosLugares(sesion);
   const bloqueada = lleno || deshabilitada;
 
   return (
@@ -51,11 +44,11 @@ export default function TimeSlot({
       </span>
       <span
         className={`eyebrow flex shrink-0 items-center gap-1.5 text-[0.58rem] ${
-          seleccionada ? 'text-crema/85' : lleno ? '' : estado === 'ultimos' ? 'text-cafe' : 'text-cafe/60'
+          seleccionada ? 'text-crema/85' : lleno ? '' : pocos ? 'text-cafe' : 'text-cafe/60'
         }`}
       >
-        {estado === 'ultimos' && <span className="h-1.5 w-1.5 rounded-full bg-naranja" aria-hidden="true" />}
-        {textoLugares(sesion.disponibles)}
+        {pocos && <span className="h-1.5 w-1.5 rounded-full bg-naranja" aria-hidden="true" />}
+        {textoLugares(sesion)}
       </span>
     </button>
   );

@@ -107,21 +107,31 @@ export const FOTOS = {
     referencia: 'jarrones', tono: 'terracota', silueta: 'botellon',
   },
 
-  // --- Talleres ------------------------------------------------------------
+  // --- Talleres (agenda) ------------------------------------------------------
+  'taller-tardes-ninos': {
+    alt: 'Niñas y niños trabajando barro en Tardes de Cerámica',
+    encuadre: 'Niñas y niños de 10 a 14 años modelando barro en la mesa (con permiso de sus papás). Horizontal 4:3.',
+    tono: 'amarillo', silueta: 'tarro',
+  },
+  'taller-tardes-adultos': {
+    alt: 'Piezas de bizcochito listas para pintar',
+    encuadre: 'Mesa de una tarde de cerámica: piezas de bizcochito, pinceles y pinturas. Horizontal 4:3.',
+    referencia: 'esmaltes', tono: 'terracota', silueta: 'cuenco',
+  },
+  'taller-clases': {
+    alt: 'Manos trabajando una pieza durante una clase',
+    encuadre: 'Alumna trabajando su proyecto con acompañamiento, plano de manos. Horizontal 4:3.',
+    referencia: 'manos-pieza', tono: 'terracota', silueta: 'guaje',
+  },
   'taller-halloween': {
     alt: 'Tazas decoradas con motivos de Halloween',
-    encuadre: 'Tazas terminadas del taller de Halloween sobre la mesa. Horizontal 4:3.',
+    encuadre: 'Tazas terminadas del taller de Halloween sobre la mesa, luz cálida. Horizontal 4:3.',
     tono: 'naranja', silueta: 'taza',
   },
-  'taller-catrina': {
-    alt: 'Tazas pintadas con motivos de Catrina',
-    encuadre: 'Tazas de Catrina a medio pintar con pinceles y esmaltes. Horizontal 4:3.',
-    referencia: 'esmaltes', tono: 'indigo', silueta: 'tarro',
-  },
-  'taller-libre': {
-    alt: 'Persona trabajando barro en cerámica libre',
-    encuadre: 'Participante de cerámica libre modelando su propia pieza. Horizontal 4:3.',
-    referencia: 'manos-amasando', tono: 'verde', silueta: 'guaje',
+  'taller-halloween-pan': {
+    alt: 'Taza de Halloween junto a un pan de muerto',
+    encuadre: 'Taza de Halloween recién decorada junto a un pan de muerto sobre la mesa de trabajo. Horizontal 4:3.',
+    tono: 'naranja', silueta: 'tarro',
   },
 
   // --- NUMA Kids -----------------------------------------------------------

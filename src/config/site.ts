@@ -32,14 +32,19 @@ export const siteConfig = {
   whatsapp: (env.VITE_NUMA_WHATSAPP as string | undefined) ?? '',
   /** PENDIENTE · correo de contacto. */
   email: (env.VITE_NUMA_EMAIL as string | undefined) ?? '',
-  /** PENDIENTE · usuario de Instagram, sin @. */
-  instagram: (env.VITE_NUMA_INSTAGRAM as string | undefined) ?? '',
+  /** Confirmado por Casa Numa: instagram.com/casanumamx (sin @). */
+  instagram: (env.VITE_NUMA_INSTAGRAM as string | undefined) || 'casanumamx',
 
   // --- Ubicación -----------------------------------------------------------
   /** Confirmado en el documento de contenido. */
   zona: 'Casco de San Pedro Garza García, Nuevo León',
-  /** PENDIENTE · calle, número y colonia exactos. */
-  direccion: (env.VITE_NUMA_DIRECCION as string | undefined) ?? '',
+  /**
+   * PROVISIONAL · tomada de la publicación de la agenda de octubre 2026.
+   * Sin código postal ni colonia: no están confirmados.
+   */
+  direccion: (env.VITE_NUMA_DIRECCION as string | undefined) || 'Los Aldama 345A',
+  /** true mientras la dirección no esté confirmada con su ficha de Google Maps. */
+  direccionProvisional: !(env.VITE_NUMA_DIRECCION as string | undefined),
   /** PENDIENTE · enlace de Google Maps para "Cómo llegar". */
   googleMapsUrl: (env.VITE_NUMA_MAPS_URL as string | undefined) ?? '',
   /** PENDIENTE · URL de inserción (Compartir → Insertar un mapa → src del iframe). */
@@ -78,6 +83,12 @@ export function enlaceInstagram(): string | null {
   return u ? `https://instagram.com/${u}` : null;
 }
 
+/** Mensaje directo de Instagram ("Info DM"), o null sin usuario. */
+export function enlaceInstagramDM(): string | null {
+  const u = siteConfig.instagram.replace(/^@/, '').trim();
+  return u ? `https://ig.me/m/${u}` : null;
+}
+
 /** wa.me con mensaje precargado, o null si el número aún no existe. */
 export function enlaceWhatsapp(mensaje?: string): string | null {
   const d = siteConfig.whatsapp.replace(/\D/g, '');
@@ -85,11 +96,18 @@ export function enlaceWhatsapp(mensaje?: string): string | null {
   return `https://wa.me/${d}${mensaje ? `?text=${encodeURIComponent(mensaje)}` : ''}`;
 }
 
+/** Mapa para insertar: el configurado, o uno generado desde la dirección. */
+export function enlaceMapaEmbebido(): string | null {
+  if (siteConfig.googleMapsEmbedUrl) return siteConfig.googleMapsEmbedUrl;
+  if (!siteConfig.direccion) return null;
+  return `https://maps.google.com/maps?q=${encodeURIComponent(`${siteConfig.direccion}, San Pedro Garza García, Nuevo León`)}&z=16&output=embed`;
+}
+
 export function enlaceComoLlegar(): string | null {
   if (siteConfig.googleMapsUrl) return siteConfig.googleMapsUrl;
   if (siteConfig.direccion) {
     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-      `${siteConfig.direccion}, ${siteConfig.zona}`,
+      `${siteConfig.direccion}, San Pedro Garza García, Nuevo León`,
     )}`;
   }
   return null;

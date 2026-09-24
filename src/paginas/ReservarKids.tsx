@@ -14,6 +14,7 @@ import { Pendiente } from '../componentes/base/Pendiente';
 import { KIDS } from '../contenido/oferta';
 import { duracionTexto, fechaCompleta, rango } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
+import { maximoPersonas, sinLugar } from '../lib/cupo';
 import { useSeo } from '../lib/seo';
 
 const PASOS = ['Fecha', 'Niños', 'Tus datos', 'Pago'];
@@ -41,13 +42,13 @@ export default function ReservarKids() {
   const { reserva, setReserva, error, setError, apartando, apartar } = useApartado();
 
   const sesion = useMemo(() => sesiones?.find((s) => s.id === sesionId) ?? null, [sesiones, sesionId]);
-  const maximo = Math.min(MAX_NINOS, sesion?.disponibles ?? MAX_NINOS);
+  const maximo = Math.max(1, maximoPersonas(sesion, MAX_NINOS));
 
   const autoAvance = useRef(false);
   useEffect(() => {
     if (autoAvance.current || !sesion || !params.get('sesion')) return;
     autoAvance.current = true;
-    if (sesion.disponibles > 0) setPaso(1);
+    if (!sinLugar(sesion)) setPaso(1);
   }, [sesion, params]);
 
   const alVencer = useCallback(() => {

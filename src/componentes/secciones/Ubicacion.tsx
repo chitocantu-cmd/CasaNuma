@@ -1,4 +1,4 @@
-import { enlaceComoLlegar, siteConfig } from '../../config/site';
+import { enlaceComoLlegar, enlaceMapaEmbebido, siteConfig } from '../../config/site';
 import SectionHeading from '../SectionHeading';
 import Foto from '../base/Foto';
 import { BotonExterno } from '../base/Boton';
@@ -13,7 +13,8 @@ import { IconoU } from '../marca/Logo';
  */
 export default function Ubicacion({ numero }: { numero?: string }) {
   const comoLlegar = enlaceComoLlegar();
-  const { direccion, horarios, googleMapsEmbedUrl, zona } = siteConfig;
+  const mapa = enlaceMapaEmbebido();
+  const { direccion, direccionProvisional, horarios, zona } = siteConfig;
 
   return (
     <section id="ubicacion" className="contenedor py-seccion" aria-labelledby="titulo-ubicacion">
@@ -55,16 +56,19 @@ export default function Ubicacion({ numero }: { numero?: string }) {
               </BotonExterno>
             )}
 
-            {(!direccion || !comoLlegar) && (
-              <Pendiente>Dirección exacta, mapa de Google y horario de atención del estudio.</Pendiente>
+            {(direccionProvisional || horarios.length === 0) && (
+              <Pendiente>
+                {direccionProvisional && 'Dirección tomada de la publicación de octubre; confirmar la ficha de Google Maps. '}
+                {horarios.length === 0 && 'Falta el horario de atención del estudio.'}
+              </Pendiente>
             )}
           </Revelar>
         </div>
 
         <Revelar retraso={0.15} className="lg:col-span-6 lg:col-start-7">
-          {googleMapsEmbedUrl ? (
+          {mapa ? (
             <iframe
-              src={googleMapsEmbedUrl}
+              src={mapa}
               title={`Mapa: Casa Numa, ${zona}`}
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"

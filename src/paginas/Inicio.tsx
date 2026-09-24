@@ -3,6 +3,7 @@ import SectionHeading from '../componentes/SectionHeading';
 import EditorialGallery from '../componentes/EditorialGallery';
 import ExperienceCard from '../componentes/ExperienceCard';
 import ProductCard from '../componentes/ProductCard';
+import WorkshopCard from '../componentes/WorkshopCard';
 import Testimonial from '../componentes/Testimonial';
 import Ubicacion from '../componentes/secciones/Ubicacion';
 import Comunidad from '../componentes/secciones/Comunidad';
@@ -15,8 +16,10 @@ import { PORTAFOLIO } from '../contenido/portafolio';
 import { TESTIMONIOS } from '../contenido/testimonios';
 import { MEMBRESIA, KIDS } from '../contenido/oferta';
 import { mostrarPendientes } from '../config/site';
-import { useProductos } from '../datos/hooks';
+import { useProductos, useTalleres } from '../datos/hooks';
 import { pesosCortos } from '../lib/formato';
+import { MESES } from '../lib/calendario';
+import { esProximo } from '../lib/talleres';
 import { ldNegocio, useSeo } from '../lib/seo';
 
 const OCASIONES = ['Cumpleaños', 'Baby shower', 'Despedidas', 'Tardes entre amigas', 'Eventos empresariales', 'Reuniones privadas'];
@@ -30,19 +33,28 @@ export default function Inicio() {
   });
 
   const { datos: productos } = useProductos();
+  const { datos: talleres } = useTalleres();
   const hayTestimonios = TESTIMONIOS.length > 0 || mostrarPendientes;
+  // Los próximos tres de la agenda; el mes del título sale del primero.
+  const agenda = (talleres ?? []).filter(esProximo).slice(0, 3);
+  const mesAgenda = agenda[0] ? MESES[Number(agenda[0].sesiones[0].fecha.slice(5, 7)) - 1] : null;
+
+  // Numeración editorial de las secciones: se calcula en orden de aparición
+  // para que no se descuadre cuando una sección se oculta.
+  let seccion = 0;
+  const n = () => String(++seccion).padStart(2, '0');
 
   return (
     <>
       <Hero />
 
-      {/* 01 · Portafolio ------------------------------------------------ */}
+      {/* Portafolio ------------------------------------------------ */}
       <section id="portafolio" className="contenedor py-seccion" aria-label="Portafolio NUMA">
         <EditorialGallery
           piezas={PORTAFOLIO}
           encabezado={
             <SectionHeading
-              numero="01"
+              numero={n()}
               eyebrow="Portafolio NUMA"
               titulo="Hecho a mano, hecho con intención."
               intro={
@@ -65,11 +77,11 @@ export default function Inicio() {
         />
       </section>
 
-      {/* 02 · Experiencias ---------------------------------------------- */}
+      {/* Experiencias ---------------------------------------------- */}
       <section className="py-seccion-s" aria-labelledby="titulo-experiencias">
         <div className="contenedor flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <SectionHeading
-            numero="02"
+            numero={n()}
             eyebrow="Experiencias"
             titulo={<span id="titulo-experiencias">Encuentra tu forma de crear.</span>}
           />
@@ -115,12 +127,36 @@ export default function Inicio() {
         </div>
       </section>
 
-      {/* 03 · Eventos especiales ---------------------------------------- */}
+      {/* Agenda: solo lo próximo, la agenda completa vive en /talleres -------- */}
+      {agenda.length > 0 && mesAgenda && (
+        <section className="contenedor pt-seccion" aria-labelledby="titulo-agenda">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+            <SectionHeading
+              numero={n()}
+              eyebrow="Agenda"
+              titulo={<span id="titulo-agenda">Este {mesAgenda} en NUMA.</span>}
+              tamano="t2"
+            />
+            <Revelar retraso={0.1} className="shrink-0 lg:pb-3">
+              <BotonEnlace to="/talleres" variante="secundario" flecha>Ver agenda completa</BotonEnlace>
+            </Revelar>
+          </div>
+          <div className="mt-12 grid gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+            {agenda.map((t, i) => (
+              <Revelar key={t.id} retraso={i * 0.06} className="h-full">
+                <WorkshopCard taller={t} compacta />
+              </Revelar>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Eventos especiales -------------------------------------------------- */}
       <section data-fondo="oscuro" className="relative mt-seccion-s overflow-hidden bg-cafe py-seccion text-crema" aria-labelledby="titulo-eventos">
         <div className="contenedor grid gap-14 lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-5 lg:py-6">
             <SectionHeading
-              numero="03"
+              numero={n()}
               eyebrow="Eventos especiales"
               titulo={<span id="titulo-eventos">Hay momentos que merecen celebrarse de una forma diferente.</span>}
               intro={
@@ -153,11 +189,11 @@ export default function Inicio() {
         </div>
       </section>
 
-      {/* 04 · NUMA Store ------------------------------------------------ */}
+      {/* NUMA Store ------------------------------------------------ */}
       <section className="contenedor py-seccion" aria-labelledby="titulo-store">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
           <SectionHeading
-            numero="04"
+            numero={n()}
             eyebrow="NUMA Store"
             titulo={<span id="titulo-store">Piezas únicas, hechas con nuestras manos.</span>}
             intro={
@@ -186,13 +222,13 @@ export default function Inicio() {
         </p>
       </section>
 
-      {/* 05 · ¡Hola! Somos Casa Numa ------------------------------------ */}
+      {/* ¡Hola! Somos Casa Numa ------------------------------------ */}
       <section className="contenedor pb-seccion pt-seccion-s" aria-labelledby="titulo-hola">
         <div className="grid items-center gap-16 lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-5">
             <Revelar>
               <p className="eyebrow flex items-center gap-4 text-cafe/70">
-                <span className="cifra text-[1.35rem] leading-none tracking-[0.04em]">05</span>
+                <span className="cifra text-[1.35rem] leading-none tracking-[0.04em]">{n()}</span>
                 <span className="h-px w-10 bg-cafe/30" aria-hidden="true" />
                 Nosotras
               </p>
@@ -229,12 +265,12 @@ export default function Inicio() {
         </div>
       </section>
 
-      {/* 06 · Testimonios ------------------------------------------------ */}
+      {/* Testimonios ------------------------------------------------ */}
       {hayTestimonios && (
         <section className="border-y border-cafe/10 bg-cafe/[0.035] py-seccion" aria-labelledby="titulo-testimonios">
           <div className="contenedor">
             <SectionHeading
-              numero="06"
+              numero={n()}
               eyebrow="Testimonios"
               titulo={<span id="titulo-testimonios">Lo que se vive en NUMA, se comparte.</span>}
               intro={
@@ -252,9 +288,9 @@ export default function Inicio() {
         </section>
       )}
 
-      {/* 07 · Ubicación · 08 · Comunidad ---------------------------------- */}
-      <Ubicacion numero={hayTestimonios ? '07' : '06'} />
-      <Comunidad numero={hayTestimonios ? '08' : '07'} />
+      {/* Ubicación y comunidad ---------------------------------- */}
+      <Ubicacion numero={n()} />
+      <Comunidad numero={n()} />
     </>
   );
 }

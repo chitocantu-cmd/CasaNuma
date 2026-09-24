@@ -38,7 +38,8 @@ interface EventoIcs {
   uid: string;
   fecha: string;
   inicio: string;
-  fin: string;
+  /** Sin hora de término, el evento se publica solo con su inicio. */
+  fin: string | null;
   titulo: string;
   lugar: string;
   descripcion: string;
@@ -67,7 +68,7 @@ function construirIcsEventos(eventos: EventoIcs[]): string {
       `UID:${e.uid}@casanuma`,
       `DTSTAMP:${ahoraUTC()}`,
       `DTSTART;TZID=${ZONA}:${marcaLocal(e.fecha, e.inicio)}`,
-      `DTEND;TZID=${ZONA}:${marcaLocal(e.fecha, e.fin)}`,
+      ...(e.fin ? [`DTEND;TZID=${ZONA}:${marcaLocal(e.fecha, e.fin)}`] : []),
       `SUMMARY:${esc(e.titulo)}`,
       `LOCATION:${esc(e.lugar)}`,
       `DESCRIPTION:${esc(e.descripcion)}`,
