@@ -39,6 +39,8 @@ export interface Repositorio {
   entrar(email: string, password: string): Promise<Usuario>;
   salir(): Promise<void>;
   recuperarPassword(email: string): Promise<void>;
+  /** Nueva contraseña de la cuenta con sesión (tras abrir el enlace de recuperación). */
+  cambiarPassword(password: string): Promise<void>;
   actualizarPerfil(cambios: Pick<Usuario, 'nombre' | 'telefono'>): Promise<Usuario>;
 
   // --- Novedades (independiente de la cuenta) ------------------------------
@@ -92,6 +94,8 @@ export type CodigoError =
   | 'SIN_SESION'
   | 'CREDENCIALES'
   | 'CORREO_REGISTRADO'
+  /** La cuenta existe pero falta abrir el enlace del correo de confirmación. */
+  | 'CONFIRMAR_CORREO'
   | 'APARTADO_VENCIDO'
   | 'NO_ENCONTRADO'
   | 'NO_CONECTADO'

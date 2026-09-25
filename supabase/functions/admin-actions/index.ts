@@ -8,6 +8,7 @@
 //   · register_payment          — pago recibido por transferencia o efectivo
 //   · update_reservation        — completada / no asistió / notas internas
 //   · create_manual_reservation — reserva que registra el equipo (y su pago)
+//   · mark_refunded             — reembolso hecho fuera (Stripe, transferencia)
 //   · set_capacity              — cupo de una sesión (nunca menor a lo reservado)
 //   · sync_calendar             — fuerza la sincronización de un taller
 //   · retry_job                 — reintenta un trabajo que quedó en 'failed'
@@ -80,7 +81,8 @@ Deno.serve(async (req: Request) => {
         const { data, error } = await db.rpc('registrar_pago_manual', {
           p_reservation_id: id,
           p_amount: monto,
-          p_method: String(body.method ?? 'transferencia'),
+          // Sin método: se conserva el que se capturó al registrar la reserva.
+          p_method: body.method ? String(body.method) : null,
           p_reference: body.reference ? String(body.reference) : null,
           p_avisar_cliente: body.notify_client !== false,
           p_actor: admin.email || admin.userId,
@@ -109,39 +111,29 @@ Deno.serve(async (req: Request) => {
       // ---------------------------------------------------------------------
       // Reserva registrada por el equipo
       // ---------------------------------------------------------------------
-      // Pasa por la misma función que la web: mismo cupo, mismas reglas. Queda
-      // con folio desde que se crea y aparta hasta la hora de la clase.
+      // Mismo control de cupo que la web; el importe lo captura el equipo
+      // (talleres "Info DM", precios especiales). Folio desde que se crea;
+      // aparta hasta la hora de la clase.
       // ---------------------------------------------------------------------
       case 'create_manual_reservation': {
-        const sesiones = Array.isArray(body.session_ids) ? body.session_ids.map(String) : [];
         const ninos = Array.isArray(body.children)
           ? (body.children as Record<string, unknown>[]).map((n) => ({ name: String(n?.name ?? ''), age: Number(n?.age) }))
           : [];
 
-        const { data: r, error } = await db.rpc('crear_reserva_sesiones', {
-          p_tipo: String(body.tipo ?? ''),
-          p_session_ids: sesiones,
+        const { data: r, error } = await db.rpc('crear_reserva_panel', {
+          p_session_id: String(body.session_id ?? ''),
           p_quantity: Number(body.quantity),
           p_full_name: String(body.full_name ?? ''),
           p_email: String(body.email ?? ''),
           p_phone: String(body.phone ?? ''),
+          p_total: Number(body.total),
+          p_method: String(body.method ?? 'transferencia'),
+          p_reference: body.reference ? String(body.reference) : null,
           p_children: ninos,
-          p_origin: 'panel',
           p_notes: body.notes ? String(body.notes) : null,
         });
         if (error) throw error;
 
-        if (body.paid === true) {
-          const { error: e2 } = await db.rpc('registrar_pago_manual', {
-            p_reservation_id: r.reservation_id,
-            p_amount: Number(r.total_amount),
-            p_method: String(body.method ?? 'transferencia'),
-            p_reference: body.reference ? String(body.reference) : null,
-            p_avisar_cliente: body.notify_client !== false,
-            p_actor: admin.email || admin.userId,
-          });
-          if (e2) throw e2;
-        }
         if (typeof body.internal_notes === 'string' && body.internal_notes.trim()) {
           await db.rpc('admin_actualizar_reserva', {
             p_reservation_id: r.reservation_id,
@@ -149,7 +141,32 @@ Deno.serve(async (req: Request) => {
             p_actor: admin.email || admin.userId,
           });
         }
+        if (body.paid === true) {
+          const { error: e2 } = await db.rpc('registrar_pago_manual', {
+            p_reservation_id: r.reservation_id,
+            p_amount: Number(r.total_amount),
+            p_method: null,
+            p_avisar_cliente: body.notify_client !== false,
+            p_actor: admin.email || admin.userId,
+          });
+          if (e2) throw e2;
+        }
         return json({ ok: true, reservation: r }, 200, origin);
+      }
+
+      // ---------------------------------------------------------------------
+      // Reembolso hecho fuera del sitio (Stripe, transferencia)
+      // ---------------------------------------------------------------------
+      case 'mark_refunded': {
+        const id = String(body.reservation_id ?? '');
+        if (!id) return json({ error: 'INVALID_INPUT' }, 400, origin);
+
+        const { data, error } = await db.rpc('admin_marcar_reembolso', {
+          p_reservation_id: id,
+          p_actor: admin.email || admin.userId,
+        });
+        if (error) throw error;
+        return json({ ok: true, result: data }, 200, origin);
       }
 
       // ---------------------------------------------------------------------

@@ -16,7 +16,7 @@ import CeramicShape from '../../componentes/marca/CeramicShape';
 
 const TIPO: Record<Reserva['tipo'], string> = { taller: 'Taller', membresia: 'Membresía', kids: 'NUMA Kids' };
 const ESTADO: Record<Reserva['estado'], string> = {
-  confirmada: 'Confirmada', pendiente_pago: 'Pendiente de pago', cancelada: 'Cancelada', completada: 'Completada', expirada: 'Expirada',
+  confirmada: 'Confirmada', pendiente_pago: 'Pendiente de pago', cancelada: 'Cancelada', completada: 'Completada', no_asistio: 'No asististe', expirada: 'Expirada',
 };
 const PAGO: Record<Reserva['pago'], string> = { pagado: 'Pagado', pendiente: 'Pendiente', reembolsado: 'Reembolsado', fallido: 'Rechazado' };
 

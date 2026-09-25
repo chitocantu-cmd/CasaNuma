@@ -700,6 +700,15 @@ export const repoDemo: Repositorio = {
     // para no revelar qué correos están registrados.
   },
 
+  async cambiarPassword(password) {
+    await espera(350);
+    const e = await estado();
+    const u = usuarioEnSesion(e);
+    if (password.length < 8) throw new ErrorDatos('DATOS_INVALIDOS', 'Tu contraseña necesita al menos 8 caracteres.');
+    const nuevo = { ...u, hash: await hashPassword(u.email, password) };
+    guardar({ ...e, usuarios: e.usuarios.map((x) => (x.id === u.id ? nuevo : x)) });
+  },
+
   async actualizarPerfil(cambios) {
     await espera(350);
     const e = await estado();

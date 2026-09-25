@@ -9,7 +9,7 @@ import { enlaceWhatsapp as waDe, soloDigitos } from '../../lib/formato';
 import { Icono } from '../../componentes/base/Iconos';
 import { Aviso } from '../../componentes/base/Campos';
 import {
-  DemoPill, ETIQUETA_METODO, ETIQUETA_TIPO, EstadoPill, PagoPill, Tarjeta, dinero, fechaHora, horaCorta,
+  DemoPill, ETIQUETA_AVISO, ETIQUETA_METODO, ETIQUETA_TIPO, EstadoPill, PagoPill, Tarjeta, dinero, fechaHora, horaCorta,
 } from './ui';
 
 const mayuscula = (t: string) => t.replace(/^./, (c) => c.toUpperCase());
@@ -256,12 +256,13 @@ function AvisoFila({ aviso: a }: { aviso: AvisoT }) {
             {a.canal === 'email' ? 'Correo' : 'WhatsApp'} {a.destinatario === 'equipo' ? 'al equipo' : 'a la clienta'}
           </span>
           <span className="text-[0.7rem] text-cafe/60">
-            {a.estado === 'enviado' ? 'Enviado' : a.estado === 'sin_destinatario' ? 'Falta correo' : 'Pendiente de integrar'}
+            {ETIQUETA_AVISO[a.estado]}
           </span>
         </summary>
         <div className="border-t border-cafe/10 px-3 py-3 text-[0.78rem]">
           <p className="text-cafe/60">Para: {a.para ?? (a.canal === 'email' ? 'ADMIN_NOTIFICATION_EMAIL (sin configurar)' : 'API de WhatsApp (por conectar)')}</p>
           <p className="mt-1 font-medium">{a.asunto}</p>
+          {a.error && <p className="mt-1 text-naranja">{a.error}</p>}
         </div>
       </details>
     </li>

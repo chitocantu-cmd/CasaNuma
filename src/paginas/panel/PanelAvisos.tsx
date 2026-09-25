@@ -9,6 +9,8 @@ const ESTADO = {
   enviado: 'Enviado',
   sin_destinatario: 'Sin enviar: falta ADMIN_NOTIFICATION_EMAIL',
   pendiente_integracion: 'Preparado: falta conectar la API de WhatsApp',
+  en_cola: 'En cola: sale en el siguiente minuto',
+  fallido: 'No se pudo enviar',
 } as const;
 
 export default function PanelAvisos() {
@@ -57,6 +59,7 @@ export default function PanelAvisos() {
                 </summary>
                 <div className="border-t border-cafe/10 p-5">
                   <p className="text-[0.74rem] text-cafe/60">Para: {a.para ?? '—'}</p>
+                  {a.error && <p className="mt-1 text-[0.74rem] text-naranja">Motivo: {a.error}</p>}
                   <div className="mt-4 max-w-lg rounded-[0.6rem] border border-cafe/10 bg-cafe/[0.03] p-5 text-[0.86rem] leading-relaxed">
                     <p className="font-medium">{a.asunto}</p>
                     <div className="mt-3 whitespace-pre-line">{a.lineas.join('\n')}</div>

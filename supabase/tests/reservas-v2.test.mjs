@@ -315,6 +315,102 @@ seccion('Cupo desde el panel');
 }
 
 // ---------------------------------------------------------------------------
+seccion('Conexión del sitio: panel, apartados propios y reembolsos');
+{
+  // Sesión de NUMA Kids ligada a su fila del catálogo (antes no se podía).
+  const { rows: [{ fila }] } = await db.query(`insert into workshops (slug, title, date, start_time, price, booking_mode, status, category, booking_type)
+     values ('tardes-ninos-prueba', 'Tardes de Cerámica (Niños)', current_date + 50, '17:00', 680, 'paid', 'published', 'kids', 'online') returning id as fila`);
+  const lig = await intentar(db, `insert into workshop_sessions (experience_type, workshop_id, date, start_time, end_time, price)
+     values ('kids', $1, current_date + 50, '17:00', '18:30', 680) returning id`, [fila]);
+  ok('una sesión de NUMA Kids se puede ligar a su tarjeta', lig.ok, lig.error);
+  const sinTaller = await intentar(db, `insert into workshop_sessions (experience_type, date, start_time, price) values ('taller', current_date + 51, '11:00', 800)`);
+  ok('un taller sigue necesitando su fila', !sinTaller.ok);
+  const { rows: [{ slug }] } = await db.query(`select workshop_slug slug from public_sessions where id = $1`, [lig.rows[0].id]);
+  ok('public_sessions trae la tarjeta de la sesión de NUMA Kids', slug === 'tardes-ninos-prueba', slug);
+
+  // Reserva del panel con importe capturado
+  const s5 = await sesion(`insert into workshop_sessions (experience_type, workshop_id, date, start_time, capacity, price)
+                            values ('taller', '${taller}', current_date + 42, '16:00', 3, null)`);
+  const pan = await intentar(db, `select crear_reserva_panel($1, 2, 'Clienta Instagram', 'insta@ejemplo.com', '8112345678', 1500, 'transferencia', 'SPEI 9') r`, [s5]);
+  ok('el panel registra una reserva de un taller «Info DM» con importe', pan.ok, pan.error);
+  const rp = pan.rows?.[0].r;
+  ok('…con folio desde que se crea y total capturado', /^NUMA-\d{5}$/.test(rp?.folio ?? '') && Number(rp?.total_amount) === 1500, JSON.stringify(rp));
+  const { rows: [pp] } = await db.query(`select count(*)::int n, min(status::text) st, min(method) m, min(reference) ref from payments where reservation_id = $1`, [rp.reservation_id]);
+  ok('…y deja el pago previsto como pendiente (método y referencia)', pp.n === 1 && pp.st === 'pending' && pp.m === 'transferencia' && pp.ref === 'SPEI 9', JSON.stringify(pp));
+  const sobre = await intentar(db, `select crear_reserva_panel($1, 2, 'Otra', 'otra2@ejemplo.com', '8112345678', 1600, 'efectivo')`, [s5]);
+  ok('el panel tampoco sobrevende (quedaba 1)', !sobre.ok && sobre.code === 'CN001' && sobre.detail === '1', sobre.error);
+  await db.query(`select registrar_pago_manual($1, 1500, null)`, [rp.reservation_id]);
+  const { rows: [pq] } = await db.query(`select count(*)::int n, min(status::text) st, min(method) m, min(reference) ref from payments where reservation_id = $1`, [rp.reservation_id]);
+  ok('registrar el pago completa ese mismo pago (una fila, método conservado)', pq.n === 1 && pq.st === 'paid' && pq.m === 'transferencia' && pq.ref === 'SPEI 9', JSON.stringify(pq));
+
+  // Reembolso marcado por el equipo
+  const { rows: [{ antes }] } = await db.query(`select lugares_ocupados_sesion($1) antes`, [s5]);
+  await db.query(`select admin_marcar_reembolso($1)`, [rp.reservation_id]);
+  const { rows: [{ despues }] } = await db.query(`select lugares_ocupados_sesion($1) despues`, [s5]);
+  const { rows: [rr] } = await db.query(`select r.status::text rs, p.status::text ps from reservations r join payments p on p.reservation_id = r.id where r.id = $1`, [rp.reservation_id]);
+  ok('reembolso: reserva y pago «refunded», y el lugar se libera', rr.rs === 'refunded' && rr.ps === 'refunded' && antes === 2 && despues === 0, JSON.stringify({ rr, antes, despues }));
+  const dos = await intentar(db, `select admin_marcar_reembolso($1)`, [rp.reservation_id]);
+  ok('no se reembolsa dos veces', !dos.ok && dos.code === 'CN004', dos.error);
+
+  // La clienta libera su propio apartado
+  const { rows: [{ uid }] } = await db.query(`insert into auth.users (email) values ('libera@cuenta.com') returning id as uid`);
+  const s6 = await sesion(`insert into workshop_sessions (experience_type, workshop_id, date, start_time, capacity, price)
+                            values ('taller', '${taller}', current_date + 43, '11:00', 2, 800)`);
+  const mio = await reservar(db, { tipo: 'taller', sesiones: [s6], personas: 2, correo: 'libera@cuenta.com', usuario: uid });
+  const ajeno = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 1, correo: 'ajeno@ejemplo.com', ninos: [{ name: 'Leo', age: 12 }] });
+  await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [uid]);
+  await db.query(`set role authenticated`);
+  const lib = await intentar(db, `select liberar_mi_apartado($1)`, [mio.rows[0].r.reservation_id]);
+  await intentar(db, `select liberar_mi_apartado($1)`, [ajeno.rows[0].r.reservation_id]);
+  const ver = await intentar(db, `select count(*)::int n from sesiones_ocupacion where id = '${s6}'`);
+  await db.query(`reset role`);
+  ok('la clienta libera su apartado', lib.ok, lib.error);
+  const { rows: [{ o }] } = await db.query(`select lugares_ocupados_sesion($1) o`, [s6]);
+  ok('…y el lugar queda libre de inmediato', o === 0, String(o));
+  ok('sesiones_ocupacion se puede leer con sesión', ver.ok && ver.rows[0].n === 1, ver.error);
+  const { rows: [{ st }] } = await db.query(`select status::text st from reservations where id = $1`, [ajeno.rows[0].r.reservation_id]);
+  ok('…pero no puede liberar el apartado de otra persona', st === 'pending_payment', st);
+}
+
+// ---------------------------------------------------------------------------
+seccion('Cancelaciones y novedades');
+{
+  // Membresía: no tiene taller, y cancelarla fallaba al encolar Calendar.
+  const clases = [];
+  for (const d of [2, 9, 16, 23]) {
+    clases.push(await sesion(`insert into workshop_sessions (experience_type, date, start_time, end_time, capacity)
+      values ('membresia', (date_trunc('month', now()) + interval '4 months')::date + ${d - 1}, '15:00', '18:00', 2)`));
+  }
+  const m = await reservar(db, { tipo: 'membresia', sesiones: clases, correo: 'cancela@ejemplo.com' });
+  ok('membresía apartada', m.ok, m.error);
+  await pagar(db, m.rows[0].r.reservation_id, 77);
+  const c = await intentar(db, `select cancelar_reserva($1, 'prueba') r`, [m.rows[0].r.reservation_id]);
+  ok('el equipo cancela una membresía (sin taller ligado)', c.ok && c.rows[0].r === 'cancelled', c.error);
+  const { rows: [{ o }] } = await db.query(`select lugares_ocupados_sesion($1) o`, [clases[0]]);
+  ok('…y sus cuatro lugares quedan libres', o === 0, String(o));
+
+  // Reserva del panel sin pagar: al cancelarla, su pago pendiente no queda colgado.
+  const s7 = await sesion(`insert into workshop_sessions (experience_type, workshop_id, date, start_time, capacity, price)
+                            values ('taller', '${taller}', current_date + 44, '11:00', 4, 800)`);
+  const pan = await db.query(`select crear_reserva_panel($1, 1, 'Panel', 'panel@ejemplo.com', '8112345678', 800, 'efectivo') r`, [s7]);
+  await db.query(`select cancelar_reserva($1)`, [pan.rows[0].r.reservation_id]);
+  const { rows: [pg] } = await db.query(`select status::text st from payments where reservation_id = $1`, [pan.rows[0].r.reservation_id]);
+  ok('cancelar una reserva del panel cancela su pago pendiente', pg.st === 'cancelled', pg.st);
+
+  await db.query(`set role anon`);
+  const s1 = await intentar(db, `select suscribir_novedades('Novedades@Ejemplo.com')`);
+  const s2 = await intentar(db, `select suscribir_novedades('novedades@ejemplo.com')`);
+  const mal = await intentar(db, `select suscribir_novedades('sin-arroba')`);
+  const leer = await intentar(db, `select * from newsletter_subscribers`);
+  await db.query(`reset role`);
+  ok('cualquiera se suscribe a novedades (y repetir no truena)', s1.ok && s2.ok, s1.error ?? s2.error);
+  ok('…con un correo válido', !mal.ok && mal.code === 'CN004', mal.error);
+  ok('…pero no puede leer la lista', !leer.ok || leer.rows.length === 0, JSON.stringify(leer.rows));
+  const { rows: [{ n }] } = await db.query(`select count(*)::int n from newsletter_subscribers where email = 'novedades@ejemplo.com'`);
+  ok('un correo, una suscripción', n === 1, String(n));
+}
+
+// ---------------------------------------------------------------------------
 seccion('Seguridad');
 {
   const { rows: [{ ana }] } = await db.query(`insert into auth.users (email) values ('ana@cuenta.com') returning id as ana`);
@@ -335,13 +431,25 @@ seccion('Seguridad');
     await db.query(`set role authenticated`);
     try { return await intentar(db, sql); } finally { await db.query(`reset role`); }
   }
-  const verAna = await como(ana, `select id, folio from reservations`);
-  ok('Ana ve su reserva', verAna.ok && verAna.rows.length === 1 && verAna.rows[0].id === a.rows[0].r.reservation_id,
-     verAna.error ?? JSON.stringify(verAna.rows));
-  const verBeto = await como(beto, `select r.id from reservations r`);
+  await db.query(`update reservations set internal_notes = 'Nota del equipo' where id = $1`, [a.rows[0].r.reservation_id]);
+  const verAna = await como(ana, `select mis_reservas() m`);
+  const deAna = verAna.rows?.[0].m ?? [];
+  ok('Ana ve su reserva en Mi cuenta', verAna.ok && deAna.length === 1 && deAna[0].id === a.rows[0].r.reservation_id,
+     verAna.error ?? JSON.stringify(deAna));
+  ok('…con folio, sesión y su contacto', /^NUMA-\d{5}$/.test(deAna[0]?.folio ?? '') && deAna[0]?.sessions.length === 1
+     && deAna[0]?.customer?.email === 'ana@cuenta.com', JSON.stringify(deAna[0]));
+  ok('…y sin las notas internas', !JSON.stringify(deAna).includes('Nota del equipo'), JSON.stringify(deAna[0]));
+  const directo = await como(ana, `select id, internal_notes from reservations`);
+  ok('una clienta ya no lee la tabla de reservas (notas internas)', !directo.ok || directo.rows.length === 0, JSON.stringify(directo.rows));
+  const verBeto = await como(beto, `select mis_reservas() m`);
+  const deBeto = verBeto.rows?.[0].m ?? [];
   ok('Beto solo ve la que hizo él, no el historial de "uno@ejemplo.com"',
-     verBeto.ok && verBeto.rows.length === 1 && verBeto.rows[0].id === b.rows[0].r.reservation_id,
-     verBeto.error ?? JSON.stringify(verBeto.rows));
+     verBeto.ok && deBeto.length === 1 && deBeto[0].id === b.rows[0].r.reservation_id,
+     verBeto.error ?? JSON.stringify(deBeto));
+  ok('…y no ve el nombre ni el teléfono guardados con ese correo', deBeto[0]?.customer === null, JSON.stringify(deBeto[0]?.customer));
+  await db.query(`select set_config('request.jwt.claim.sub', '', false)`);
+  const sinSesion = await intentar(db, `select mis_reservas() m`);
+  ok('sin sesión, Mi cuenta no trae nada', sinSesion.ok && sinSesion.rows[0].m.length === 0, JSON.stringify(sinSesion.rows));
   const ninos = await como(ana, `select * from reservation_children`);
   ok('Ana no ve niños de otras reservas', ninos.ok && ninos.rows.length === 0, ninos.error ?? String(ninos.rows.length));
   const pagos = await como(ana, `select * from payments`);
@@ -351,10 +459,18 @@ seccion('Seguridad');
   const folio = await como(ana, `select siguiente_folio()`);
   ok('el navegador no puede generar folios', !folio.ok, 'se pudo');
 
+  const cuentasCliente = await como(ana, `select count(*)::int n from admin_cuentas()`);
+  ok('una clienta no lista las cuentas del sitio', cuentasCliente.ok && cuentasCliente.rows[0].n === 0, cuentasCliente.error);
+
   await db.query(`insert into admin_profiles (user_id) values ($1)`, [beto]);
-  const verAdmin = await como(beto, `select count(*)::int n from reservations`);
+  const verAdmin = await como(beto, `select count(*)::int n, count(internal_notes)::int notas from reservations`);
   const { rows: [{ total }] } = await db.query(`select count(*)::int total from reservations`);
-  ok('el equipo (admin) ve todas', verAdmin.ok && verAdmin.rows[0].n === total, `${verAdmin.rows?.[0]?.n} de ${total}`);
+  ok('el equipo (admin) ve todas, con sus notas', verAdmin.ok && verAdmin.rows[0].n === total && verAdmin.rows[0].notas >= 1,
+     `${verAdmin.rows?.[0]?.n} de ${total}`);
+  const cuentas = await como(beto, `select email from admin_cuentas()`);
+  ok('el equipo lista las cuentas de clientas (sin las del equipo)',
+     cuentas.ok && cuentas.rows.some((x) => x.email === 'ana@cuenta.com') && !cuentas.rows.some((x) => x.email === 'beto@cuenta.com'),
+     cuentas.error ?? JSON.stringify(cuentas.rows));
 
   const { rows } = await db.query(`select tablename from pg_tables where schemaname = 'public' and not rowsecurity`);
   ok('RLS activo en TODAS las tablas', rows.length === 0, rows.map((x) => x.tablename).join(', '));

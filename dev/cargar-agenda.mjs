@@ -84,10 +84,6 @@ async function cargar() {
 
   const slugPorId = Object.fromEntries(talleresBase.map((w) => [w.id, w.slug]));
   const idPorSlug = Object.fromEntries(talleresBase.map((w) => [w.slug, w.id]));
-  const clave = (tipo, slug, fecha, inicio) => `${tipo}|${slug ?? ''}|${fecha}|${hhmm(inicio)}`;
-  const existentes = new Map(
-    sesionesBase.map((s) => [clave(s.experience_type, slugPorId[s.workshop_id], s.date, s.start_time), s]),
-  );
   // Una sesión con reservas vivas no se cierra nunca desde aquí.
   const ahora = Date.now();
   const conReservasVivas = new Set(
@@ -122,19 +118,19 @@ async function cargar() {
     is_featured: a.is_featured,
     status: a.is_active ? 'published' : 'draft',
     booking_mode: a.booking_type !== 'inquiry' && a.price ? 'paid' : 'quote',
+    booking_type: a.booking_type,
   }));
 
   // --- 2. Horarios publicados ------------------------------------------------------
-  // Talleres: sesión 'taller' ligada a su fila. Tardes de Cerámica (Niños) y
-  // Clases de Cerámica son sesiones de NUMA Kids y de membresía: van sin
-  // taller ligado (así lo pide la tabla) y se reconocen por fecha y hora.
+  // Cada horario va ligado a su tarjeta. Tardes de Cerámica (Niños) y Clases
+  // de Cerámica son sesiones de NUMA Kids y de membresía.
   const deseadas = [];
   for (const a of AGENDA.filter((x) => x.is_active)) {
     const flujo = flujoAgenda(a);
     const tipo = flujo === 'kids' ? 'kids' : flujo === 'membresia' ? 'membresia' : 'taller';
     for (const s of a.sessions) {
       deseadas.push({
-        slug: tipo === 'taller' ? a.slug : null,
+        slug: a.slug,
         fila: {
           experience_type: tipo, date: a.date, start_time: s.start_time, end_time: s.end_time,
           timezone: ZONA, capacity: s.capacity, price: tipo === 'membresia' ? null : a.price,
@@ -143,15 +139,31 @@ async function cargar() {
       });
     }
   }
-  const clavesDeseadas = new Set(deseadas.map((d) => clave(d.fila.experience_type, d.slug, d.fila.date, d.fila.start_time)));
 
-  const nuevas = deseadas.filter((d) => !existentes.has(clave(d.fila.experience_type, d.slug, d.fila.date, d.fila.start_time)));
+  // La sesión que ya existe para un horario: la ligada a su tarjeta o, para
+  // NUMA Kids y membresía de cargas anteriores, la de ese día y hora sin
+  // tarjeta (se liga, así conserva su id y sus reservas).
+  const buscar = (d) => sesionesBase.find((s) =>
+    s.experience_type === d.fila.experience_type && s.date === d.fila.date
+    && hhmm(s.start_time) === hhmm(d.fila.start_time)
+    && (slugPorId[s.workshop_id] === d.slug || (s.workshop_id === null && d.fila.experience_type !== 'taller')));
+  const usadas = new Set();
+  const nuevas = [];
+  const ligar = [];
+  for (const d of deseadas) {
+    const e = buscar(d);
+    if (!e) nuevas.push(d);
+    else {
+      usadas.add(e.id);
+      if (e.workshop_id === null) ligar.push({ id: e.id, d });
+    }
+  }
 
   // Datos que estaban vacíos y la agenda ya publica (precio, hora de cierre).
   // Nunca se toca un valor que ya exista: lo pudo haber puesto el equipo.
   const rellenar = [];
   for (const d of deseadas) {
-    const e = existentes.get(clave(d.fila.experience_type, d.slug, d.fila.date, d.fila.start_time));
+    const e = buscar(d);
     if (!e) continue;
     const cambios = {};
     if (e.price === null && d.fila.price !== null) cambios.price = d.fila.price;
@@ -160,9 +172,7 @@ async function cargar() {
   }
 
   // Horarios abiertos que ya no están publicados.
-  const sobrantes = sesionesBase.filter(
-    (s) => s.status === 'open' && !clavesDeseadas.has(clave(s.experience_type, slugPorId[s.workshop_id], s.date, s.start_time)),
-  );
+  const sobrantes = sesionesBase.filter((s) => s.status === 'open' && !usadas.has(s.id));
   const cerrar = sobrantes.filter((s) => !conReservasVivas.has(s.id));
   const intocables = sobrantes.filter((s) => conReservasVivas.has(s.id));
 
@@ -184,6 +194,7 @@ async function cargar() {
   console.log(`  Horarios publicados          ${deseadas.length}  (talleres ${cuenta(deseadas, 'taller')} · NUMA Kids ${cuenta(deseadas, 'kids')} · membresía ${cuenta(deseadas, 'membresia')})`);
   console.log(`  Horarios nuevos              ${nuevas.length}`);
   for (const d of nuevas) console.log(`    + ${describe(d.fila.experience_type, d.slug, d.fila.date, d.fila.start_time)}${d.fila.price ? `  $${d.fila.price}` : ''}`);
+  console.log(`  Sesiones que se ligan        ${ligar.length}  (NUMA Kids / membresía → su tarjeta)`);
   console.log(`  Datos vacíos que se llenan   ${rellenar.length}`);
   for (const r of rellenar) console.log(`    ~ ${describe(r.d.fila.experience_type, r.d.slug, r.d.fila.date, r.d.fila.start_time)}  ${JSON.stringify(r.cambios)}`);
   console.log(`  Horarios que se cierran      ${cerrar.length}  (ya no están publicados; no se borran)`);
@@ -228,6 +239,11 @@ async function cargar() {
     await rest(`workshop_sessions?id=eq.${r.id}`, { method: 'PATCH', body: JSON.stringify(r.cambios) });
   }
   if (rellenar.length) console.log(`    datos llenados             ${rellenar.length} OK`);
+
+  for (const l of ligar) {
+    await rest(`workshop_sessions?id=eq.${l.id}`, { method: 'PATCH', body: JSON.stringify({ workshop_id: idPorSlug[l.d.slug] }) });
+  }
+  if (ligar.length) console.log(`    sesiones ligadas           ${ligar.length} OK`);
 
   if (cerrar.length) {
     await rest(`workshop_sessions?id=in.(${cerrar.map((s) => s.id).join(',')})`, {

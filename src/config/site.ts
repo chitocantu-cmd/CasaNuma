@@ -71,8 +71,7 @@ export const siteConfig = {
 /**
  * De dónde salen talleres, reservas y cuentas.
  *   'demo'     → datos simulados en el navegador (src/datos/demo). Pagos falsos.
- *   'supabase' → backend real. Ver docs/INTEGRACION.md: aún no está conectado
- *                al sitio rediseñado.
+ *   'supabase' → backend real (Supabase + Stripe). Ver docs/INTEGRACION.md.
  */
 export const fuenteDatos = ((env.VITE_FUENTE_DATOS as string | undefined) ?? 'demo') as
   | 'demo'

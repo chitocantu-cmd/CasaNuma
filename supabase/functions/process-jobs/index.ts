@@ -55,8 +55,11 @@ Deno.serve(async (req: Request) => {
 
   for (const job of jobs as Job[]) {
     try {
-      await ejecutar(job);
+      const nota = await ejecutar(job);
       await db.rpc('completar_job', { p_id: job.id });
+      // Terminado sin enviar (p. ej. WhatsApp sin configurar): queda anotado
+      // para que el panel no lo muestre como enviado.
+      if (nota) await db.from('integration_jobs').update({ last_error: nota }).eq('id', job.id);
       hechos++;
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : String(e);
@@ -73,7 +76,8 @@ Deno.serve(async (req: Request) => {
 
 // ---------------------------------------------------------------------------
 
-async function ejecutar(job: Job): Promise<void> {
+/** Devuelve una nota cuando el trabajo termina sin hacer nada (no es error). */
+async function ejecutar(job: Job): Promise<string | void> {
   if (job.type === 'calendar_sync') return await sincronizarCalendario(job);
   if (job.type === 'email_send') return await mandarCorreo(job);
   if (job.type === 'whatsapp_send') return await mandarWhatsApp(job);
@@ -142,12 +146,17 @@ async function mandarCorreo(job: Job): Promise<void> {
   }
 }
 
-async function mandarWhatsApp(job: Job): Promise<void> {
+const OMITIDO_WHATSAPP = 'OMITIDO: WhatsApp Business sin configurar';
+
+async function mandarWhatsApp(job: Job): Promise<string | void> {
   const { data, error } = await db.rpc('datos_reserva', { p_reservation_id: job.entity_id });
   if (error) throw error;
   if (!data) throw new Error(`Reserva ${job.entity_id} no encontrada`);
   const enviado = await avisarReservaPorWhatsApp(data as DatosReserva);
-  if (!enviado) console.info(`[process-jobs/whatsapp] omitido: WhatsApp Business sin configurar (${job.entity_id})`);
+  if (!enviado) {
+    console.info(`[process-jobs/whatsapp] omitido: WhatsApp Business sin configurar (${job.entity_id})`);
+    return OMITIDO_WHATSAPP;
+  }
 }
 
 function json(body: unknown): Response {

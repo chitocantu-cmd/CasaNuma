@@ -40,11 +40,8 @@ const PagoCancelado = SIN_BACKEND ? null : lazy(() => import('./paginas/PagoCanc
 
 // Panel administrativo: aparte, solo para el equipo. Habla con el mismo
 // repositorio que el sitio: en la demo, con los datos locales (funciona incluso
-// en la presentación); con fuenteDatos = 'supabase', el panel de Supabase.
-const PanelAdmin =
-  fuenteDatos === 'demo'
-    ? lazy(() => import('./paginas/panel/Panel'))
-    : SIN_BACKEND ? null : lazy(() => import('./paginas/admin/PanelAdmin'));
+// en la presentación); con fuenteDatos = 'supabase', con la base real.
+const PanelAdmin = fuenteDatos !== 'demo' && SIN_BACKEND ? null : lazy(() => import('./paginas/panel/Panel'));
 const panelConBackend = fuenteDatos !== 'demo';
 
 // Se lee de las variables en vez de importar el cliente de Supabase: así el
@@ -84,6 +81,7 @@ export default function App() {
                   <Route path="/cuenta/entrar" element={<Acceso modo="entrar" />} />
                   <Route path="/cuenta/registro" element={<Acceso modo="registro" />} />
                   <Route path="/cuenta/recuperar" element={<Acceso modo="recuperar" />} />
+                  <Route path="/cuenta/nueva-contrasena" element={<Acceso modo="nueva" />} />
                   <Route path="/aviso-de-privacidad" element={<Legal documento="privacidad" />} />
                   <Route path="/terminos" element={<Legal documento="terminos" />} />
                   <Route path="/politica-de-reservaciones" element={<Legal documento="reservaciones" />} />

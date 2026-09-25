@@ -11,7 +11,7 @@ import { Boton } from '../../componentes/base/Boton';
 import { Aviso, Campo, Casilla } from '../../componentes/base/Campos';
 import { Logo } from '../../componentes/marca/Logo';
 
-type Modo = 'entrar' | 'registro' | 'recuperar';
+type Modo = 'entrar' | 'registro' | 'recuperar' | 'nueva';
 
 const TITULOS: Record<Modo, { h1: string; seo: string; bajada: string }> = {
   entrar: { h1: 'Qué gusto verte de nuevo.', seo: 'Iniciar sesión', bajada: 'Entra para ver tus reservas y tus clases de membresía.' },
@@ -21,13 +21,15 @@ const TITULOS: Record<Modo, { h1: string; seo: string; bajada: string }> = {
     bajada: 'Organiza tus próximas experiencias: tus reservas, tus clases y tu historial, en un solo lugar.',
   },
   recuperar: { h1: 'Recupera tu contraseña.', seo: 'Recuperar contraseña', bajada: 'Escribe tu correo y te enviamos un enlace para crear una nueva.' },
+  // A esta pantalla llega el enlace del correo de recuperación, ya con sesión.
+  nueva: { h1: 'Crea una contraseña nueva.', seo: 'Nueva contraseña', bajada: 'Con ella vuelves a entrar a tus reservas y tus clases.' },
 };
 
 export default function Acceso({ modo }: { modo: Modo }) {
   const t = TITULOS[modo];
   useSeo({ titulo: `${t.seo} | Casa Numa`, descripcion: t.bajada, indexar: false });
 
-  const { usuario, entrar, registrar } = useSesion();
+  const { usuario, cargando, entrar, registrar } = useSesion();
   const navigate = useNavigate();
   const location = useLocation();
   const destino = (location.state as { desde?: string } | null)?.desde ?? '/cuenta';
@@ -41,16 +43,18 @@ export default function Acceso({ modo }: { modo: Modo }) {
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
+  /** Cuenta creada que espera la confirmación del correo. */
+  const [porConfirmar, setPorConfirmar] = useState<string | null>(null);
 
-  if (usuario && modo !== 'recuperar') return <Navigate to={destino} replace />;
+  if (usuario && (modo === 'entrar' || modo === 'registro')) return <Navigate to={destino} replace />;
 
   async function enviar(e: FormEvent) {
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (modo === 'registro' && !nombre.trim()) errs.nombre = 'Escribe tu nombre.';
-    if (!correoValido(email)) errs.email = 'Revisa tu correo, parece incompleto.';
+    if (modo !== 'nueva' && !correoValido(email)) errs.email = 'Revisa tu correo, parece incompleto.';
     if (modo === 'registro' && soloDigitos(telefono).length < 10) errs.telefono = 'Tu teléfono necesita 10 dígitos.';
-    if (modo === 'registro' && password.length < 8) errs.password = 'Usa al menos 8 caracteres.';
+    if ((modo === 'registro' || modo === 'nueva') && password.length < 8) errs.password = 'Usa al menos 8 caracteres.';
     if (modo === 'entrar' && !password) errs.password = 'Escribe tu contraseña.';
     setErrores(errs);
     if (Object.keys(errs).length) return;
@@ -60,13 +64,21 @@ export default function Acceso({ modo }: { modo: Modo }) {
     try {
       if (modo === 'entrar') await entrar(email, password);
       else if (modo === 'registro') await registrar({ nombre, email, telefono, password, novedades });
-      else {
+      else if (modo === 'nueva') {
+        await repo.cambiarPassword(password);
+        setEnviado(true);
+        return;
+      } else {
         await repo.recuperarPassword(email);
         setEnviado(true);
         return;
       }
       navigate(destino, { replace: true });
     } catch (err) {
+      if (err instanceof ErrorDatos && err.codigo === 'CONFIRMAR_CORREO' && modo === 'registro') {
+        setPorConfirmar(err.message);
+        return;
+      }
       setError(err instanceof ErrorDatos ? err.message : 'Algo salió mal. Intenta de nuevo.');
     } finally {
       setEnviando(false);
@@ -80,7 +92,12 @@ export default function Acceso({ modo }: { modo: Modo }) {
         <h1 className="mt-5 font-display text-t1 font-light">{t.h1}</h1>
         <p className="mt-5 max-w-lectura text-cuerpo-l text-cafe/80">{t.bajada}</p>
 
-        {enviado ? (
+        {enviado && modo === 'nueva' ? (
+          <div className="mt-10 space-y-6">
+            <Aviso tipo="exito">Listo: tu contraseña quedó cambiada.</Aviso>
+            <Link to="/cuenta" className="subrayado-fijo inline-block pb-0.5 text-nota">Ir a mi cuenta</Link>
+          </div>
+        ) : enviado ? (
           <div className="mt-10 space-y-6">
             <Aviso tipo="exito">
               Si hay una cuenta con {email.trim()}, te llegará un enlace para crear una nueva contraseña.
@@ -88,21 +105,36 @@ export default function Acceso({ modo }: { modo: Modo }) {
             </Aviso>
             <Link to="/cuenta/entrar" className="subrayado-fijo inline-block pb-0.5 text-nota">Volver a iniciar sesión</Link>
           </div>
+        ) : porConfirmar ? (
+          <div className="mt-10 space-y-6">
+            <Aviso tipo="info">{porConfirmar}</Aviso>
+            <Link to="/cuenta/entrar" state={location.state} className="subrayado-fijo inline-block pb-0.5 text-nota">
+              Ya la confirmé: iniciar sesión
+            </Link>
+          </div>
+        ) : modo === 'nueva' && !cargando && !usuario ? (
+          <div className="mt-10 space-y-6">
+            <Aviso>El enlace ya no es válido. Pide uno nuevo: cada enlace sirve una sola vez y por tiempo limitado.</Aviso>
+            <Link to="/cuenta/recuperar" className="subrayado-fijo inline-block pb-0.5 text-nota">Pedir otro enlace</Link>
+          </div>
         ) : (
           <form onSubmit={enviar} className="mt-10 space-y-7" noValidate>
             {error && <Aviso>{error}</Aviso>}
             {modo === 'registro' && (
               <Campo id="a-nombre" label="Nombre completo" value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="name" error={errores.nombre} />
             )}
-            <Campo id="a-email" label="Correo" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="tu@correo.com" error={errores.email} />
+            {modo !== 'nueva' && (
+              <Campo id="a-email" label="Correo" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="tu@correo.com" error={errores.email} />
+            )}
             {modo === 'registro' && (
               <Campo id="a-telefono" label="WhatsApp" type="tel" inputMode="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} autoComplete="tel" placeholder="81 0000 0000" error={errores.telefono} />
             )}
             {modo !== 'recuperar' && (
               <Campo
-                id="a-password" label="Contraseña" type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                autoComplete={modo === 'registro' ? 'new-password' : 'current-password'}
-                error={errores.password} ayuda={modo === 'registro' ? 'Mínimo 8 caracteres.' : undefined}
+                id="a-password" label={modo === 'nueva' ? 'Contraseña nueva' : 'Contraseña'} type="password" value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={modo === 'entrar' ? 'current-password' : 'new-password'}
+                error={errores.password} ayuda={modo === 'entrar' ? undefined : 'Mínimo 8 caracteres.'}
               />
             )}
 
@@ -119,7 +151,7 @@ export default function Acceso({ modo }: { modo: Modo }) {
             )}
 
             <Boton type="submit" disabled={enviando} flecha={!enviando} className="w-full sm:w-auto">
-              {enviando ? 'Un momento…' : modo === 'entrar' ? 'Entrar' : modo === 'registro' ? 'Crear mi cuenta' : 'Enviar enlace'}
+              {enviando ? 'Un momento…' : modo === 'entrar' ? 'Entrar' : modo === 'registro' ? 'Crear mi cuenta' : modo === 'nueva' ? 'Guardar contraseña' : 'Enviar enlace'}
             </Boton>
 
             <div className="flex flex-col gap-3 border-t border-cafe/12 pt-6 text-nota text-cafe/75">

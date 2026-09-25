@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
-import type { EstadoPago, EstadoReserva, MetodoPago, Reserva, TipoExperiencia, Usuario } from '../../datos/tipos';
+import type { Aviso, EstadoPago, EstadoReserva, MetodoPago, Reserva, TipoExperiencia, Usuario } from '../../datos/tipos';
 import { DIAS_CORTOS, MESES, diaSemana, hora, partes } from '../../lib/calendario';
 
 // ---------------------------------------------------------------------------
@@ -11,7 +11,17 @@ export const ETIQUETA_ESTADO: Record<EstadoReserva, string> = {
   confirmada: 'Confirmada',
   cancelada: 'Cancelada',
   completada: 'Completada',
+  no_asistio: 'No asistió',
   expirada: 'Apartado vencido',
+};
+
+/** Estado de un aviso, en corto (listas del resumen y de la reserva). */
+export const ETIQUETA_AVISO: Record<Aviso['estado'], string> = {
+  enviado: 'Enviado',
+  sin_destinatario: 'Falta correo del equipo',
+  pendiente_integracion: 'Pendiente de integrar',
+  en_cola: 'En cola',
+  fallido: 'No se pudo enviar',
 };
 
 export const ETIQUETA_PAGO: Record<EstadoPago, string> = {
@@ -38,6 +48,7 @@ const TONO_ESTADO: Record<EstadoReserva, string> = {
   confirmada: 'bg-verde/25 text-cafe',
   pendiente_pago: 'bg-amarillo/35 text-cafe',
   completada: 'bg-indigo/12 text-indigo',
+  no_asistio: 'bg-naranja/20 text-cafe',
   cancelada: 'bg-cafe/[0.07] text-cafe/60',
   expirada: 'bg-cafe/[0.05] text-cafe/50',
 };

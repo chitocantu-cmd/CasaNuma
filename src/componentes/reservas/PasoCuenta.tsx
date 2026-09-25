@@ -34,6 +34,8 @@ export default function PasoCuenta({
   const [novedades, setNovedades] = useState(false);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  /** Cuenta creada que espera la confirmación del correo. */
+  const [porConfirmar, setPorConfirmar] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
   // La sesión puede resolverse después de montar: rellenar sin pisar lo escrito.
@@ -77,6 +79,13 @@ export default function PasoCuenta({
           : await entrar(email, password);
       onListo({ nombre: u.nombre, email: u.email, telefono: u.telefono });
     } catch (err) {
+      // Cuenta creada que espera confirmar el correo: el enlace la trae de
+      // vuelta a esta página, ya con sesión.
+      if (err instanceof ErrorDatos && err.codigo === 'CONFIRMAR_CORREO') {
+        setPorConfirmar(err.message);
+        setModo('entrar');
+        return;
+      }
       setError(err instanceof ErrorDatos ? err.message : 'Algo salió mal. Intenta de nuevo.');
       if (err instanceof ErrorDatos && err.codigo === 'CORREO_REGISTRADO') setModo('entrar');
     } finally {
@@ -125,6 +134,7 @@ export default function PasoCuenta({
         ))}
       </div>
 
+      {porConfirmar && !error && <div className="mt-6"><Aviso tipo="info">{porConfirmar}</Aviso></div>}
       {error && <div className="mt-6"><Aviso>{error}</Aviso></div>}
 
       <div className="mt-8 grid gap-7 sm:grid-cols-2">

@@ -5,7 +5,7 @@ import { fuenteDatos } from '../../config/site';
 import { fechaCompleta, hoy, rango } from '../../lib/calendario';
 import { Icono } from '../../componentes/base/Iconos';
 import {
-  DemoPill, EncabezadoPanel, Kpi, NuevaPill, PagoPill, Tarjeta, diaMes, dinero, esNueva, horaCorta, useEnVivo, usePanel,
+  DemoPill, ETIQUETA_AVISO, EncabezadoPanel, Kpi, NuevaPill, PagoPill, Tarjeta, diaMes, dinero, esNueva, horaCorta, useEnVivo, usePanel,
 } from './ui';
 
 export default function PanelResumen() {
@@ -122,7 +122,7 @@ export default function PanelResumen() {
                     </span>
                     <span className="text-[0.72rem] text-cafe/60">
                       {a.destinatario === 'equipo' ? 'Equipo' : 'Clienta'} ·{' '}
-                      {a.estado === 'enviado' ? 'Enviado' : a.estado === 'sin_destinatario' ? 'Falta correo del equipo' : 'Pendiente de integrar'}
+                      {ETIQUETA_AVISO[a.estado]}
                     </span>
                   </li>
                 ))}

@@ -6,10 +6,14 @@ El sitio habla con los datos a través de dos contratos en
 - `Repositorio`: sitio público y Mi cuenta.
 - `RepositorioAdmin`: panel `/admin`.
 
-Hoy los dos los cumple `src/datos/demo/repoDemo.ts`, con datos en el
-navegador. Para producción hay que escribir `src/datos/supabase/repoSupabase.ts`
-y elegirlo en `src/datos/index.ts` cuando `VITE_FUENTE_DATOS=supabase`.
-Ningún componente cambia.
+Los cumplen dos implementaciones y `src/datos/index.ts` elige con
+`VITE_FUENTE_DATOS`:
+
+- `demo` → `src/datos/demo/repoDemo.ts`, datos en el navegador, pagos falsos.
+- `supabase` → `src/datos/supabase/repoSupabase.ts`, la base real, Stripe
+  Checkout y el panel con los datos del estudio. Se descarga solo en ese modo.
+
+Ningún componente cambia entre una y otra.
 
 ## El flujo de una reserva (igual en la demo y en el backend)
 
@@ -37,10 +41,21 @@ Migraciones v1 (en producción):
   `reservation-status`, holds con vencimiento, cron, correos (Resend),
   Google Calendar, `admin_profiles` + `es_admin()` + RLS.
 
-Migraciones v2 (`20260924100000_estados_v2.sql` … `20260924100400_pago_stripe_una_fila.sql`):
-**aplicadas a la base real el 24 sep 2026**, con las Edge Functions ya
-desplegadas y probadas con un pago real de Stripe en modo prueba. El sitio
-público todavía no las usa: sigue en modo demo hasta el paso 5.
+Migraciones v2 (`20260924100000_estados_v2.sql` … `20260925100000_mi_cuenta_y_panel.sql`):
+**aplicadas a la base real** (hasta la 13 el 24 sep 2026; la 14 el 25 sep),
+con las Edge Functions desplegadas. El sitio se probó de punta a punta en
+modo `supabase` contra la base real y Stripe en modo prueba (paso 5). El
+sitio publicado sigue en modo demo hasta el paso 6.
+
+- `20260924100500_conexion_sitio.sql`: sesiones de NUMA Kids y membresía
+  ligadas a su tarjeta, `workshops.booking_type`, `sesiones_ocupacion`,
+  `liberar_mi_apartado()`, `crear_reserva_panel()` (importe capturado por el
+  equipo) y `admin_marcar_reembolso()`.
+- `20260925100000_mi_cuenta_y_panel.sql`: `mis_reservas()` (Mi cuenta, sin
+  notas internas: la clienta ya no lee la tabla `reservations`),
+  `newsletter_subscribers` + `suscribir_novedades()`, `admin_cuentas()` y
+  `cancelar_reserva()` corregida (cancelar una membresía fallaba al encolar
+  Calendar sin taller).
 
 | Entidad pedida | Tabla |
 |---|---|
@@ -65,8 +80,9 @@ Funciones (solo las llama el backend con `service_role`; el navegador no):
 - `datos_reserva(reserva)`: lo que usan los correos y el WhatsApp.
 - `siguiente_folio()` + trigger `asignar_folio`: ningún camino confirma sin folio.
 
-Pruebas: `npm run test:reservas` (65 pruebas, fechas relativas a hoy:
-cupo, AGOTADO, pago tardío, folio, membresía, NUMA Kids, panel y RLS).
+Pruebas: `npm run test:reservas` (115 pruebas, fechas relativas a hoy:
+cupo, AGOTADO, pago tardío, folio, membresía, NUMA Kids, panel, Mi cuenta,
+novedades y RLS).
 `npm test` (v1) tiene una semilla con fechas de septiembre de 2026 que ya
 pasaron; falla por eso, no por la v2.
 
@@ -99,7 +115,29 @@ pasaron; falla por eso, no por la v2.
 4. Configurar `ADMIN_NOTIFICATION_EMAIL` y Resend (`RESEND_API_KEY`,
    `RESEND_FROM_EMAIL` con dominio verificado); si se quiere, WhatsApp.
    Mientras tanto los correos quedan en la cola y fallan con aviso claro.
-5. Escribir `repoSupabase.ts` y cambiar `VITE_FUENTE_DATOS=supabase`.
+5. *Hecho el 25 sep 2026.* `repoSupabase.ts` cumple los dos contratos; el
+   panel `/admin` es el mismo en los dos modos. Probado de punta a punta con
+   el sitio local en modo `supabase` (`VITE_FUENTE_DATOS=supabase npx vite`)
+   con `dev/prueba-sitio-tmp.mjs` (no se versiona): catálogo, cuenta,
+   apartar y cambiar de idea, NUMA Kids, membresía, pago en Stripe y regreso
+   a `/pago/exitoso` con la confirmación y el folio, Mi cuenta, y en el
+   panel: detalle, notas, agenda, cupo, reserva manual, pago, cancelación,
+   reembolso, clientes, pagos y avisos. Los datos de prueba se borraron y el
+   folio volvió a cero.
+6. Publicar: en Vercel, `VITE_FUENTE_DATOS=supabase`; en Supabase,
+   `APP_URL` y `STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` con el dominio
+   definitivo. En Supabase → Authentication:
+   - **URL Configuration:** Site URL = el dominio, y en Redirect URLs
+     `https://<dominio>/**` (los enlaces de confirmar cuenta y de nueva
+     contraseña regresan a la página donde se pidieron, y a
+     `/cuenta/nueva-contrasena`).
+   - **SMTP:** el correo integrado de Supabase manda muy pocos por hora;
+     conectar Resend (el mismo dominio verificado del paso 4) antes de abrir
+     los registros al público.
+   - **Confirmar correo** está activo: quien crea su cuenta en el checkout
+     debe abrir el enlace antes de pagar (el sitio se lo explica). Si Casa
+     Numa prefiere no pedirlo, se desactiva ahí mismo; el código funciona
+     igual con las dos opciones.
 
 ## Método por método
 
@@ -110,10 +148,12 @@ pasaron; falla por eso, no por la v2.
 | `disponibilidad(ids)` | cuenta en el navegador | `public_sessions.seats_available`. |
 | `apartar(solicitud)` | valida y guarda | `create-reservation` → `crear_reserva_sesiones`. |
 | `pagar(id)` | confirma al instante (DEMO) | `create-checkout-session` → `{ tipo: 'redireccion', url }`. El webhook confirma. |
-| `misReservas()` | por usuario | `select` sobre `reservations` con la sesión de la clienta: el RLS solo deja ver las suyas. |
-| `registrar` / `entrar` / `salir` | localStorage | Supabase Auth. Hoy los registros públicos están desactivados a propósito; habilitarlos y confirmar correo. |
-| `productos()` / `producto(slug)` | `PRODUCTOS_SEMILLA` | **Nuevo:** tabla `products`. |
-| `suscribirNovedades` | localStorage | **Nuevo:** tabla `newsletter_subscribers`. |
+| `liberar(id)` | marca expirada | `liberar_mi_apartado()`: solo el apartado propio, web y pendiente. |
+| `misReservas()` | por usuario | `mis_reservas()`: las de la cuenta y las que el equipo registró con su correo, sin notas internas. |
+| `registrar` / `entrar` / `salir` | localStorage | Supabase Auth; nombre y teléfono en los metadatos de la cuenta. Con confirmación de correo, `registrar` responde `CONFIRMAR_CORREO`. |
+| `recuperarPassword` / `cambiarPassword` | sin correo | Enlace de Supabase Auth a `/cuenta/nueva-contrasena`. |
+| `productos()` / `producto(slug)` | `PRODUCTOS_SEMILLA` | **Pendiente:** tabla `products`. Mientras, las mismas fichas de ejemplo (marcadas demo). |
+| `suscribirNovedades` | localStorage | `suscribir_novedades()` → `newsletter_subscribers` (10 intentos por IP cada 10 min). |
 
 Panel (`RepositorioAdmin`):
 
@@ -121,12 +161,13 @@ Panel (`RepositorioAdmin`):
 |---|---|
 | `entrarAdmin` / `adminActual` | Supabase Auth + fila en `admin_profiles`. Una clienta no entra. |
 | `resumen`, `reservas`, `reserva` | `select` con RLS de admin sobre `reservations`, `customers`, `payments`, `reservation_items`, `workshop_sessions`. |
-| `actualizarReserva` | Edge Function `admin-actions` → `admin_actualizar_reserva`, `cancelar_reserva`, `registrar_reembolso`, `registrar_pago_manual`. |
-| `crearReservaManual` | `admin-actions` → `crear_reserva_sesiones(..., origen = 'panel')` (+ `registrar_pago_manual` si ya pagó). |
-| `agenda(mes)`, `talleres()` | `workshop_sessions` + `lugares_ocupados_sesion`. |
-| `ajustarCupo` | `update workshop_sessions set capacity` (política de admin). |
-| `membresias()` | `membership_usage`. |
-| `avisos()` | `integration_jobs` (estado de cada correo / WhatsApp). |
+| `actualizarReserva` | Edge Function `admin-actions` → `registrar_pago_manual` (avisa a la clienta), `cancelar_reserva`, `admin_marcar_reembolso`, `admin_actualizar_reserva` (completada / no asistió / notas). |
+| `crearReservaManual` | `admin-actions` → `crear_reserva_panel()` con el importe que captura el equipo (+ `registrar_pago_manual` si ya pagó). |
+| `agenda(mes)`, `talleres()` | `sesiones_ocupacion` + partidas de las reservas vivas. |
+| `ajustarCupo` | `admin-actions` → `admin_ajustar_cupo()` (nunca menor a lo reservado). |
+| `membresias()` | reservas de tipo membresía con sus 4 clases. |
+| `clientes()` | clientes de las reservas + `admin_cuentas()` (cuentas sin reservas). |
+| `avisos()` | `integration_jobs`: enviado, en cola, sin destinatario, WhatsApp omitido (sin configurar) o fallido con su motivo. |
 
 ## Avisos
 

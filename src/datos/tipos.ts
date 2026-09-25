@@ -105,9 +105,10 @@ export interface Usuario {
  * pendiente_pago: lugares apartados, el cobro no se ha confirmado.
  * confirmada: el proveedor de pagos (o el equipo, si pagó en el estudio) confirmó el cobro.
  * completada: la experiencia ya ocurrió.
- * Preparados para después: reembolsada, no_asistio.
+ * no_asistio: tenía lugar pagado y no llegó (lo marca el equipo).
+ * Una reserva reembolsada queda cancelada con el pago 'reembolsado'.
  */
-export type EstadoReserva = 'pendiente_pago' | 'confirmada' | 'cancelada' | 'completada' | 'expirada';
+export type EstadoReserva = 'pendiente_pago' | 'confirmada' | 'cancelada' | 'completada' | 'no_asistio' | 'expirada';
 export type EstadoPago = 'pendiente' | 'pagado' | 'reembolsado' | 'fallido';
 export type MetodoPago = 'tarjeta' | 'transferencia' | 'efectivo' | 'otro';
 
@@ -219,7 +220,12 @@ export interface Aviso {
   lineas: string[];
   enlace: { texto: string; ruta: string } | null;
   reservaId: string;
-  estado: 'enviado' | 'sin_destinatario' | 'pendiente_integracion';
+  /**
+   * en_cola y fallido solo existen con el backend real: el aviso espera al
+   * worker o se agotaron sus reintentos (el motivo va en `error`).
+   */
+  estado: 'enviado' | 'sin_destinatario' | 'pendiente_integracion' | 'en_cola' | 'fallido';
+  error?: string;
   creadoEn: string;
 }
 
