@@ -25,11 +25,10 @@ export const siteConfig = {
 
   // --- Contacto ------------------------------------------------------------
   /**
-   * PENDIENTE · WhatsApp oficial, solo dígitos con lada de país: 52 + 10 dígitos.
-   * El brandbook muestra un número en la tarjeta de presentación de muestra;
-   * no se usa porque es una maqueta, no un dato confirmado.
+   * Confirmado por Casa Numa (25 sep 2026): 81 2594 5907, el mismo de su ficha
+   * de Google Maps. Solo dígitos con lada de país: 52 + 10 dígitos.
    */
-  whatsapp: (env.VITE_NUMA_WHATSAPP as string | undefined) ?? '',
+  whatsapp: (env.VITE_NUMA_WHATSAPP as string | undefined) || '528125945907',
   /** PENDIENTE · correo de contacto. */
   email: (env.VITE_NUMA_EMAIL as string | undefined) ?? '',
   /** Confirmado por Casa Numa: instagram.com/casanumamx (sin @). */
