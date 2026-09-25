@@ -22,6 +22,9 @@ import { maximoPersonas, sinLugar, textoLugares } from '../lib/cupo';
 import { pesosCortos } from '../lib/formato';
 import { cuandoTaller, precioTaller, publicoTaller, rutaReserva } from '../lib/talleres';
 import { ldEvento, useSeo } from '../lib/seo';
+import ErrorCarga from '../componentes/base/ErrorCarga';
+import { borrarBorrador, useBorrador } from '../lib/borrador';
+import { CargandoPagina } from '../componentes/base/Cargando';
 
 const PASOS = ['Fecha y horario', 'Personas', 'Tus datos', 'Pago'];
 /** Tope por reserva en línea; grupos más grandes se organizan por mensaje. */
@@ -55,7 +58,7 @@ function faltantes(t: Taller): string[] {
 export default function ReservarTaller() {
   const { slug } = useParams();
   const [params] = useSearchParams();
-  const { datos: taller, cargando } = useTaller(slug);
+  const { datos: taller, cargando, error, recargar } = useTaller(slug);
 
   useSeo({
     titulo: taller ? `${taller.titulo} | Talleres de cerámica | Casa Numa` : 'Taller | Casa Numa',
@@ -69,7 +72,8 @@ export default function ReservarTaller() {
       : null,
   });
 
-  if (cargando && !taller) return <div className="min-h-[80vh]" aria-busy="true" />;
+  if (cargando && !taller) return <CargandoPagina />;
+  if (error && !taller) return <ErrorCarga pagina onReintentar={recargar} />;
 
   if (!taller) {
     return (
@@ -160,13 +164,19 @@ function Checkout({ taller }: { taller: Taller }) {
   const [params] = useSearchParams();
   const { recargar } = useTaller(taller.slug);
   const [paso, setPaso] = useState(0);
-  const [sesionId, setSesionId] = useState<string | null>(
-    params.get('sesion') ?? (taller.sesiones.length === 1 ? taller.sesiones[0].id : null),
+  // Horario y personas sobreviven a recargar la página.
+  const [sesionId, setSesionId] = useBorrador<string | null>(
+    `taller:${taller.slug}:sesion`,
+    () => params.get('sesion') ?? (taller.sesiones.length === 1 ? taller.sesiones[0].id : null),
   );
-  const [personas, setPersonas] = useState(1);
+  const [personas, setPersonas] = useBorrador(`taller:${taller.slug}:personas`, 1);
+  const desdeAgenda = params.get('sesion');
+  useEffect(() => {
+    if (desdeAgenda) setSesionId(desdeAgenda);
+  }, [desdeAgenda, setSesionId]);
   const [aviso, setAviso] = useState<string | null>(null);
   const [consultando, setConsultando] = useState(false);
-  const { reserva, setReserva, error, setError, apartando, apartar } = useApartado();
+  const { reserva, setReserva, error, setError, apartando, apartar, soltar } = useApartado();
 
   const precio = taller.precio ?? 0;
   const sesion = useMemo(() => taller.sesiones.find((s) => s.id === sesionId) ?? null, [taller, sesionId]);
@@ -184,7 +194,14 @@ function Checkout({ taller }: { taller: Taller }) {
 
   useEffect(() => {
     if (personas > maximo) setPersonas(maximo);
-  }, [maximo, personas]);
+  }, [maximo, personas, setPersonas]);
+
+  // Confirmada: la selección ya no hace falta.
+  useEffect(() => {
+    if (reserva?.estado !== 'confirmada') return;
+    borrarBorrador(`taller:${taller.slug}:sesion`);
+    borrarBorrador(`taller:${taller.slug}:personas`);
+  }, [reserva?.estado, taller.slug]);
 
   const alVencer = useCallback(() => {
     setReserva(null);
@@ -358,7 +375,9 @@ function Checkout({ taller }: { taller: Taller }) {
             </div>
           )}
 
-          {paso === 3 && reserva && <PasoPago reserva={reserva} onPagado={setReserva} onVencido={alVencer} />}
+          {paso === 3 && reserva && (
+            <PasoPago reserva={reserva} onPagado={setReserva} onVencido={alVencer} onVolver={() => { soltar(); setPaso(0); }} />
+          )}
         </>
       )}
     </CheckoutLayout>

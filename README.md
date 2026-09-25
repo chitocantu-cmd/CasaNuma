@@ -296,7 +296,8 @@ verificado.** Esos trabajos solo se encolan desde `confirmar_pago()`.
 ## Google Calendar Setup
 
 Casa Numa tiene su propio calendario administrativo, con **un evento por
-taller** (no uno por reservación: eso lo volvería ilegible).
+sesión** (cada horario de taller, NUMA Kids y clase de membresía), no uno por
+reservación: eso lo volvería ilegible.
 
 ### 1. Proyecto en Google Cloud
 
@@ -307,60 +308,48 @@ taller** (no uno por reservación: eso lo volvería ilegible).
 
 - **APIs & Services → Library** → busca *Google Calendar API* → **Enable**.
 
-### 3. Pantalla de consentimiento
+### 3. Cuenta de servicio
 
-- **APIs & Services → OAuth consent screen**
-- Tipo **External**, en modo *Testing*.
-- Agrega tu correo de Google en **Test users** (obligatorio en modo Testing).
-- Scope: `https://www.googleapis.com/auth/calendar`
+- **IAM & Admin → Service Accounts → Create service account** →
+  `casa-numa-calendario`. No necesita roles del proyecto.
+- En la cuenta creada: **Keys → Add key → Create new key → JSON**.
+- Guarda el archivo como `dev/google-calendar.json` (está en `.gitignore`:
+  nunca se sube a GitHub). Copia el correo de la cuenta
+  (`...@...iam.gserviceaccount.com`).
 
-### 4. Crear el OAuth Client
+A diferencia de un refresh token de OAuth, la llave de una cuenta de
+servicio no caduca a los 7 días en modo *Testing*.
 
-- **Credentials → Create Credentials → OAuth client ID**
-- Tipo: **Web application**
-- *Authorized redirect URIs*: `https://developers.google.com/oauthplayground`
-- Copia `Client ID` y `Client Secret`.
-
-### 5. Obtener el refresh token
-
-- Abre [OAuth Playground](https://developers.google.com/oauthplayground).
-- Engrane (arriba derecha) → marca **Use your own OAuth credentials** → pega
-  Client ID y Secret.
-- Panel izquierdo: escribe `https://www.googleapis.com/auth/calendar` → **Authorize APIs**.
-- Autoriza con la cuenta de Google **dueña del calendario**.
-- **Exchange authorization code for tokens** → copia el `refresh_token`.
-
-> Si no aparece refresh token, revoca el acceso de la app en
-> [myaccount.google.com/permissions](https://myaccount.google.com/permissions) y
-> repite: Google solo lo entrega en la primera autorización.
-
-### 6. Crear el calendario y obtener su ID
+### 4. Crear el calendario y compartirlo
 
 - En Google Calendar: **+ → Crear calendario** → `CASA NUMA — TALLERES`.
-- **Configuración del calendario → Integrar calendario** → copia el
-  **ID de calendario** (`...@group.calendar.google.com`).
-- Asegúrate de que la cuenta que autorizó tenga permiso para **hacer cambios en
-  eventos**.
+- **Configuración del calendario → Compartir con personas específicas** →
+  agrega el correo de la cuenta de servicio con permiso **Hacer cambios en
+  los eventos**.
+- **Integrar calendario** → copia el **ID de calendario**
+  (`...@group.calendar.google.com`) a `GOOGLE_CALENDAR_ID` en
+  `dev/secretos.env`.
 
-### 7. Cargar y probar
+### 5. Cargar y probar
 
 ```bash
-supabase secrets set \
-  GOOGLE_CLIENT_ID=... \
-  GOOGLE_CLIENT_SECRET=... \
-  GOOGLE_REFRESH_TOKEN=... \
-  GOOGLE_CALENDAR_ID=...@group.calendar.google.com \
-  GOOGLE_TIMEZONE=America/Monterrey
-supabase functions deploy process-jobs
+node dev/desplegar.mjs   # sube GOOGLE_SERVICE_ACCOUNT (el JSON) y GOOGLE_CALENDAR_ID
 ```
 
-Publica un taller desde `/admin/talleres` y revisa el calendario.
+Después, una sola vez, sincroniza la agenda próxima: `select
+encolar_calendario();` en el SQL Editor (o `admin-actions` →
+`sync_calendar`). En `/admin/avisos` la tarjeta **Google Calendar** pasa de
+«Sin configurar» a «Funcionando». Sin configurar, cada trabajo se cierra con
+la nota «OMITIDO» y nada más se detiene.
+
+(El código todavía acepta `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` /
+`GOOGLE_REFRESH_TOKEN` si alguien prefiere OAuth.)
 
 ### Qué hace la sincronización
 
 | Evento | Efecto |
 |---|---|
-| Se publica un taller | Crea el evento, guarda `google_calendar_event_id` |
+| Se crea o cambia una sesión | Crea o mueve su evento, guarda el id |
 | Alguien paga | Actualiza conteo y lista de asistentes |
 | Se cancela una reserva | Actualiza conteo y lista |
 | Cambia horario o lugar | Mueve el **mismo** evento, no crea otro |
@@ -448,7 +437,23 @@ directas devuelven 404:
 
 ## Pruebas
 
-La lista completa, con SQL reproducible, está en
+```bash
+npm run typecheck        # tipos
+npm run test:unit        # Vitest: lógica y repositorio demo
+npm test                 # 73 pruebas de la lógica v1 de la base (PGlite)
+npm run test:reservas    # 131 pruebas de la base v2 (PGlite, sin red)
+npm run test:migraciones # todas las migraciones aplican en orden
+npm run test:e2e         # Playwright: sitio en modo demo, Chrome instalado
+```
+
+`test:e2e` levanta el sitio en el puerto 5175 con la fecha fija 25 sep 2026
+y recorre: reserva completa (taller → cuenta → pago simulado → folio → Mi
+cuenta → panel), pago rechazado, doble clic, NUMA Kids, membresía, eventos,
+todas las rutas (y la 404), 320–1440 px sin desbordes, el panel (crear,
+editar y desactivar un taller; reserva manual) y una revisión de cada botón,
+imagen y campo. `npx playwright show-report` abre el detalle de una falla.
+
+La lista de pruebas manuales, con SQL reproducible, está en
 [`docs/PRUEBAS.md`](docs/PRUEBAS.md).
 
 La más importante es la **C: dos peticiones simultáneas por el último lugar**.
@@ -489,8 +494,10 @@ sobreventa.
 
 No son de programación, pero bloquean el lanzamiento:
 
-- **38 fotos** del estudio, los talleres y el equipo. Mientras no existan, el
-  sitio dibuja marcadores que describen el encuadre que hace falta.
-- **Datos reales** de WhatsApp, correo y dirección (van en `site_settings`).
+- **Fotos que faltan:** Gloria y las fundadoras, la fachada y los talleres de
+  temporada. Mientras no existan, el sitio dibuja marcadores que describen el
+  encuadre que hace falta. (Las fotos del estudio y de NUMA Store ya son
+  reales.)
+- **Precios de NUMA Store** (hoy «Precio por mensaje»).
 - **Bios del equipo** y la historia real de Casa Numa.
 - **Política de cancelación**, que decide qué hace el sistema con los reembolsos.

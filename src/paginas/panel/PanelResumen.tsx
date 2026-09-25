@@ -4,13 +4,15 @@ import { useConsulta } from '../../datos/hooks';
 import { fuenteDatos } from '../../config/site';
 import { fechaCompleta, hoy, rango } from '../../lib/calendario';
 import { Icono } from '../../componentes/base/Iconos';
+import ErrorCarga from '../../componentes/base/ErrorCarga';
+import { CargandoBloque } from '../../componentes/base/Cargando';
 import {
   DemoPill, ETIQUETA_AVISO, EncabezadoPanel, Kpi, NuevaPill, PagoPill, Tarjeta, diaMes, dinero, esNueva, horaCorta, useEnVivo, usePanel,
 } from './ui';
 
 export default function PanelResumen() {
   const { admin } = usePanel();
-  const { datos, recargar } = useConsulta('admin:resumen', () => repoAdmin.resumen());
+  const { datos, error, recargar } = useConsulta('admin:resumen', () => repoAdmin.resumen());
   const { datos: avisos } = useConsulta('admin:avisos', () => repoAdmin.avisos());
   useEnVivo(recargar);
 
@@ -29,8 +31,10 @@ export default function PanelResumen() {
         }
       />
 
-      {!datos ? (
-        <div className="h-40" aria-busy="true" />
+      {!datos && error ? (
+        <ErrorCarga onReintentar={recargar} />
+      ) : !datos ? (
+        <CargandoBloque className="h-40" />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -63,7 +67,7 @@ export default function PanelResumen() {
                             {r.demo && <DemoPill />}
                           </span>
                           <span className="block truncate text-[0.78rem] text-cafe/65">
-                            {r.titulo} · {diaMes(r.sesiones[0].fecha)} · {horaCorta(r.sesiones[0].inicio)} · {r.participantes} {r.participantes === 1 ? 'persona' : 'personas'}
+                            {r.titulo}{r.sesiones[0] ? ` · ${diaMes(r.sesiones[0].fecha)} · ${horaCorta(r.sesiones[0].inicio)}` : ''} · {r.participantes} {r.participantes === 1 ? 'persona' : 'personas'}
                           </span>
                         </span>
                         <span className="flex flex-wrap items-center gap-2 sm:justify-end">

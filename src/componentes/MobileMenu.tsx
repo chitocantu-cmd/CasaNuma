@@ -8,6 +8,7 @@ import { Logo } from './marca/Logo';
 import CeramicShape from './marca/CeramicShape';
 import { Icono } from './base/Iconos';
 import { EASE_NUMA } from './base/Revelar';
+import { useAtraparFoco } from '../lib/foco';
 
 const SILUETAS_PIE = ['olla', 'guaje', 'taza', 'doble', 'jarron', 'anfora'] as const;
 
@@ -17,6 +18,8 @@ const SILUETAS_PIE = ['olla', 'guaje', 'taza', 'doble', 'jarron', 'anfora'] as c
  */
 export default function MobileMenu({ abierto, onCerrar }: { abierto: boolean; onCerrar: () => void }) {
   const cerrarRef = useRef<HTMLButtonElement>(null);
+  const cajaRef = useRef<HTMLDivElement>(null);
+  useAtraparFoco(cajaRef, abierto);
   const { usuario } = useSesion();
   const instagram = enlaceInstagram();
   const whatsapp = enlaceWhatsapp();
@@ -40,6 +43,7 @@ export default function MobileMenu({ abierto, onCerrar }: { abierto: boolean; on
     <AnimatePresence>
       {abierto && (
         <m.div
+          ref={cajaRef}
           id="menu-movil"
           role="dialog"
           aria-modal="true"

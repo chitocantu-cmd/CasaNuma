@@ -17,6 +17,9 @@ import { diaSemana, fechaCompleta, rango, yaPaso } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
 import { sinLugar } from '../lib/cupo';
 import { useSeo } from '../lib/seo';
+import ErrorCarga from '../componentes/base/ErrorCarga';
+import { borrarBorrador, useBorrador } from '../lib/borrador';
+import { CargandoBloque } from '../componentes/base/Cargando';
 
 const PASOS = ['Mes', 'Tus 4 clases', 'Resumen', 'Tus datos', 'Pago'];
 const CLASES = MEMBRESIA.clasesPorMes;
@@ -33,14 +36,15 @@ export default function ReservarMembresia() {
     indexar: false,
   });
 
-  const { datos: meses, cargando, recargar } = useMesesMembresia();
+  const { datos: meses, cargando, error: errorCarga, recargar } = useMesesMembresia();
   const disponibles = useMemo(() => (meses ?? []).filter(reservable), [meses]);
   const [paso, setPaso] = useState(0);
-  const [clave, setClave] = useState<string | null>(null);
-  const [elegidas, setElegidasEstado] = useState<string[]>([]);
+  // Mes y clases elegidas sobreviven a recargar la página.
+  const [clave, setClave] = useBorrador<string | null>('membresia:mes', null);
+  const [elegidas, setElegidasEstado] = useBorrador<string[]>('membresia:clases', []);
   // Copia síncrona de la selección: dos toques seguidos, antes de que React
   // vuelva a pintar, no pueden colar una quinta clase.
-  const elegidasRef = useRef<string[]>([]);
+  const elegidasRef = useRef<string[]>(elegidas);
   const setElegidas = useCallback((nuevo: string[] | ((v: string[]) => string[])) => {
     const valor = typeof nuevo === 'function' ? nuevo(elegidasRef.current) : nuevo;
     elegidasRef.current = valor;
@@ -49,15 +53,24 @@ export default function ReservarMembresia() {
   const [dia, setDia] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [consultando, setConsultando] = useState(false);
-  const { reserva, setReserva, error, setError, apartando, apartar } = useApartado();
+  const { reserva, setReserva, error, setError, apartando, apartar, soltar } = useApartado();
 
   useEffect(() => {
-    if (!clave && disponibles[0]) setClave(disponibles[0].clave);
-  }, [clave, disponibles]);
+    if (!meses) return;
+    // Sin mes elegido, o con uno guardado que ya no está abierto: el primero.
+    if (!clave || !disponibles.some((m) => m.clave === clave)) {
+      setClave(disponibles[0]?.clave ?? null);
+      if (clave) setElegidas([]);
+    }
+  }, [clave, disponibles, meses, setClave, setElegidas]);
 
   const mes = disponibles.find((m) => m.clave === clave) ?? null;
   const porId = useMemo(() => new Map((mes?.sesiones ?? []).map((s) => [s.id, s])), [mes]);
   const seleccion = elegidas.map((id) => porId.get(id)).filter(Boolean) as Sesion[];
+  // Una clase guardada que ya no existe (o se llenó y cerró) sale de la selección.
+  useEffect(() => {
+    if (mes && seleccion.length !== elegidas.length) setElegidas(seleccion.map((x) => x.id));
+  }, [mes, seleccion, elegidas.length, setElegidas]);
   const ordenadas = [...seleccion].sort((a, b) => a.fecha.localeCompare(b.fecha));
 
   // Si al recargar el cupo una clase elegida se llenó, se quita y se avisa.
@@ -135,6 +148,11 @@ export default function ReservarMembresia() {
   for (const s of seleccion) porDia.set(diaSemana(s.fecha), (porDia.get(diaSemana(s.fecha)) ?? 0) + 1);
 
   const confirmada = reserva?.estado === 'confirmada';
+  useEffect(() => {
+    if (!confirmada) return;
+    borrarBorrador('membresia:mes');
+    borrarBorrador('membresia:clases');
+  }, [confirmada]);
   const etiquetaMes = mes?.etiqueta.split(' ')[0] ?? '';
 
   return (
@@ -182,7 +200,8 @@ export default function ReservarMembresia() {
               <p className="mt-3 max-w-lectura text-cuerpo text-cafe/75">
                 Tu membresía incluye {CLASES} clases de {MEMBRESIA.horasPorClase} horas dentro del mismo mes.
               </p>
-              {cargando && !meses && <div className="mt-8 h-40" aria-busy="true" />}
+              {cargando && !meses && <CargandoBloque className="mt-8 h-40" />}
+              {errorCarga && !meses && <ErrorCarga className="mt-8" onReintentar={recargar} />}
               {meses && disponibles.length === 0 && (
                 <p className="mt-8 text-cuerpo text-cafe/80">Por ahora no hay meses con lugares. Suscríbete a las novedades y te avisamos cuando abramos.</p>
               )}
@@ -306,7 +325,9 @@ export default function ReservarMembresia() {
             </div>
           )}
 
-          {paso === 4 && reserva && <PasoPago reserva={reserva} onPagado={setReserva} onVencido={alVencer} />}
+          {paso === 4 && reserva && (
+            <PasoPago reserva={reserva} onPagado={setReserva} onVencido={alVencer} onVolver={() => { soltar(); setPaso(0); }} textoVolver="Volver a elegir clases" />
+          )}
         </>
       )}
     </CheckoutLayout>

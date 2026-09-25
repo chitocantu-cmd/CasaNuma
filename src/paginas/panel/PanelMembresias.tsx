@@ -3,12 +3,14 @@ import { repoAdmin } from '../../datos';
 import { useConsulta } from '../../datos/hooks';
 import { etiquetaMes } from '../../lib/calendario';
 import { DemoPill, EncabezadoPanel, EstadoPill, PagoPill, claseTabla, useEnVivo } from './ui';
+import ErrorCarga from '../../componentes/base/ErrorCarga';
+import { CargandoBloque } from '../../componentes/base/Cargando';
 
 const TONO = { utilizada: 'bg-cafe', reservada: 'bg-terracota/60', disponible: 'border border-cafe/30' };
 
 export default function PanelMembresias() {
   const navigate = useNavigate();
-  const { datos, recargar } = useConsulta('admin:membresias', () => repoAdmin.membresias());
+  const { datos, error, recargar } = useConsulta('admin:membresias', () => repoAdmin.membresias());
   useEnVivo(recargar);
 
   return (
@@ -22,8 +24,10 @@ export default function PanelMembresias() {
         ))}
       </ul>
 
-      {!datos ? (
-        <div className="h-60" aria-busy="true" />
+      {!datos && error ? (
+        <ErrorCarga onReintentar={recargar} />
+      ) : !datos ? (
+        <CargandoBloque className="h-60" />
       ) : datos.length === 0 ? (
         <p className="rounded-suave border border-dashed border-cafe/20 p-8 text-center text-nota text-cafe/65">Aún no hay membresías.</p>
       ) : (

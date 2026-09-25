@@ -126,6 +126,28 @@ export function descargarIcs(r: EstadoReserva): void {
   descargar(construirIcs(r), `casa-numa-${r.workshop.slug}.ics`);
 }
 
+/**
+ * Google Calendar en el navegador, para una reserva de una sola sesión (la
+ * membresía, con cuatro clases, se agrega con el .ics). Horas locales de
+ * Monterrey con `ctz`: sin conversiones a UTC que se desfasen.
+ */
+export function enlaceGoogleCalendarReserva(r: Reserva, lugar: string): string | null {
+  if (r.sesiones.length !== 1) return null;
+  const s = r.sesiones[0];
+  const compacta = (hhmm: string) => `${s.fecha.replace(/-/g, '')}T${hhmm.replace(':', '')}00`;
+  const [h, m] = s.inicio.split(':').map(Number);
+  const fin = s.fin ?? `${String(Math.min(h + 2, 23)).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `Casa Numa — ${r.titulo}`,
+    dates: `${compacta(s.inicio)}/${compacta(fin)}`,
+    ctz: 'America/Monterrey',
+    details: `Reservación ${r.folio ?? ''}`.trim(),
+    location: lugar,
+  });
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
+
 /** Alternativa para quien usa Google Calendar en el navegador. */
 export function enlaceGoogleCalendar(r: EstadoReserva): string {
   const aUtc = (hora: string) => {

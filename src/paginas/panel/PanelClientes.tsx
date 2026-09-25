@@ -5,9 +5,11 @@ import { useConsulta } from '../../datos/hooks';
 import { soloDigitos } from '../../lib/formato';
 import { Icono } from '../../componentes/base/Iconos';
 import { DemoPill, EncabezadoPanel, claseCampo, claseTabla, dinero, fechaHora } from './ui';
+import ErrorCarga from '../../componentes/base/ErrorCarga';
+import { CargandoBloque } from '../../componentes/base/Cargando';
 
 export default function PanelClientes() {
-  const { datos } = useConsulta('admin:clientes', () => repoAdmin.clientes());
+  const { datos, error, recargar } = useConsulta('admin:clientes', () => repoAdmin.clientes());
   const [q, setQ] = useState('');
 
   const lista = useMemo(() => {
@@ -27,8 +29,10 @@ export default function PanelClientes() {
         <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, correo o teléfono" className={`${claseCampo} w-full pl-9`} />
       </label>
 
-      {!datos ? (
-        <div className="h-60" aria-busy="true" />
+      {!datos && error ? (
+        <ErrorCarga onReintentar={recargar} />
+      ) : !datos ? (
+        <CargandoBloque className="h-60" />
       ) : (
         <div className="overflow-x-auto rounded-suave border border-cafe/12 bg-crema">
           <table className={claseTabla.tabla}>

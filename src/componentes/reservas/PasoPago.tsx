@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { repo, ErrorDatos } from '../../datos';
 import { invalidarCupos } from '../../datos/hooks';
 import type { Reserva } from '../../datos/tipos';
@@ -9,25 +9,38 @@ import { Aviso } from '../base/Campos';
 import { Icono } from '../base/Iconos';
 import { Pendiente } from '../base/Pendiente';
 
+type Simulacion = 'aprobado' | 'rechazado';
+
 /**
  * Pago. Los lugares ya están apartados; aquí corre el reloj del apartado.
  *
- * En demo el cobro es simulado y lo dice sin rodeos. Con el backend real,
- * `repo.pagar` devuelve la URL de Stripe Checkout y este paso redirige: el
- * número de tarjeta nunca pasa por este sitio.
+ * Con el backend real, `repo.pagar` devuelve la URL de Stripe Checkout y este
+ * paso redirige: el número de tarjeta nunca pasa por este sitio.
+ *
+ * En la demo NO hay cobro ni formulario de tarjeta: dos botones deciden cómo
+ * termina el pago, y lo dice sin rodeos.
  */
 export default function PasoPago({
   reserva,
   onPagado,
   onVencido,
+  onVolver,
+  textoVolver = 'Volver al taller',
 }: {
   reserva: Reserva;
   onPagado: (r: Reserva) => void;
   onVencido: () => void;
+  /** «Volver al taller»: regresa a elegir fecha (el apartado se suelta al volver a apartar). */
+  onVolver: () => void;
+  textoVolver?: string;
 }) {
+  const demo = fuenteDatos === 'demo';
   const [reloj, setReloj] = useState(() => restante(reserva.expiraEn));
-  const [pagando, setPagando] = useState(false);
+  const [pagando, setPagando] = useState<Simulacion | 'real' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rechazado, setRechazado] = useState(false);
+  // Candado síncrono: dos clics antes de que React repinte no pagan dos veces.
+  const enCurso = useRef(false);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -41,21 +54,30 @@ export default function PasoPago({
     return () => clearInterval(t);
   }, [reserva.expiraEn, onVencido]);
 
-  async function pagar() {
-    setPagando(true);
+  async function pagar(simulacion?: Simulacion) {
+    if (enCurso.current) return;
+    enCurso.current = true;
+    setPagando(simulacion ?? 'real');
     setError(null);
+    setRechazado(false);
     try {
-      const r = await repo.pagar(reserva.id);
+      const r = await repo.pagar(reserva.id, simulacion ? { simulacion } : undefined);
       if (r.tipo === 'redireccion') {
+        // Se queda «procesando» mientras el navegador va a Stripe.
         window.location.href = r.url;
         return;
       }
       invalidarCupos();
       onPagado(r.reserva);
     } catch (e) {
-      setPagando(false);
+      enCurso.current = false;
+      setPagando(null);
       if (e instanceof ErrorDatos && e.codigo === 'APARTADO_VENCIDO') {
         onVencido();
+        return;
+      }
+      if (e instanceof ErrorDatos && e.codigo === 'PAGO_RECHAZADO') {
+        setRechazado(true);
         return;
       }
       setError(e instanceof ErrorDatos ? e.message : 'No pudimos procesar el pago. Intenta de nuevo.');
@@ -75,47 +97,60 @@ export default function PasoPago({
 
       {error && <div className="mt-6"><Aviso>{error}</Aviso></div>}
 
-      <div className="mt-8 rounded-suave border border-cafe/15 p-6 sm:p-8">
-        <div className="flex items-center justify-between gap-4">
-          <p className="flex items-center gap-2.5 text-cuerpo">
-            <Icono.candado tam={18} className="text-terracota" />
-            Tarjeta de crédito o débito
-          </p>
-          {fuenteDatos === 'demo' && (
-            <span className="eyebrow rounded-full border border-indigo/40 px-2.5 py-1 text-[0.56rem] text-indigo">Simulado</span>
+      {rechazado ? (
+        <div role="alert" className="mt-8 rounded-suave border border-naranja/60 bg-naranja/[0.08] p-6 sm:p-8">
+          <p className="font-display text-t3 font-light">El pago no pudo completarse.</p>
+          <p className="mt-2 text-cuerpo text-cafe/80">Tu lugar todavía no ha sido confirmado.</p>
+          {demo && <p className="mt-2 text-[0.78rem] text-indigo">Rechazo simulado: en la demo no se intentó ningún cargo.</p>}
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Boton tamano="chico" onClick={() => setRechazado(false)}>Intentar nuevamente</Boton>
+            <Boton tamano="chico" variante="secundario" onClick={onVolver}>{textoVolver}</Boton>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-8 rounded-suave border border-cafe/15 p-6 sm:p-8">
+          {demo ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="font-display text-t4 font-light">Pago de demostración</p>
+                <span className="eyebrow rounded-full border border-indigo/40 px-2.5 py-1 text-[0.56rem] text-indigo">Simulado</span>
+              </div>
+              <p className="mt-3 text-nota text-cafe/75">
+                Esta versión todavía no procesa cargos reales. Elige cómo termina el pago para recorrer el flujo completo;
+                no se pide ni se guarda ninguna tarjeta.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Boton onClick={() => pagar('aprobado')} disabled={pagando !== null || !reloj}>
+                  {pagando === 'aprobado' ? 'Procesando pago…' : `Simular pago aprobado · ${pesosCortos(reserva.total)}`}
+                </Boton>
+                <Boton variante="secundario" onClick={() => pagar('rechazado')} disabled={pagando !== null || !reloj}>
+                  {pagando === 'rechazado' ? 'Procesando pago…' : 'Simular pago rechazado'}
+                </Boton>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="flex items-center gap-2.5 text-cuerpo">
+                <Icono.candado tam={18} className="text-terracota" />
+                Tarjeta de crédito o débito
+              </p>
+              <p className="mt-4 text-nota text-cafe/70">
+                Te llevamos a la página de pago segura de Stripe. Tu reserva se confirma en cuanto el pago se aprueba.
+              </p>
+              <Boton className="mt-6" onClick={() => pagar()} disabled={pagando !== null || !reloj}>
+                {pagando ? 'Abriendo el pago seguro…' : `Pagar ${pesosCortos(reserva.total)}`}
+              </Boton>
+            </>
           )}
         </div>
-
-        {fuenteDatos === 'demo' ? (
-          <>
-            {/* Campos de muestra, de solo lectura: no se captura ninguna tarjeta. */}
-            <div className="mt-6 grid gap-3 opacity-80 sm:grid-cols-[2fr_1fr_1fr]" aria-hidden="true">
-              {['4242 4242 4242 4242', '12 / 30', '123'].map((v) => (
-                <div key={v} className="rounded-[0.5rem] border border-cafe/15 bg-cafe/[0.03] px-4 py-3 font-mono text-[0.85rem] text-cafe/60">{v}</div>
-              ))}
-            </div>
-            <p className="mt-4 text-[0.78rem] text-indigo">
-              Esta es una demostración: no se captura ninguna tarjeta ni se hace ningún cargo.
-            </p>
-          </>
-        ) : (
-          <p className="mt-4 text-nota text-cafe/70">
-            Te llevamos a la página de pago segura de Stripe. Tu reserva se confirma en cuanto el pago se aprueba.
-          </p>
-        )}
-      </div>
+      )}
 
       <Pendiente className="mt-6">
         Qué formas de pago además de tarjeta se habilitan en línea (para membresía el documento dice «se aceptan todas
         las formas de pago») y la política de cancelación y reembolso.
       </Pendiente>
 
-      <div className="mt-10 flex flex-wrap items-center gap-5">
-        <Boton onClick={pagar} disabled={pagando || !reloj}>
-          {pagando ? 'Procesando pago…' : `Pagar ${pesosCortos(reserva.total)}`}
-        </Boton>
-        <p className="text-[0.74rem] text-cafe/60">Tu folio se genera en cuanto se confirme el pago.</p>
-      </div>
+      <p className="mt-6 text-[0.74rem] text-cafe/60">Tu folio se genera en cuanto se confirme el pago.</p>
     </div>
   );
 }

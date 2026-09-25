@@ -7,13 +7,14 @@ import AgendaMes from '../componentes/reservas/AgendaMes';
 import Foto from '../componentes/base/Foto';
 import Revelar from '../componentes/base/Revelar';
 import { Pendiente } from '../componentes/base/Pendiente';
-import { Aviso } from '../componentes/base/Campos';
-import { Boton, EnlaceFlecha } from '../componentes/base/Boton';
+import { Boton, BotonEnlace, EnlaceFlecha } from '../componentes/base/Boton';
 import { Icono } from '../componentes/base/Iconos';
 import CeramicShape from '../componentes/marca/CeramicShape';
 import { MESES, claveMes, fechaCompleta, partes, rango, sumarMeses } from '../lib/calendario';
 import { FILTROS, esProximo, precioTaller, publicoTaller, semanaDelMes } from '../lib/talleres';
 import { useSeo } from '../lib/seo';
+import ErrorCarga from '../componentes/base/ErrorCarga';
+import { CargandoBloque } from '../componentes/base/Cargando';
 
 interface Semana {
   clave: string;
@@ -150,22 +151,35 @@ export default function Talleres() {
       </section>
 
       <section className="contenedor pb-seccion pt-10" aria-live="polite">
-        {cargando && !talleres && <div className="h-96" aria-busy="true" />}
-        {error && (
-          <div className="max-w-xl">
-            <Aviso>No pudimos cargar la agenda. {error}</Aviso>
-            <Boton variante="secundario" className="mt-4" onClick={recargar}>Reintentar</Boton>
+        {cargando && !talleres && <CargandoBloque className="h-96" />}
+        {error && !talleres && <ErrorCarga onReintentar={recargar} />}
+
+        {/* Filtro sin resultados: en las dos vistas */}
+        {talleres && filtro !== 'todos' && (vista === 'fichas' ? grupos.length === 0 : filtrados.length === 0) && (
+          <div className="rounded-suave border border-dashed border-cafe/20 p-8 sm:p-10">
+            <CeramicShape nombre="cuenco" className="h-10 w-auto" />
+            <h2 className="mt-6 font-display text-t3 font-light">No encontramos talleres en esta categoría.</h2>
+            <Boton variante="secundario" tamano="chico" className="mt-6" onClick={() => setFiltro('todos')}>
+              Ver todos los talleres
+            </Boton>
           </div>
         )}
 
         {/* --- Próximos talleres, por mes y semana ------------------------------ */}
         {talleres && vista === 'fichas' && (
           grupos.length === 0 ? (
-            <p className="max-w-lectura py-10 text-cuerpo-l text-cafe/80">
-              {filtro === 'todos'
-                ? 'Estamos preparando las próximas fechas. Suscríbete a las novedades para enterarte primero.'
-                : 'No hay talleres de esta categoría en la agenda por ahora.'}
-            </p>
+            filtro === 'todos' && (
+              <div className="rounded-suave border border-dashed border-cafe/20 p-8 sm:p-10">
+                <h2 className="font-display text-t3 font-light">Estamos preparando las próximas fechas.</h2>
+                <p className="mt-3 max-w-lectura text-cuerpo text-cafe/75">
+                  Mientras, conoce la membresía o escríbenos para un evento privado.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <BotonEnlace to="/membresia" tamano="chico" flecha>Conocer la membresía</BotonEnlace>
+                  <BotonEnlace to="/eventos" tamano="chico" variante="secundario">Eventos privados</BotonEnlace>
+                </div>
+              </div>
+            )
           ) : (
             <div className="space-y-20">
               {grupos.map((g) => (
@@ -244,8 +258,7 @@ export default function Talleres() {
         )}
 
         <Pendiente className="mt-14">
-          Semana 1 de octubre confirmada. Faltan las semanas 2 a 4, el precio de las tardes y clases de cerámica
-          (publicado como «Info DM»), el cupo de cada taller y la hora de término de los talleres de Halloween.
+          Hora de término de los talleres de fin de semana y fotos de los talleres de temporada.
         </Pendiente>
       </section>
 

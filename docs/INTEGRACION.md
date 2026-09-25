@@ -7,9 +7,12 @@ El sitio habla con los datos a través de dos contratos en
 - `RepositorioAdmin`: panel `/admin`.
 
 Los cumplen dos implementaciones y `src/datos/index.ts` elige con
-`VITE_FUENTE_DATOS`:
+`VITE_FUENTE_DATOS` (o su alias `VITE_DEMO_MODE`: `true` = demo,
+`false` = supabase):
 
-- `demo` → `src/datos/demo/repoDemo.ts`, datos en el navegador, pagos falsos.
+- `demo` → `src/datos/demo/repoDemo.ts`, datos en el navegador. Pago
+  simulado con dos botones (aprobado / rechazado), avisos en una bandeja de
+  demostración y Calendar marcado como «Simulado (demo)» en `/admin/avisos`.
 - `supabase` → `src/datos/supabase/repoSupabase.ts`, la base real, Stripe
   Checkout y el panel con los datos del estudio. Se descarga solo en ese modo.
 
@@ -41,8 +44,8 @@ Migraciones v1 (en producción):
   `reservation-status`, holds con vencimiento, cron, correos (Resend),
   Google Calendar, `admin_profiles` + `es_admin()` + RLS.
 
-Migraciones v2 (`20260924100000_estados_v2.sql` … `20260925100000_mi_cuenta_y_panel.sql`):
-**aplicadas a la base real** (hasta la 13 el 24 sep 2026; la 14 el 25 sep),
+Migraciones v2 (`20260924100000_estados_v2.sql` … `20260925130000_completar_job_con_nota.sql`):
+**aplicadas a la base real** (hasta la 13 el 24 sep 2026; de la 14 a la 17 el 25 sep),
 con las Edge Functions desplegadas. El sitio se probó de punta a punta en
 modo `supabase` contra la base real y Stripe en modo prueba (paso 5). El
 sitio publicado sigue en modo demo hasta el paso 6.
@@ -56,6 +59,16 @@ sitio publicado sigue en modo demo hasta el paso 6.
   `newsletter_subscribers` + `suscribir_novedades()`, `admin_cuentas()` y
   `cancelar_reserva()` corregida (cancelar una membresía fallaba al encolar
   Calendar sin taller).
+- `20260925110000_calendario_por_sesion.sql`: un evento de Google Calendar
+  por sesión (ver abajo).
+- `20260925120000_catalogo_panel.sql`: `workshops.origen` (`agenda` /
+  `panel`) y `editado_en`. Los talleres creados o editados desde
+  `/admin/talleres` quedan protegidos: `dev/cargar-agenda.mjs` ya no los
+  sobrescribe, ni los cierra, ni los oculta.
+- `20260925130000_completar_job_con_nota.sql`: `completar_job(id, nota)`
+  cierra el trabajo y guarda su nota («OMITIDO…», «PARCIAL…») en un solo
+  paso, para que el panel no muestre «enviado» un instante antes de saber
+  que se omitió.
 
 | Entidad pedida | Tabla |
 |---|---|
@@ -80,11 +93,21 @@ Funciones (solo las llama el backend con `service_role`; el navegador no):
 - `datos_reserva(reserva)`: lo que usan los correos y el WhatsApp.
 - `siguiente_folio()` + trigger `asignar_folio`: ningún camino confirma sin folio.
 
-Pruebas: `npm run test:reservas` (115 pruebas, fechas relativas a hoy:
-cupo, AGOTADO, pago tardío, folio, membresía, NUMA Kids, panel, Mi cuenta,
-novedades y RLS).
-`npm test` (v1) tiene una semilla con fechas de septiembre de 2026 que ya
-pasaron; falla por eso, no por la v2.
+Pruebas:
+
+- `npm run test:reservas` (131 pruebas sobre las migraciones en PGlite,
+  fechas relativas a hoy: cupo, AGOTADO, pago tardío, folio, membresía, NUMA
+  Kids, panel, Mi cuenta, novedades, RLS, Calendar por sesión y catálogo del
+  panel). `npm run test:migraciones`: todas aplican en orden.
+- `npm run test:unit` (Vitest): lógica de precios, fechas y validaciones, y
+  el repositorio demo (doble clic, pago rechazado, catálogo del panel).
+- `npm run test:e2e` (Playwright, Chrome instalado; levanta el sitio en modo
+  demo en el puerto 5175 con la fecha fija 25 sep 2026): reserva completa de
+  punta a punta, NUMA Kids, membresía, eventos, todas las rutas, 320–1440 px
+  sin desbordes, panel (crear/editar/desactivar taller, reserva manual) y
+  una revisión de cada botón, imagen y campo del sitio y del panel.
+- `npm test` (v1, 73 pruebas): la semilla se recorre a fechas relativas a
+  hoy, así que ya no caduca.
 
 ### Para activar v2
 
@@ -147,7 +170,7 @@ pasaron; falla por eso, no por la v2.
 | `mesesMembresia()` / `sesionesKids()` | filas de la agenda (Clases de Cerámica / Tardes de Cerámica · Niños) | `public_sessions` con `experience_type = 'membresia'` / `'kids'`. |
 | `disponibilidad(ids)` | cuenta en el navegador | `public_sessions.seats_available`. |
 | `apartar(solicitud)` | valida y guarda | `create-reservation` → `crear_reserva_sesiones`. |
-| `pagar(id)` | confirma al instante (DEMO) | `create-checkout-session` → `{ tipo: 'redireccion', url }`. El webhook confirma. |
+| `pagar(id, { simulacion })` | `aprobado` confirma al instante; `rechazado` registra el pago fallido y responde `PAGO_RECHAZADO` (la reserva sigue apartada) | `create-checkout-session` → `{ tipo: 'redireccion', url }`. El webhook confirma. La opción de simulación se ignora. |
 | `liberar(id)` | marca expirada | `liberar_mi_apartado()`: solo el apartado propio, web y pendiente. |
 | `misReservas()` | por usuario | `mis_reservas()`: las de la cuenta y las que el equipo registró con su correo, sin notas internas. |
 | `registrar` / `entrar` / `salir` | localStorage | Supabase Auth; nombre y teléfono en los metadatos de la cuenta. Con confirmación de correo, `registrar` responde `CONFIRMAR_CORREO`. |
@@ -164,6 +187,11 @@ Panel (`RepositorioAdmin`):
 | `actualizarReserva` | Edge Function `admin-actions` → `registrar_pago_manual` (avisa a la clienta), `cancelar_reserva`, `admin_marcar_reembolso`, `admin_actualizar_reserva` (completada / no asistió / notas). |
 | `crearReservaManual` | `admin-actions` → `crear_reserva_panel()` con el importe que captura el equipo (+ `registrar_pago_manual` si ya pagó). |
 | `agenda(mes)`, `talleres()` | `sesiones_ocupacion` + partidas de las reservas vivas. |
+| `catalogo()` | `workshops` (todos, publicados o no) + sus sesiones con lo ocupado. |
+| `crearTaller` | `insert` en `workshops` (`origen = 'panel'`, slug único) y una `workshop_sessions` por horario. RLS de admin. |
+| `editarTaller` | Nombre, descripción, categoría, foto y precio (también el de sus horarios). Marca `editado_en`. El precio de NUMA Kids y membresía no se cambia aquí. |
+| `activarTaller` | `status` `published` / `draft`: desactivado deja de verse en el sitio; las reservas existentes no se tocan. |
+| `integraciones()` | Último trabajo terminado de cada tipo en `integration_jobs`: conectado, sin configurar (nota «OMITIDO») o con error. |
 | `ajustarCupo` | `admin-actions` → `admin_ajustar_cupo()` (nunca menor a lo reservado). |
 | `membresias()` | reservas de tipo membresía con sus 4 clases. |
 | `clientes()` | clientes de las reservas + `admin_cuentas()` (cuentas sin reservas). |

@@ -13,5 +13,9 @@ dev/google-calendar.json
 supabase/.temp/
 *-tmp.mjs
 
+# resultados de Playwright
+test-results/
+playwright-report/
+
 # presentación de un solo archivo (npm run presentacion)
 presentacion/

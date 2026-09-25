@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ErrorDatos } from '../../datos';
 import type { Contacto } from '../../datos/tipos';
@@ -45,6 +45,8 @@ export default function PasoCuenta({
     setTelefono((t) => t || usuario.telefono);
   }, [usuario]);
 
+  const enviandoRef = useRef(false);
+
   async function continuar(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -71,6 +73,8 @@ export default function PasoCuenta({
     setErrores(errs);
     if (Object.keys(errs).length) return;
 
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
     setEnviando(true);
     try {
       const u =
@@ -89,6 +93,7 @@ export default function PasoCuenta({
       setError(err instanceof ErrorDatos ? err.message : 'Algo salió mal. Intenta de nuevo.');
       if (err instanceof ErrorDatos && err.codigo === 'CORREO_REGISTRADO') setModo('entrar');
     } finally {
+      enviandoRef.current = false;
       setEnviando(false);
     }
   }

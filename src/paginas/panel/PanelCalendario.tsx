@@ -7,6 +7,8 @@ import { AGENDA } from '../../datos/agenda';
 import { DIAS_LARGOS, MESES, claveMes, diaSemana, etiquetaMes, hoy, partes, rango, sumarMeses, yaPaso } from '../../lib/calendario';
 import { Icono } from '../../componentes/base/Iconos';
 import { ETIQUETA_TIPO, EncabezadoPanel, PagoPill, useEnVivo } from './ui';
+import ErrorCarga from '../../componentes/base/ErrorCarga';
+import { CargandoBloque } from '../../componentes/base/Cargando';
 
 /** Ocupación visible solo con cupo confirmado; nunca se inventa una capacidad. */
 function Ocupacion({ s }: { s: SesionAdmin }) {
@@ -20,7 +22,9 @@ function Ocupacion({ s }: { s: SesionAdmin }) {
       <span className="h-1.5 w-24 overflow-hidden rounded-full bg-cafe/10" aria-hidden="true">
         <span className={`block h-full rounded-full ${lleno ? 'bg-naranja' : 'bg-cafe'}`} style={{ width: `${Math.min(100, (s.ocupados / Math.max(cupo, 1)) * 100)}%` }} />
       </span>
-      <span className="text-[0.8rem]">{s.ocupados} / {cupo} lugares</span>
+      <span className="text-[0.8rem]">
+        {s.ocupados} / {cupo} reservados · {Math.max(0, cupo - s.ocupados)} disponibles
+      </span>
       {lleno && <span className="rounded-full bg-naranja px-2 py-[2px] text-[0.56rem] font-medium uppercase tracking-[0.12em] text-cafe">Agotado</span>}
     </span>
   );
@@ -34,7 +38,7 @@ export default function PanelCalendario() {
     return conAgenda ?? actual;
   }, []);
   const [mes, setMes] = useState(primerMes);
-  const { datos, recargar } = useConsulta(`admin:agenda:${mes}`, () => repoAdmin.agenda(mes));
+  const { datos, error, recargar } = useConsulta(`admin:agenda:${mes}`, () => repoAdmin.agenda(mes));
   useEnVivo(recargar);
 
   const porDia = useMemo(() => {
@@ -63,8 +67,10 @@ export default function PanelCalendario() {
         Talleres de la agenda, más las sesiones de NUMA Kids y membresía que tienen reservas. Toca una sesión para ver la lista.
       </p>
 
-      {!datos ? (
-        <div className="h-60" aria-busy="true" />
+      {!datos && error ? (
+        <ErrorCarga onReintentar={recargar} />
+      ) : !datos ? (
+        <CargandoBloque className="h-60" />
       ) : porDia.length === 0 ? (
         <p className="rounded-suave border border-dashed border-cafe/20 p-8 text-center text-nota text-cafe/65">Sin sesiones ni reservas este mes.</p>
       ) : (

@@ -57,6 +57,8 @@ export interface RegistroTaller {
    * 'inquiry'    = se pide información.
    */
   booking_type: 'online' | 'membership' | 'inquiry';
+  /** 'panel' = lo creó el equipo desde el panel; siempre se aparta como taller. */
+  origen?: 'agenda' | 'panel';
 }
 
 /** Confirmado por Casa Numa (25 sep 2026): 16 lugares por sesión. */
@@ -247,6 +249,7 @@ export function idSesionAgenda(r: RegistroTaller, inicio: string): string {
 
 /** Por dónde se aparta cada fila (ver `booking_type`). */
 export function flujoAgenda(r: RegistroTaller): 'taller' | 'kids' | 'membresia' {
+  if (r.origen === 'panel') return 'taller';
   if (r.booking_type === 'membership') return 'membresia';
   if (r.category === 'kids' && r.booking_type === 'online' && r.price !== null) return 'kids';
   return 'taller';

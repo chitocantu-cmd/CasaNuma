@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ErrorDatos, repoAdmin } from '../../datos';
 import { invalidarCupos, useConsulta } from '../../datos/hooks';
@@ -61,12 +61,16 @@ export default function PanelNuevaReserva() {
     if (esKids) setNinos((a) => Array.from({ length: v }, (_, i) => a[i] ?? { nombre: '', edad: KIDS.edadMinima }));
   }
 
+  const enviandoRef = useRef(false);
+
   async function guardar(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!elegida) return setError('Elige la sesión.');
     const importe = total === '' ? sugerido : Number(total);
     if (importe === null || !Number.isFinite(importe) || importe < 0) return setError('Captura el importe total.');
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
     setEnviando(true);
     try {
       const r = await repoAdmin.crearReservaManual({
@@ -86,6 +90,7 @@ export default function PanelNuevaReserva() {
     } catch (err) {
       setError(err instanceof ErrorDatos ? err.message : 'No pudimos registrar la reserva.');
     } finally {
+      enviandoRef.current = false;
       setEnviando(false);
     }
   }

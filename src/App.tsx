@@ -1,11 +1,13 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { LazyMotion, MotionConfig, domAnimation } from 'framer-motion';
 import Layout from './componentes/layout/Layout';
+import LimiteError from './componentes/base/LimiteError';
 import { fuenteDatos } from './config/site';
 import { SesionProvider } from './features/cuenta/sesion';
 import SinConfigurar from './paginas/SinConfigurar';
 import Inicio from './paginas/Inicio';
+import { CargandoPagina } from './componentes/base/Cargando';
 
 // ---------------------------------------------------------------------------
 // La portada va en el bundle principal; todo lo demás se carga al entrar.
@@ -49,7 +51,13 @@ const panelConBackend = fuenteDatos !== 'demo';
 const configurado = Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 function Cargando() {
-  return <div className="min-h-[80vh]" aria-busy="true" />;
+  return <CargandoPagina />;
+}
+
+/** Direcciones con parámetro que cambiaron de nombre (p. ej. /store/:slug). */
+function Redirigir({ a }: { a: string }) {
+  const { slug = '' } = useParams();
+  return <Navigate to={a.replace(':slug', slug)} replace />;
 }
 
 /** Lo que depende de Supabase explica qué falta en vez de fallar en blanco. */
@@ -59,7 +67,8 @@ function ConBackend({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <LimiteError>
       <LazyMotion features={domAnimation} strict>
         <MotionConfig reducedMotion="user">
           <SesionProvider>
@@ -86,10 +95,22 @@ export default function App() {
                   <Route path="/terminos" element={<Legal documento="terminos" />} />
                   <Route path="/politica-de-reservaciones" element={<Legal documento="reservaciones" />} />
 
-                  {/* Direcciones del sitio anterior */}
+                  {/* Direcciones del sitio anterior y nombres comunes */}
                   <Route path="/contacto" element={<Navigate to="/#ubicacion" replace />} />
+                  <Route path="/ubicacion" element={<Navigate to="/#ubicacion" replace />} />
                   <Route path="/kids" element={<Navigate to="/numa-kids" replace />} />
                   <Route path="/tienda" element={<Navigate to="/numa-store" replace />} />
+                  <Route path="/store" element={<Navigate to="/numa-store" replace />} />
+                  <Route path="/store/:slug" element={<Redirigir a="/numa-store/:slug" />} />
+                  <Route path="/tienda/:slug" element={<Redirigir a="/numa-store/:slug" />} />
+                  <Route path="/checkout" element={<Navigate to="/talleres" replace />} />
+                  <Route path="/login" element={<Navigate to="/cuenta/entrar" replace />} />
+                  <Route path="/registro" element={<Navigate to="/cuenta/registro" replace />} />
+                  <Route path="/recuperar-password" element={<Navigate to="/cuenta/recuperar" replace />} />
+                  <Route path="/mi-cuenta" element={<Navigate to="/cuenta" replace />} />
+                  <Route path="/mi-cuenta/reservas" element={<Navigate to="/cuenta#proximas" replace />} />
+                  <Route path="/mi-cuenta/membresia" element={<Navigate to="/cuenta#membresia" replace />} />
+                  <Route path="/mi-cuenta/perfil" element={<Navigate to="/cuenta#perfil" replace />} />
 
                   {Reserva && <Route path="/reserva/:code" element={<ConBackend><Reserva /></ConBackend>} />}
                   {PagoExitoso && <Route path="/pago/exitoso" element={<ConBackend><PagoExitoso /></ConBackend>} />}
@@ -105,6 +126,7 @@ export default function App() {
           </SesionProvider>
         </MotionConfig>
       </LazyMotion>
+      </LimiteError>
     </Router>
   );
 }

@@ -2,12 +2,14 @@ import { useNavigate } from 'react-router-dom';
 import { repoAdmin } from '../../datos';
 import { useConsulta } from '../../datos/hooks';
 import { DemoPill, ETIQUETA_METODO, EncabezadoPanel, Kpi, PagoPill, claseTabla, dinero, fechaHora, useEnVivo } from './ui';
+import ErrorCarga from '../../componentes/base/ErrorCarga';
+import { CargandoBloque } from '../../componentes/base/Cargando';
 
 const PROVEEDOR = { demo: 'Pago simulado', stripe: 'Stripe', manual: 'Registrado en el panel' } as const;
 
 export default function PanelPagos() {
   const navigate = useNavigate();
-  const { datos, recargar } = useConsulta('admin:pagos', () => repoAdmin.pagos());
+  const { datos, error, recargar } = useConsulta('admin:pagos', () => repoAdmin.pagos());
   useEnVivo(recargar);
   const pagado = (datos ?? []).filter((p) => p.estado === 'pagado').reduce((n, p) => n + p.monto, 0);
   const pendiente = (datos ?? []).filter((p) => p.estado === 'pendiente').reduce((n, p) => n + p.monto, 0);
@@ -19,8 +21,10 @@ export default function PanelPagos() {
         <Kpi etiqueta="Confirmado" valor={dinero(pagado)} />
         <Kpi etiqueta="Pendiente" valor={dinero(pendiente)} alerta={pendiente > 0} />
       </div>
-      {!datos ? (
-        <div className="h-60" aria-busy="true" />
+      {!datos && error ? (
+        <ErrorCarga onReintentar={recargar} />
+      ) : !datos ? (
+        <CargandoBloque className="h-60" />
       ) : (
         <div className="overflow-x-auto rounded-suave border border-cafe/12 bg-crema">
           <table className={claseTabla.tabla}>

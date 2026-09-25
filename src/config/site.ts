@@ -82,7 +82,9 @@ export const siteConfig = {
  *   'demo'     → datos simulados en el navegador (src/datos/demo). Pagos falsos.
  *   'supabase' → backend real (Supabase + Stripe). Ver docs/INTEGRACION.md.
  */
-export const fuenteDatos = ((env.VITE_FUENTE_DATOS as string | undefined) ?? 'demo') as
+export const fuenteDatos = ((env.VITE_FUENTE_DATOS as string | undefined) ??
+  // Alias: VITE_DEMO_MODE=false equivale a VITE_FUENTE_DATOS=supabase.
+  ((env.VITE_DEMO_MODE as string | undefined) === 'false' ? 'supabase' : 'demo')) as
   | 'demo'
   | 'supabase';
 

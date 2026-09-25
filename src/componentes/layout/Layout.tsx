@@ -5,6 +5,7 @@ import Header from '../Header';
 import Footer from '../Footer';
 import { fuenteDatos } from '../../config/site';
 import { EASE_NUMA } from '../base/Revelar';
+import LimiteError from '../base/LimiteError';
 
 /** Al cambiar de página: arriba; si la URL trae #ancla, a esa sección. */
 function Desplazamiento() {
@@ -71,7 +72,9 @@ export default function Layout() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.45, ease: EASE_NUMA }}
       >
-        <Outlet />
+        <LimiteError key={pathname}>
+          <Outlet />
+        </LimiteError>
       </m.main>
       <Footer />
       <AvisoDemo />

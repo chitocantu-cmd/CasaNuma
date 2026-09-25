@@ -15,7 +15,6 @@ import CeramicShape from '../componentes/marca/CeramicShape';
 import { PORTAFOLIO } from '../contenido/portafolio';
 import { TESTIMONIOS } from '../contenido/testimonios';
 import { EDADES_KIDS, MEMBRESIA } from '../contenido/oferta';
-import { mostrarPendientes } from '../config/site';
 import { useProductos, useTalleres } from '../datos/hooks';
 import { pesosCortos } from '../lib/formato';
 import { MESES } from '../lib/calendario';
@@ -34,7 +33,9 @@ export default function Inicio() {
 
   const { datos: productos } = useProductos();
   const { datos: talleres } = useTalleres();
-  const hayTestimonios = TESTIMONIOS.length > 0 || mostrarPendientes;
+  // Solo reseñas reales. Sin ellas, la sección existe únicamente en
+  // desarrollo (con espacios marcados), nunca en el sitio publicado.
+  const hayTestimonios = TESTIMONIOS.length > 0 || import.meta.env.DEV;
   // Los próximos tres de la agenda; el mes del título sale del primero.
   const agenda = (talleres ?? []).filter(esProximo).slice(0, 3);
   const mesAgenda = agenda[0] ? MESES[Number(agenda[0].sesiones[0].fecha.slice(5, 7)) - 1] : null;

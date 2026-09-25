@@ -7,9 +7,11 @@ export default function NoEncontrado() {
   return (
     <section className="contenedor flex min-h-[80vh] flex-col items-start justify-center pb-seccion-s pt-[calc(theme(spacing.header)+3rem)]">
       <CeramicShape nombre="cuenco" className="h-14 w-auto" />
-      <p className="eyebrow mt-10 text-cafe/65">Error 404</p>
-      <h1 className="mt-5 max-w-[16ch] font-display text-t1 font-light">Esta pieza no salió del horno.</h1>
-      <p className="mt-6 max-w-lectura text-cuerpo-l text-cafe/80">La página que buscas no existe o cambió de lugar.</p>
+      <p className="cifra mt-10 text-[3.4rem] leading-none text-terracota">404</p>
+      <h1 className="mt-5 max-w-[18ch] font-display text-t1 font-light">Esta pieza todavía no existe.</h1>
+      <p className="mt-6 max-w-lectura text-cuerpo-l text-cafe/80">
+        Parece que la página que buscas cambió de lugar o todavía no ha sido creada.
+      </p>
       <div className="mt-10 flex flex-wrap gap-3">
         <BotonEnlace to="/" flecha>Volver al inicio</BotonEnlace>
         <BotonEnlace to="/talleres" variante="secundario">Ver talleres</BotonEnlace>

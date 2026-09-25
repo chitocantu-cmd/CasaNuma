@@ -20,15 +20,18 @@ import { MEMBRESIA } from '../../contenido/oferta';
 import { claveMes, diaSemana, diasDelMes, etiquetaMes, hoy } from '../../lib/calendario';
 import type { EntradaFoto } from '../../contenido/fotos';
 import type { MesMembresia, Producto, Sesion } from '../tipos';
-import { AGENDA, flujoAgenda, idSesionAgenda } from '../agenda';
+import { AGENDA, flujoAgenda, idSesionAgenda, type RegistroTaller } from '../agenda';
 
 function sesion(id: string, fecha: string, inicio: string, fin: string | null, cupo: number | null): Sesion {
   return { id, fecha, inicio, fin, cupo, disponibles: cupo, agotada: false };
 }
 
-/** Sesiones de la agenda de un camino ('kids' o 'membresia'), por fecha. */
-function sesionesDeAgenda(flujo: 'kids' | 'membresia'): Sesion[] {
-  return AGENDA.filter((r) => r.is_active && flujoAgenda(r) === flujo)
+/**
+ * Sesiones de la agenda de un camino ('kids' o 'membresia'), por fecha.
+ * `lista` = la agenda con los cambios del panel (activar / desactivar).
+ */
+function sesionesDeAgenda(flujo: 'kids' | 'membresia', lista: RegistroTaller[] = AGENDA): Sesion[] {
+  return lista.filter((r) => r.is_active && flujoAgenda(r) === flujo)
     .flatMap((r) => r.sessions.map((x) => sesion(idSesionAgenda(r, x.start_time), r.date, x.start_time, x.end_time, x.capacity)))
     .sort((a, b) => (a.fecha + a.inicio).localeCompare(b.fecha + b.inicio));
 }
@@ -40,8 +43,8 @@ function sesionesDeAgenda(flujo: 'kids' | 'membresia'): Sesion[] {
  * Clases de membresía de un mes. Si el mes está en la agenda, son esas. Si
  * no (solo pasa con el historial de reservas DEMO), el patrón del PDF.
  */
-export function sesionesMembresiaDelMes(clave: string): Sesion[] {
-  const publicadas = sesionesDeAgenda('membresia').filter((s) => claveMes(s.fecha) === clave);
+export function sesionesMembresiaDelMes(clave: string, lista: RegistroTaller[] = AGENDA): Sesion[] {
+  const publicadas = sesionesDeAgenda('membresia', lista).filter((s) => claveMes(s.fecha) === clave);
   if (publicadas.length) return publicadas;
   return diasDelMes(clave).flatMap((fecha) => {
     const h = MEMBRESIA.horarios.find((x) => x.diaSemana === diaSemana(fecha));
@@ -50,17 +53,17 @@ export function sesionesMembresiaDelMes(clave: string): Sesion[] {
 }
 
 /** Meses con clases publicadas, de este mes en adelante. */
-export function mesesMembresiaSemilla(): MesMembresia[] {
+export function mesesMembresiaSemilla(lista: RegistroTaller[] = AGENDA): MesMembresia[] {
   const actual = claveMes(hoy());
-  const meses = [...new Set(sesionesDeAgenda('membresia').map((s) => claveMes(s.fecha)))].filter((m) => m >= actual);
-  return meses.map((clave) => ({ clave, etiqueta: etiquetaMes(clave), sesiones: sesionesMembresiaDelMes(clave), demo: false }));
+  const meses = [...new Set(sesionesDeAgenda('membresia', lista).map((s) => claveMes(s.fecha)))].filter((m) => m >= actual);
+  return meses.map((clave) => ({ clave, etiqueta: etiquetaMes(clave), sesiones: sesionesMembresiaDelMes(clave, lista), demo: false }));
 }
 
 // ---------------------------------------------------------------------------
 // NUMA Kids: las Tardes de Cerámica (Niños) publicadas en la agenda
 // ---------------------------------------------------------------------------
-export function sesionesKidsSemilla(): Sesion[] {
-  return sesionesDeAgenda('kids');
+export function sesionesKidsSemilla(lista: RegistroTaller[] = AGENDA): Sesion[] {
+  return sesionesDeAgenda('kids', lista);
 }
 
 // ---------------------------------------------------------------------------

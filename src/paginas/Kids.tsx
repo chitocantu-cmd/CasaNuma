@@ -9,9 +9,10 @@ import CeramicShape from '../componentes/marca/CeramicShape';
 import { sinLugar, textoLugares } from '../lib/cupo';
 import { EDADES_KIDS, KIDS } from '../contenido/oferta';
 import { useSesionesKids } from '../datos/hooks';
-import { duracionTexto, fechaCompacta, hora } from '../lib/calendario';
+import { duracionTexto, fechaCompacta, hora, yaPaso } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
 import { useSeo } from '../lib/seo';
+import ErrorCarga from '../componentes/base/ErrorCarga';
 
 // Texto: documento de contenido, sección 4.
 
@@ -28,8 +29,8 @@ export default function Kids() {
     descripcion:
       'Talleres de cerámica para niñas y niños a partir de 7 años. Jueves a las 5:00 p.m., 90 minutos, $680 MXN por sesión con materiales, vidriado y horneado incluidos.',
   });
-  const { datos: sesiones } = useSesionesKids();
-  const proximas = (sesiones ?? []).slice(0, 4);
+  const { datos: sesiones, error, recargar } = useSesionesKids();
+  const proximas = (sesiones ?? []).filter((s) => !yaPaso(s.fecha, s.inicio)).slice(0, 4);
 
   return (
     <>
@@ -123,6 +124,12 @@ export default function Kids() {
               <BotonEnlace to="/numa-kids/reservar" variante="secundario" flecha>Ver todas las fechas</BotonEnlace>
             </Revelar>
           </div>
+          {error && !sesiones && <ErrorCarga className="mt-12" onReintentar={recargar} />}
+          {sesiones && proximas.length === 0 && (
+            <p className="mt-12 max-w-lectura rounded-suave border border-dashed border-cafe/20 p-8 text-cuerpo text-cafe/80">
+              Estamos preparando los próximos jueves de NUMA Kids. Escríbenos y te avisamos en cuanto abramos fechas.
+            </p>
+          )}
           <ul className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {proximas.map((s, i) => {
               const lleno = sinLugar(s);

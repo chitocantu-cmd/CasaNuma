@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, useRef } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { repo, ErrorDatos } from '../../datos';
 import { CUENTA_DEMO } from '../../datos/demo/repoDemo';
@@ -45,6 +45,8 @@ export default function Acceso({ modo }: { modo: Modo }) {
   const [enviado, setEnviado] = useState(false);
   /** Cuenta creada que espera la confirmación del correo. */
   const [porConfirmar, setPorConfirmar] = useState<string | null>(null);
+  // Candado síncrono contra doble clic. Va antes del return: los hooks no pueden ser condicionales.
+  const enviandoRef = useRef(false);
 
   if (usuario && (modo === 'entrar' || modo === 'registro')) return <Navigate to={destino} replace />;
 
@@ -59,6 +61,8 @@ export default function Acceso({ modo }: { modo: Modo }) {
     setErrores(errs);
     if (Object.keys(errs).length) return;
 
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
     setEnviando(true);
     setError(null);
     try {
@@ -81,6 +85,7 @@ export default function Acceso({ modo }: { modo: Modo }) {
       }
       setError(err instanceof ErrorDatos ? err.message : 'Algo salió mal. Intenta de nuevo.');
     } finally {
+      enviandoRef.current = false;
       setEnviando(false);
     }
   }

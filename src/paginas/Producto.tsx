@@ -10,10 +10,12 @@ import { MarcaDemo } from '../componentes/base/Pendiente';
 import { mensajeEncargo, mensajePieza } from '../contenido/whatsapp';
 import { useProducto, useProductos } from '../datos/hooks';
 import { ldProducto, useSeo } from '../lib/seo';
+import ErrorCarga from '../componentes/base/ErrorCarga';
+import { CargandoPagina } from '../componentes/base/Cargando';
 
 export default function Producto() {
   const { slug } = useParams();
-  const { datos: p, cargando } = useProducto(slug);
+  const { datos: p, cargando, error, recargar } = useProducto(slug);
   const { datos: todos } = useProductos();
   const [foto, setFoto] = useState(0);
 
@@ -23,7 +25,8 @@ export default function Producto() {
     jsonLd: p ? ldProducto({ nombre: p.nombre, descripcion: p.descripcion, precio: p.precio, agotado: p.disponibilidad === 'agotado', demo: p.demo }) : null,
   });
 
-  if (cargando && !p) return <div className="min-h-[80vh]" aria-busy="true" />;
+  if (cargando && !p) return <CargandoPagina />;
+  if (error && !p) return <ErrorCarga pagina onReintentar={recargar} />;
   if (!p) {
     return (
       <div className="contenedor flex min-h-[70vh] flex-col items-start justify-center pt-header">

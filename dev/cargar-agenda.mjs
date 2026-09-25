@@ -19,6 +19,10 @@
 //      publicados, salvo que tengan reservas vivas.
 //   5. Oculta los talleres de ejemplo (status 'draft'). No borra nada.
 //
+// Lo que el equipo creó o editó en el panel (workshops.origen = 'panel' o
+// editado_en con fecha) no se toca: ni sus datos, ni su estado, ni se cierran
+// sus horarios.
+//
 // Lo que Casa Numa no ha publicado queda en NULL. Nunca se rellena, y el
 // cupo no se toca nunca (lo captura el equipo en el panel).
 //
@@ -77,7 +81,10 @@ if (!tieneMigracion) {
 }
 
 async function cargar() {
-  const talleresBase = await rest('workshops?select=id,slug,status');
+  const talleresBase = await rest('workshops?select=id,slug,status,origen,editado_en');
+  // Lo que el equipo maneja desde el panel manda sobre la agenda.
+  const protegidos = new Set(talleresBase.filter((w) => w.origen === 'panel' || w.editado_en).map((w) => w.slug));
+  const delPanel = new Set(talleresBase.filter((w) => w.origen === 'panel').map((w) => w.id));
   const sesionesBase = await rest('workshop_sessions?select=id,experience_type,workshop_id,date,start_time,end_time,price,status');
   const partidas = await rest('reservation_items?select=session_id,reservations(status,expires_at)');
   const reservasBase = await rest('reservations?select=workshop_id');
@@ -168,18 +175,18 @@ async function cargar() {
     const cambios = {};
     if (e.price === null && d.fila.price !== null) cambios.price = d.fila.price;
     if (e.end_time === null && d.fila.end_time !== null) cambios.end_time = d.fila.end_time;
-    if (Object.keys(cambios).length) rellenar.push({ id: e.id, cambios, d });
+    if (Object.keys(cambios).length && !protegidos.has(d.slug)) rellenar.push({ id: e.id, cambios, d });
   }
 
   // Horarios abiertos que ya no están publicados.
-  const sobrantes = sesionesBase.filter((s) => s.status === 'open' && !usadas.has(s.id));
+  const sobrantes = sesionesBase.filter((s) => s.status === 'open' && !usadas.has(s.id) && !delPanel.has(s.workshop_id));
   const cerrar = sobrantes.filter((s) => !conReservasVivas.has(s.id));
   const intocables = sobrantes.filter((s) => conReservasVivas.has(s.id));
 
   // --- 3. Talleres fuera de la agenda (ejemplos) --------------------------------
   const slugsAgenda = new Set(AGENDA.map((a) => a.slug));
   const conReservas = new Set(reservasBase.map((r) => r.workshop_id));
-  const ejemplos = talleresBase.filter((w) => !slugsAgenda.has(w.slug) && w.status !== 'draft');
+  const ejemplos = talleresBase.filter((w) => !slugsAgenda.has(w.slug) && w.status !== 'draft' && w.origen !== 'panel');
   const ocultar = ejemplos.filter((w) => !conReservas.has(w.id));
   const noSeTocan = ejemplos.filter((w) => conReservas.has(w.id));
 
@@ -190,7 +197,8 @@ async function cargar() {
 
   console.log(`\n  Carga de agenda · hoy ${hoy} (${ZONA})`);
   console.log('  ' + '-'.repeat(64));
-  console.log(`  Talleres de la agenda        ${filasTaller.length}  (${filasTaller.filter((f) => idPorSlug[f.slug]).length} ya existían: se actualizan)`);
+  console.log(`  Talleres de la agenda        ${filasTaller.length}  (${filasTaller.filter((f) => idPorSlug[f.slug] && !protegidos.has(f.slug)).length} ya existían: se actualizan)`);
+  if (protegidos.size) console.log(`  Manejados desde el panel     ${protegidos.size}  (no se tocan)`);
   console.log(`  Horarios publicados          ${deseadas.length}  (talleres ${cuenta(deseadas, 'taller')} · NUMA Kids ${cuenta(deseadas, 'kids')} · membresía ${cuenta(deseadas, 'membresia')})`);
   console.log(`  Horarios nuevos              ${nuevas.length}`);
   for (const d of nuevas) console.log(`    + ${describe(d.fila.experience_type, d.slug, d.fila.date, d.fila.start_time)}${d.fila.price ? `  $${d.fila.price}` : ''}`);
@@ -220,7 +228,7 @@ async function cargar() {
   const talleres = await rest('workshops?on_conflict=slug', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-    body: JSON.stringify(filasTaller),
+    body: JSON.stringify(filasTaller.filter((f) => !protegidos.has(f.slug))),
   });
   for (const w of talleres) idPorSlug[w.slug] = w.id;
   console.log(`    talleres                   ${talleres.length} OK`);

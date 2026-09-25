@@ -12,10 +12,12 @@ import { Aviso, Campo } from '../componentes/base/Campos';
 import { Icono } from '../componentes/base/Iconos';
 import { Pendiente } from '../componentes/base/Pendiente';
 import { EDADES_KIDS, KIDS } from '../contenido/oferta';
-import { duracionTexto, fechaCompleta, rango } from '../lib/calendario';
+import { duracionTexto, fechaCompleta, rango, yaPaso } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
 import { maximoPersonas, sinLugar } from '../lib/cupo';
 import { useSeo } from '../lib/seo';
+import ErrorCarga from '../componentes/base/ErrorCarga';
+import { borrarBorrador, useBorrador } from '../lib/borrador';
 
 const PASOS = ['Fecha', 'Niños', 'Tus datos', 'Pago'];
 const MAX_NINOS = 4;
@@ -33,14 +35,21 @@ export default function ReservarKids() {
   });
 
   const [params] = useSearchParams();
-  const { datos: sesiones, recargar } = useSesionesKids();
+  const { datos: todas, error: errorCarga, recargar } = useSesionesKids();
+  // Solo los jueves que no han pasado.
+  const sesiones = useMemo(() => todas?.filter((s) => !yaPaso(s.fecha, s.inicio)) ?? null, [todas]);
   const [paso, setPaso] = useState(0);
-  const [sesionId, setSesionId] = useState<string | null>(params.get('sesion'));
-  const [ninos, setNinos] = useState<NinoForm[]>([{ nombre: '', edad: '' }]);
+  // Jueves y datos de los niños sobreviven a recargar la página.
+  const [sesionId, setSesionId] = useBorrador<string | null>('kids:sesion', () => params.get('sesion'));
+  const [ninos, setNinos] = useBorrador<NinoForm[]>('kids:ninos', [{ nombre: '', edad: '' }]);
+  const desdeAgenda = params.get('sesion');
+  useEffect(() => {
+    if (desdeAgenda) setSesionId(desdeAgenda);
+  }, [desdeAgenda, setSesionId]);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [aviso, setAviso] = useState<string | null>(null);
   const [consultando, setConsultando] = useState(false);
-  const { reserva, setReserva, error, setError, apartando, apartar } = useApartado();
+  const { reserva, setReserva, error, setError, apartando, apartar, soltar } = useApartado();
 
   const sesion = useMemo(() => sesiones?.find((s) => s.id === sesionId) ?? null, [sesiones, sesionId]);
   const maximo = Math.max(1, maximoPersonas(sesion, MAX_NINOS));
@@ -107,6 +116,11 @@ export default function ReservarKids() {
   }
 
   const confirmada = reserva?.estado === 'confirmada';
+  useEffect(() => {
+    if (!confirmada) return;
+    borrarBorrador('kids:sesion');
+    borrarBorrador('kids:ninos');
+  }, [confirmada]);
 
   return (
     <CheckoutLayout
@@ -148,6 +162,12 @@ export default function ReservarKids() {
               <p className="mt-3 text-cuerpo text-cafe/75">
                 {KIDS.dia} · {rango(KIDS.inicio, KIDS.fin)} · {EDADES_KIDS}
               </p>
+              {errorCarga && !todas && <ErrorCarga className="mt-8" onReintentar={recargar} />}
+              {sesiones && sesiones.length === 0 && (
+                <p className="mt-8 rounded-suave border border-dashed border-cafe/20 p-6 text-cuerpo text-cafe/80">
+                  Todavía no hay jueves abiertos. Pronto publicaremos las próximas fechas.
+                </p>
+              )}
               <div className="mt-8 grid gap-2.5 sm:grid-cols-2">
                 {(sesiones ?? []).map((s) => (
                   <TimeSlot
@@ -219,7 +239,9 @@ export default function ReservarKids() {
             </div>
           )}
 
-          {paso === 3 && reserva && <PasoPago reserva={reserva} onPagado={setReserva} onVencido={alVencer} />}
+          {paso === 3 && reserva && (
+            <PasoPago reserva={reserva} onPagado={setReserva} onVencido={alVencer} onVolver={() => { soltar(); setPaso(0); }} textoVolver="Volver a las fechas" />
+          )}
         </>
       )}
     </CheckoutLayout>

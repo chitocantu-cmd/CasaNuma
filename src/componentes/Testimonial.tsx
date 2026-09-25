@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { AnimatePresence, m } from 'framer-motion';
 import type { Testimonio } from '../contenido/testimonios';
-import { mostrarPendientes } from '../config/site';
 import Foto from './base/Foto';
 import { Icono } from './base/Iconos';
 import { EASE_NUMA } from './base/Revelar';
@@ -19,7 +18,7 @@ const PENDIENTES = 3;
 export default function Testimonial({ testimonios }: { testimonios: Testimonio[] }) {
   const [i, setI] = useState(0);
   const pendiente = testimonios.length === 0;
-  if (pendiente && !mostrarPendientes) return null;
+  if (pendiente && !import.meta.env.DEV) return null;
 
   const total = pendiente ? PENDIENTES : testimonios.length;
   const t = pendiente ? null : testimonios[i];

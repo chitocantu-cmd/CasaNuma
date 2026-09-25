@@ -98,7 +98,11 @@ export function useApartado() {
     if (pendiente.current) void repo.liberar(pendiente.current.id);
   }, []);
 
+  // Candado síncrono: un doble clic no aparta dos veces.
+  const enCurso = useRef(false);
   const apartar = useCallback(async (s: SolicitudReserva): Promise<Reserva | null> => {
+    if (enCurso.current) return null;
+    enCurso.current = true;
     setApartando(true);
     setError(null);
     try {
@@ -109,9 +113,16 @@ export function useApartado() {
       setError(e instanceof ErrorDatos ? e.message : 'No pudimos apartar tus lugares. Intenta de nuevo.');
       return null;
     } finally {
+      enCurso.current = false;
       setApartando(false);
     }
   }, []);
 
-  return { reserva, setReserva, error, setError, apartando, apartar };
+  /** Deja ir el apartado (p. ej. «Volver al taller» desde el pago). */
+  const soltar = useCallback(() => {
+    if (pendiente.current) void repo.liberar(pendiente.current.id);
+    setReserva(null);
+  }, []);
+
+  return { reserva, setReserva, error, setError, apartando, apartar, soltar };
 }

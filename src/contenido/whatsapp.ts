@@ -6,6 +6,7 @@
 // ===========================================================================
 
 export interface DatosEvento {
+  nombre: string;
   tipo: string;
   fecha: string;
   personas: string;
@@ -14,7 +15,7 @@ export interface DatosEvento {
 
 export function mensajeEvento(d: Partial<DatosEvento> = {}): string {
   return [
-    'Hola Casa Numa, quisiera cotizar un evento.',
+    `Hola Casa Numa, ${d.nombre ? `soy ${d.nombre} y ` : ''}quisiera cotizar un evento.`,
     '',
     `Tipo de evento: ${d.tipo ?? ''}`,
     `Fecha tentativa: ${d.fecha ?? ''}`,

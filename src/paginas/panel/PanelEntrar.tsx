@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ErrorDatos, repoAdmin } from '../../datos';
 import { ADMIN_DEMO, CUENTA_DEMO } from '../../datos/demo/repoDemo';
@@ -20,8 +20,12 @@ export default function PanelEntrar() {
     repoAdmin.adminActual().then((a) => a && navigate(destino, { replace: true })).catch(() => undefined);
   }, [navigate, destino]);
 
+  const enviandoRef = useRef(false);
+
   async function entrar(e: FormEvent) {
     e.preventDefault();
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
     setEnviando(true);
     setError(null);
     try {
@@ -30,12 +34,13 @@ export default function PanelEntrar() {
     } catch (err) {
       setError(err instanceof ErrorDatos ? err.message : 'No pudimos iniciar sesión.');
     } finally {
+      enviandoRef.current = false;
       setEnviando(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-crema px-4 py-16 text-cafe">
+    <main className="flex min-h-screen items-center justify-center bg-crema px-4 py-16 text-cafe">
       <div className="w-full max-w-sm">
         <Logo className="h-14 w-auto" titulo="Casa Numa" />
         <p className="eyebrow mt-10 text-cafe/60">Casa Numa</p>
@@ -61,6 +66,6 @@ export default function PanelEntrar() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

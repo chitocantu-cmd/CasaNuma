@@ -453,6 +453,26 @@ seccion('Google Calendar: un evento por sesión');
 }
 
 // ---------------------------------------------------------------------------
+seccion('Catálogo administrado desde el panel');
+{
+  const { rows: [{ o }] } = await db.query(`select origen o from workshops limit 1`);
+  ok('lo cargado por la agenda queda como origen «agenda»', o === 'agenda', o);
+  const nuevo = await intentar(db, `insert into workshops (slug, title, date, start_time, price, booking_mode, status, category, origen)
+     values ('taller-panel-prueba', 'Taller del panel', current_date + 60, '11:00', 750, 'paid', 'published', 'seasonal', 'panel') returning id`);
+  ok('el equipo puede crear un taller con origen «panel»', nuevo.ok, nuevo.error);
+  const malo = await intentar(db, `update workshops set origen = 'otro' where slug = 'taller-panel-prueba'`);
+  ok('origen solo acepta agenda o panel', !malo.ok);
+  const s9 = await intentar(db, `insert into workshop_sessions (experience_type, workshop_id, date, start_time, end_time, capacity, price)
+     values ('taller', $1, current_date + 60, '11:00', '13:00', 10, 750) returning id`, [nuevo.rows?.[0].id]);
+  ok('…con su horario', s9.ok, s9.error);
+  const { rows: [{ n }] } = await db.query(`select count(*)::int n from public_sessions where workshop_slug = 'taller-panel-prueba'`);
+  ok('y aparece en el sitio', n === 1, String(n));
+  await db.query(`update workshops set status = 'draft', editado_en = now() where slug = 'taller-panel-prueba'`);
+  const { rows: [{ m }] } = await db.query(`select count(*)::int m from public_sessions where workshop_slug = 'taller-panel-prueba'`);
+  ok('desactivado, deja de verse en el sitio', m === 0, String(m));
+}
+
+// ---------------------------------------------------------------------------
 seccion('Seguridad');
 {
   const { rows: [{ ana }] } = await db.query(`insert into auth.users (email) values ('ana@cuenta.com') returning id as ana`);

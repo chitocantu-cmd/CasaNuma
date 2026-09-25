@@ -4,7 +4,7 @@ import type { Reserva } from '../../datos/tipos';
 import { fuenteDatos, siteConfig } from '../../config/site';
 import { fechaCompleta, hora } from '../../lib/calendario';
 import { pesosCortos } from '../../lib/formato';
-import { descargarIcsReserva } from '../../lib/ics';
+import { descargarIcsReserva, enlaceGoogleCalendarReserva } from '../../lib/ics';
 import { BotonEnlace } from '../base/Boton';
 import { EASE_NUMA } from '../base/Revelar';
 import CeramicShape, { type NombreSilueta } from '../marca/CeramicShape';
@@ -26,6 +26,8 @@ export default function Confirmacion({
   children?: ReactNode;
 }) {
   const lugar = siteConfig.direccion ? `${siteConfig.direccion}, ${siteConfig.zona}` : `Casa Numa, ${siteConfig.zona}`;
+  const google = enlaceGoogleCalendarReserva(r, lugar);
+  const pago = r.pago === 'pagado' ? 'Pagado' : r.pago === 'reembolsado' ? 'Reembolsado' : 'Pendiente';
 
   return (
     <div className="mx-auto max-w-3xl text-center">
@@ -62,6 +64,9 @@ export default function Confirmacion({
           <p className="text-right">
             <span className="eyebrow block text-[0.6rem] text-cafe/55">Total</span>
             <span className="cifra text-[1.9rem] leading-none">{pesosCortos(r.total)}</span>
+            <span className="mt-1 block text-[0.74rem] text-cafe/65">
+              Pago: {pago}{fuenteDatos === 'demo' ? ' · simulado en la demo' : ''}
+            </span>
           </p>
         </div>
         {children && <div className="mt-5 border-t border-cafe/10 pt-5 text-nota text-cafe/75">{children}</div>}
@@ -76,13 +81,16 @@ export default function Confirmacion({
         <BotonEnlace to="/cuenta" flecha>Ver mis reservas</BotonEnlace>
         <BotonEnlace to={volver.to} variante="secundario">{volver.texto}</BotonEnlace>
       </div>
-      <button
-        type="button"
-        onClick={() => descargarIcsReserva(r, lugar)}
-        className="subrayado-fijo mt-6 pb-0.5 text-nota text-cafe/75"
-      >
-        Agregar a mi calendario
-      </button>
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-nota text-cafe/75">
+        <button type="button" onClick={() => descargarIcsReserva(r, lugar)} className="subrayado-fijo pb-0.5">
+          Agregar a mi calendario (.ics)
+        </button>
+        {google && (
+          <a href={google} target="_blank" rel="noopener noreferrer" className="subrayado-fijo pb-0.5">
+            Agregar a Google Calendar
+          </a>
+        )}
+      </div>
     </div>
   );
 }

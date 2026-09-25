@@ -37,6 +37,9 @@ const RESERVA = `select crear_reserva($1,$2,$3,$4,$5) as r`;
 // ---------------------------------------------------------------------------
 console.log('\nPruebas de lógica · Casa Numa\n' + '='.repeat(60));
 const db = await crearBase();
+// La semilla trae fechas fijas (sep–nov 2026). Se recorren para que el taller
+// más próximo quede a 10 días de hoy: así las pruebas no caducan.
+await db.exec(`update workshops set date = date + (current_date + 10 - (select min(date) from workshops))`);
 
 // ---------------------------------------------------------------------------
 seccion('Utilidades');
@@ -279,8 +282,10 @@ seccion('TEST E y G · Confirmación de pago e idempotencia');
 
   const { rows: [{ nc }] } = await db.query(
     `select count(*)::int nc from integration_jobs where type='calendar_sync'`);
-  ok('la sincronización de calendario se encola una sola vez por taller',
-     nc >= 1, `hay ${nc}`);
+  // Desde calendario_por_sesion el evento es por sesión (reservas-v2 lo
+  // prueba); aquí basta con que el webhook duplicado no encole otro.
+  ok('el webhook duplicado no encola otra sincronización de calendario',
+     nc <= 1, `hay ${nc}`);
 }
 
 // ---------------------------------------------------------------------------

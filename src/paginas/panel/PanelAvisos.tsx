@@ -4,6 +4,9 @@ import { useConsulta } from '../../datos/hooks';
 import { fuenteDatos, siteConfig } from '../../config/site';
 import { Icono } from '../../componentes/base/Iconos';
 import { EncabezadoPanel, Tarjeta, fechaHora, useEnVivo } from './ui';
+import type { EstadoIntegracion } from '../../datos/tipos';
+import ErrorCarga from '../../componentes/base/ErrorCarga';
+import { CargandoBloque } from '../../componentes/base/Cargando';
 
 const ESTADO = {
   enviado: 'Enviado',
@@ -13,33 +16,68 @@ const ESTADO = {
   fallido: 'No se pudo enviar',
 } as const;
 
+const TEXTO_ESTADO: Record<EstadoIntegracion, string> = {
+  activo: 'Funcionando',
+  sin_configurar: 'Sin configurar',
+  error: 'Con error',
+  demo: 'Simulado (demo)',
+  sin_datos: 'Sin actividad todavía',
+};
+const TONO_ESTADO: Record<EstadoIntegracion, string> = {
+  activo: 'bg-verde/25 text-cafe',
+  sin_configurar: 'bg-cafe/[0.08] text-cafe/75',
+  error: 'bg-naranja/20 text-cafe',
+  demo: 'border border-indigo/40 text-indigo',
+  sin_datos: 'bg-cafe/[0.05] text-cafe/65',
+};
+
+function EstadoPill({ estado }: { estado?: { estado: EstadoIntegracion; detalle?: string } }) {
+  if (!estado) return <span className="inline-block h-5 w-24 rounded-full bg-cafe/[0.06]" aria-busy="true" />;
+  return (
+    <span title={estado.detalle} className={`inline-flex rounded-full px-2.5 py-1 text-[0.6rem] font-medium uppercase tracking-[0.1em] ${TONO_ESTADO[estado.estado]}`}>
+      {TEXTO_ESTADO[estado.estado]}
+    </span>
+  );
+}
+
 export default function PanelAvisos() {
-  const { datos, recargar } = useConsulta('admin:avisos', () => repoAdmin.avisos());
+  const { datos: integ } = useConsulta('admin:integraciones', () => repoAdmin.integraciones());
+  const { datos, error, recargar } = useConsulta('admin:avisos', () => repoAdmin.avisos());
   useEnVivo(recargar);
 
   return (
     <div className="space-y-6">
       <EncabezadoPanel eyebrow="Notificaciones" titulo="Avisos" />
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Tarjeta titulo="Correo al equipo">
-          <p className="text-[0.84rem]">{siteConfig.correoAvisosEquipo || 'Sin configurar'}</p>
+          <EstadoPill estado={integ?.correo} />
+          <p className="mt-2 text-[0.84rem]">{siteConfig.correoAvisosEquipo || 'Sin configurar'}</p>
           <p className="mt-1 text-[0.72rem] text-cafe/60">Variable ADMIN_NOTIFICATION_EMAIL. Se cambia sin tocar código.</p>
         </Tarjeta>
         <Tarjeta titulo="Correo a la clienta">
-          <p className="text-[0.84rem]">Al correo de cada reserva</p>
-          <p className="mt-1 text-[0.72rem] text-cafe/60">Confirmación con folio, fecha, hora y total.</p>
+          <EstadoPill estado={integ?.correo} />
+          <p className="mt-2 text-[0.84rem]">Al correo de cada reserva</p>
+          <p className="mt-1 text-[0.72rem] text-cafe/60">Confirmación con folio, fecha, hora y total. Sale por Resend.</p>
         </Tarjeta>
         <Tarjeta titulo="WhatsApp al equipo">
-          <p className="text-[0.84rem]">Preparado</p>
-          <p className="mt-1 text-[0.72rem] text-cafe/60">Se conecta a una API oficial (WhatsApp Business). No es un enlace wa.me.</p>
+          <EstadoPill estado={integ?.whatsapp} />
+          <p className="mt-2 text-[0.72rem] text-cafe/60">API oficial de WhatsApp Business (Meta), con plantilla aprobada. No es un enlace wa.me.</p>
+        </Tarjeta>
+        <Tarjeta titulo="Google Calendar">
+          <EstadoPill estado={integ?.calendario} />
+          <p className="mt-2 text-[0.72rem] text-cafe/60">
+            Un evento por horario en el calendario del equipo. Mientras no esté conectado, todo se opera aquí en el panel.
+          </p>
         </Tarjeta>
       </div>
       {fuenteDatos === 'demo' && (
         <p className="text-[0.78rem] text-indigo">En la demo los correos no salen: aquí se ve exactamente lo que se enviaría.</p>
       )}
 
-      {!datos ? (
-        <div className="h-40" aria-busy="true" />
+      {!datos && error ? (
+        <ErrorCarga onReintentar={recargar} />
+      ) : !datos ? (
+        <CargandoBloque className="h-40" />
       ) : datos.length === 0 ? (
         <p className="rounded-suave border border-dashed border-cafe/20 p-8 text-center text-nota text-cafe/65">
           Aún no hay avisos. Haz una reserva en el sitio y confírmala: aquí aparecerán el correo al equipo y el de la clienta.

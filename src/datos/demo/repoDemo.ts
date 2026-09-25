@@ -20,12 +20,13 @@ import { claveMes, etiquetaMes, hoy, minutosEntre, sumarDias, yaPaso } from '../
 import { sinLugar } from '../../lib/cupo';
 import { correoValido, soloDigitos } from '../../lib/formato';
 import { AGENDA, flujoAgenda, idSesionAgenda, type RegistroTaller } from '../agenda';
+import { CATEGORIA_DB, slugTaller, validarCambiosTaller, validarTallerNuevo } from '../catalogo';
 import { avisoClienteManual, avisosReservaConfirmada } from '../avisos';
 import { ErrorDatos, type CambiosReserva, type Repositorio, type RepositorioAdmin } from '../repositorio';
 import type {
-  Asistente, Aviso, ClaseMembresia, ClienteAdmin, Contacto, MembresiaAdmin, MesMembresia, Nino, Pago,
+  Asistente, Aviso, CambiosTaller, ClaseMembresia, ClienteAdmin, Contacto, MembresiaAdmin, MesMembresia, Nino, Pago,
   Registro, Reserva, ResumenAdmin, Sesion, SesionAdmin, SesionReservada, SolicitudManual, SolicitudReserva,
-  Taller, TipoExperiencia, Usuario,
+  Taller, TallerCatalogo, TallerNuevo, TipoExperiencia, Usuario,
 } from '../tipos';
 import { PRODUCTOS_SEMILLA, mesesMembresiaSemilla, sesionesKidsSemilla, sesionesMembresiaDelMes } from './semilla';
 
@@ -61,6 +62,10 @@ interface Estado {
   cupos: Record<string, number | null>;
   /** Último folio emitido. En Supabase: una secuencia. */
   ultimoFolio: number;
+  /** Catálogo desde el panel (opcionales: los datos guardados antes no los traen). */
+  talleresPanel?: RegistroTaller[];
+  cambiosTaller?: Record<string, Partial<RegistroTaller>>;
+  inactivos?: string[];
 }
 
 // --- Almacenamiento ---------------------------------------------------------
@@ -217,10 +222,21 @@ function aTaller(r: RegistroTaller): Taller {
   };
 }
 
-const talleresBase = () => AGENDA.filter((r) => r.is_active).map(aTaller);
+/** La agenda publicada + lo que el equipo creó, cambió o desactivó en el panel. */
+function registros(e: Estado): RegistroTaller[] {
+  const cambios = e.cambiosTaller ?? {};
+  const inactivos = new Set(e.inactivos ?? []);
+  return [...AGENDA, ...(e.talleresPanel ?? [])].map((r) => ({
+    ...r,
+    ...cambios[r.id],
+    is_active: r.is_active && !inactivos.has(r.id),
+  }));
+}
+
+const talleresBase = (e: Estado) => registros(e).filter((r) => r.is_active).map(aTaller);
 
 function catalogoTalleres(e: Estado): Taller[] {
-  return talleresBase()
+  return talleresBase(e)
     .map((t) => ({ ...t, sesiones: t.sesiones.map((s) => conDisponibles(e, s)) }))
     .sort((a, b) =>
       (a.sesiones[0].fecha + a.sesiones[0].inicio).localeCompare(b.sesiones[0].fecha + b.sesiones[0].inicio),
@@ -228,11 +244,11 @@ function catalogoTalleres(e: Estado): Taller[] {
 }
 
 function catalogoMeses(e: Estado): MesMembresia[] {
-  return mesesMembresiaSemilla().map((m) => ({ ...m, sesiones: m.sesiones.map((s) => conDisponibles(e, s)) }));
+  return mesesMembresiaSemilla(registros(e)).map((m) => ({ ...m, sesiones: m.sesiones.map((s) => conDisponibles(e, s)) }));
 }
 
 function catalogoKids(e: Estado): Sesion[] {
-  return sesionesKidsSemilla().map((s) => conDisponibles(e, s));
+  return sesionesKidsSemilla(registros(e)).map((s) => conDisponibles(e, s));
 }
 
 /** Todas las sesiones reservables, con a qué experiencia pertenecen. */
@@ -240,7 +256,7 @@ type SesionCatalogo = Omit<SesionAdmin, 'ocupados' | 'asistentes'>;
 
 function todasLasSesiones(e: Estado): SesionCatalogo[] {
   const meses = [...new Set([...catalogoMeses(e).map((m) => m.clave), ...e.reservas.map((r) => claveMes(r.sesiones[0]?.fecha ?? hoy()))])];
-  const membresia = meses.flatMap((m) => sesionesMembresiaDelMes(m)).map((s) => conDisponibles(e, s));
+  const membresia = meses.flatMap((m) => sesionesMembresiaDelMes(m, registros(e))).map((s) => conDisponibles(e, s));
   return [
     ...catalogoTalleres(e).filter((t) => t.flujo === 'taller').flatMap((t) =>
       t.sesiones.map((s) => ({
@@ -285,7 +301,7 @@ const sr = (s: Sesion): SesionReservada => ({ id: s.id, fecha: s.fecha, inicio: 
 const tel = (n: number) => `81 0000 ${String(n).padStart(4, '0')}`;
 
 function semillas(usuarioAna: UsuarioGuardado): Semilla[] {
-  const talleres = talleresBase();
+  const talleres = talleresBase(vacio());
   const sesion = (slugParcial: string, hora: string) => {
     const t = talleres.find((x) => x.slug.startsWith(slugParcial));
     const s = t?.sesiones.find((x) => x.inicio === hora);
@@ -613,7 +629,7 @@ export const repoDemo: Repositorio = {
     return reserva;
   },
 
-  async pagar(reservaId) {
+  async pagar(reservaId, opciones) {
     await espera(1100);
     const e = { ...(await estado()) };
     const usuario = usuarioEnSesion(e);
@@ -622,6 +638,20 @@ export const repoDemo: Repositorio = {
     if (r.estado === 'confirmada') return { tipo: 'confirmado', reserva: r };
     if (r.estado !== 'pendiente_pago') {
       throw new ErrorDatos('APARTADO_VENCIDO', 'Tu apartado venció antes de completar el pago. Vuelve a elegir tus fechas.');
+    }
+    if (opciones?.simulacion === 'rechazado') {
+      // Queda registrado como intento fallido; la reserva sigue apartada
+      // (sin folio) y se puede volver a intentar mientras no venza.
+      const t = ahora();
+      e.reservas = e.reservas.map((x) => (x.id === r.id ? { ...x, pago: 'fallido' as const, actualizadaEn: t } : x));
+      const previo = e.pagos.find((p) => p.reservaId === r.id);
+      const intento: Pago = {
+        id: previo?.id ?? id('pag'), reservaId: r.id, folio: null, cliente: r.contacto.nombre, proveedor: 'demo',
+        referencia: null, metodo: 'tarjeta', monto: r.total, estado: 'fallido', creadoEn: t, demo: false,
+      };
+      e.pagos = previo ? e.pagos.map((p) => (p.id === previo.id ? intento : p)) : [...e.pagos, intento];
+      guardar({ ...e });
+      throw new ErrorDatos('PAGO_RECHAZADO', 'El pago no pudo completarse. Tu lugar todavía no ha sido confirmado.');
     }
     // En producción esto no pasa aquí: Stripe cobra, el webhook verifica la
     // firma y SOLO entonces confirmar_pago() asigna el folio.
@@ -982,4 +1012,116 @@ export const repoAdminDemo: RepositorioAdmin = {
     exigirAdmin(e);
     return e.avisos.filter((a) => !reservaId || a.reservaId === reservaId).sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
   },
+
+  async integraciones() {
+    const e = await estado();
+    exigirAdmin(e);
+    const demo = { estado: 'demo' as const, detalle: 'Simulado: en la demo no sale nada.' };
+    return { correo: demo, whatsapp: demo, calendario: demo };
+  },
+
+  async catalogo() {
+    await espera(200);
+    const e = await estado();
+    exigirAdmin(e);
+    return registros(e)
+      .map((r) => aCatalogo(e, r))
+      .sort((a, b) => (a.fecha + (a.sesiones[0]?.inicio ?? '')).localeCompare(b.fecha + (b.sesiones[0]?.inicio ?? '')));
+  },
+
+  async crearTaller(n: TallerNuevo) {
+    await espera(350);
+    const e = { ...(await estado()) };
+    exigirAdmin(e);
+    validarTallerNuevo(n);
+    const usados = new Set(registros(e).map((r) => r.slug));
+    const base = slugTaller(n.titulo, n.fecha);
+    let slug = base;
+    for (let k = 2; usados.has(slug); k++) slug = `${base}-${k}`;
+    const r: RegistroTaller = {
+      id: `panel-${slug}`,
+      slug,
+      title: n.titulo.trim(),
+      description: [n.resumen.trim()],
+      date: n.fecha,
+      sessions: [...n.horarios]
+        .sort((x, y) => x.inicio.localeCompare(y.inicio))
+        .map((h) => ({ start_time: h.inicio, end_time: h.fin, capacity: n.cupo, available_spots: n.cupo, is_sold_out: false })),
+      category: CATEGORIA_DB[n.categoria],
+      label: null,
+      image: n.foto,
+      gallery: [n.foto],
+      price: n.precio,
+      price_type: 'per_person',
+      price_label: n.precio === null ? 'Info DM' : null,
+      age_min: null,
+      age_max: null,
+      includes: [],
+      is_featured: false,
+      is_active: true,
+      booking_type: n.precio === null ? 'inquiry' : 'online',
+      origen: 'panel',
+    };
+    const nuevo = { ...e, talleresPanel: [...(e.talleresPanel ?? []), r] };
+    guardar(nuevo);
+    return aCatalogo(nuevo, r);
+  },
+
+  async editarTaller(tallerId, c: CambiosTaller) {
+    await espera(300);
+    const e = { ...(await estado()) };
+    exigirAdmin(e);
+    validarCambiosTaller(c);
+    const r = registros(e).find((x) => x.id === tallerId);
+    if (!r) throw new ErrorDatos('NO_ENCONTRADO', 'Ese taller ya no existe.');
+    if (c.precio !== undefined && c.precio !== r.price && flujoAgenda(r) !== 'taller') {
+      throw new ErrorDatos('DATOS_INVALIDOS', 'El precio de NUMA Kids y de la membresía se define en su propia página, no por fecha.');
+    }
+    const cambio: Partial<RegistroTaller> = { ...e.cambiosTaller?.[r.id] };
+    if (c.titulo !== undefined) cambio.title = c.titulo.trim();
+    if (c.resumen !== undefined) cambio.description = [c.resumen.trim(), ...r.description.slice(1)];
+    if (c.categoria !== undefined) cambio.category = CATEGORIA_DB[c.categoria];
+    if (c.foto !== undefined) {
+      cambio.image = c.foto;
+      cambio.gallery = [c.foto, ...r.gallery.filter((g) => g !== c.foto)];
+    }
+    if (c.precio !== undefined && flujoAgenda(r) === 'taller') {
+      cambio.price = c.precio;
+      cambio.price_label = c.precio === null ? 'Info DM' : null;
+      cambio.booking_type = c.precio === null ? 'inquiry' : 'online';
+    }
+    const nuevo = { ...e, cambiosTaller: { ...e.cambiosTaller, [r.id]: cambio } };
+    guardar(nuevo);
+    return aCatalogo(nuevo, registros(nuevo).find((x) => x.id === r.id)!);
+  },
+
+  async activarTaller(tallerId, activo) {
+    await espera(250);
+    const e = await estado();
+    exigirAdmin(e);
+    if (!registros(e).some((r) => r.id === tallerId)) throw new ErrorDatos('NO_ENCONTRADO', 'Ese taller ya no existe.');
+    const inactivos = new Set(e.inactivos ?? []);
+    if (activo) inactivos.delete(tallerId);
+    else inactivos.add(tallerId);
+    guardar({ ...e, inactivos: [...inactivos] });
+  },
 };
+
+function aCatalogo(e: Estado, r: RegistroTaller): TallerCatalogo {
+  const t = aTaller(r);
+  return {
+    id: r.id,
+    slug: r.slug,
+    titulo: r.title,
+    resumen: r.description[0] ?? '',
+    categoria: t.categoria,
+    precio: r.price,
+    foto: r.image,
+    activo: r.is_active,
+    origen: r.origen ?? 'agenda',
+    editado: Boolean(e.cambiosTaller?.[r.id]),
+    flujo: t.flujo,
+    fecha: r.date,
+    sesiones: t.sesiones.map((s) => ({ id: s.id, inicio: s.inicio, fin: s.fin, cupo: conDisponibles(e, s).cupo, ocupados: ocupados(e, s.id) })),
+  };
+}

@@ -1,10 +1,11 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode, type TouchEvent } from 'react';
 import { AnimatePresence, m } from 'framer-motion';
 import type { PiezaPortafolio } from '../contenido/portafolio';
 import Foto from './base/Foto';
 import Revelar, { EASE_NUMA } from './base/Revelar';
 import { Icono } from './base/Iconos';
 import { EnlaceFlecha } from './base/Boton';
+import { useAtraparFoco } from '../lib/foco';
 
 // ---------------------------------------------------------------------------
 // Galería editorial del portafolio
@@ -36,7 +37,8 @@ export default function EditorialGallery({
   /** Ocupa el hueco a la derecha de la foto horizontal. */
   nota?: ReactNode;
 }) {
-  const [abierta, setAbierta] = useState<PiezaPortafolio | null>(null);
+  const visibles = piezas.slice(0, COMPOSICION.length);
+  const [abierta, setAbierta] = useState<number | null>(null);
 
   return (
     <>
@@ -44,7 +46,7 @@ export default function EditorialGallery({
         {/* Encabezado: en escritorio a la derecha de la foto grande */}
         <div className="col-span-2 lg:col-span-6 lg:col-start-7 lg:row-start-1 lg:pb-6">{encabezado}</div>
 
-        {piezas.slice(0, COMPOSICION.length).map((p, i) => {
+        {visibles.map((p, i) => {
           const c = COMPOSICION[i];
           return (
             <Fragment key={p.id}>
@@ -55,7 +57,7 @@ export default function EditorialGallery({
               <figure>
                 <button
                   type="button"
-                  onClick={() => setAbierta(p)}
+                  onClick={() => setAbierta(i)}
                   className="group relative block w-full text-left"
                   aria-label={`Ver pieza: ${p.titulo}`}
                 >
@@ -65,9 +67,9 @@ export default function EditorialGallery({
                     <Icono.flechaDiagonal tam={12} />
                   </span>
                 </button>
-                <figcaption className="mt-3 flex items-baseline justify-between gap-3 text-[0.8rem]">
-                  <span className="text-cafe">{p.titulo}</span>
-                  <span className="eyebrow text-[0.58rem] text-cafe/55">{p.autora ? `${p.categoria} · ${p.autora}` : p.categoria}</span>
+                <figcaption className="mt-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[0.8rem]">
+                  <span className="min-w-0 text-cafe">{p.titulo}</span>
+                  <span className="eyebrow min-w-0 text-[0.58rem] text-cafe/55">{p.autora ? `${p.categoria} · ${p.autora}` : p.categoria}</span>
                 </figcaption>
               </figure>
             </Revelar>
@@ -79,29 +81,65 @@ export default function EditorialGallery({
         })}
       </div>
 
-      <VisorPieza pieza={abierta} onCerrar={() => setAbierta(null)} />
+      <VisorPieza piezas={visibles} indice={abierta} onCambiar={setAbierta} onCerrar={() => setAbierta(null)} />
     </>
   );
 }
 
-function VisorPieza({ pieza, onCerrar }: { pieza: PiezaPortafolio | null; onCerrar: () => void }) {
+/**
+ * Visor de una pieza: anterior / siguiente con botones, flechas del teclado o
+ * deslizando en el celular; Esc o clic fuera para cerrar. El foco se queda
+ * dentro mientras está abierto y vuelve a la foto al cerrar.
+ */
+function VisorPieza({
+  piezas,
+  indice,
+  onCambiar,
+  onCerrar,
+}: {
+  piezas: PiezaPortafolio[];
+  indice: number | null;
+  onCambiar: (i: number) => void;
+  onCerrar: () => void;
+}) {
   const cerrar = useRef<HTMLButtonElement>(null);
-  const previo = useRef<HTMLElement | null>(null);
+  const caja = useRef<HTMLDivElement>(null);
+  const toque = useRef<number | null>(null);
+  const abierto = indice !== null;
+  const pieza = abierto ? piezas[indice] : null;
+  const total = piezas.length;
+  const mover = (d: number) => indice !== null && onCambiar((indice + d + total) % total);
+
+  useAtraparFoco(caja, abierto);
 
   useEffect(() => {
-    if (!pieza) return;
-    previo.current = document.activeElement as HTMLElement;
+    if (!abierto) return;
     cerrar.current?.focus();
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const alTeclear = (e: KeyboardEvent) => e.key === 'Escape' && onCerrar();
-    window.addEventListener('keydown', alTeclear);
     return () => {
       document.body.style.overflow = overflow;
-      window.removeEventListener('keydown', alTeclear);
-      previo.current?.focus();
     };
-  }, [pieza, onCerrar]);
+  }, [abierto]);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCerrar();
+      else if (e.key === 'ArrowRight') mover(1);
+      else if (e.key === 'ArrowLeft') mover(-1);
+    };
+    window.addEventListener('keydown', alTeclear);
+    return () => window.removeEventListener('keydown', alTeclear);
+  });
+
+  const alTocar = (e: TouchEvent) => { toque.current = e.touches[0].clientX; };
+  const alSoltar = (e: TouchEvent) => {
+    if (toque.current === null) return;
+    const dx = e.changedTouches[0].clientX - toque.current;
+    toque.current = null;
+    if (Math.abs(dx) > 50) mover(dx < 0 ? 1 : -1);
+  };
 
   return (
     <AnimatePresence>
@@ -114,6 +152,7 @@ function VisorPieza({ pieza, onCerrar }: { pieza: PiezaPortafolio | null; onCerr
           onClick={onCerrar}
         >
           <m.div
+            ref={caja}
             role="dialog"
             aria-modal="true"
             aria-label={pieza.titulo}
@@ -123,8 +162,10 @@ function VisorPieza({ pieza, onCerrar }: { pieza: PiezaPortafolio | null; onCerr
             exit={{ y: 24, opacity: 0 }}
             transition={{ duration: 0.5, ease: EASE_NUMA }}
             onClick={(e) => e.stopPropagation()}
+            onTouchStart={alTocar}
+            onTouchEnd={alSoltar}
           >
-            <Foto foto={pieza.foto} className="aspect-[4/5] w-full sm:aspect-auto sm:min-h-[34rem]" sizes="(min-width:640px) 55vw, 100vw" />
+            <Foto key={pieza.id} foto={pieza.foto} className="aspect-[4/5] w-full sm:aspect-auto sm:min-h-[34rem]" sizes="(min-width:640px) 55vw, 100vw" />
             <div className="flex flex-col p-7 sm:p-10">
               <button
                 ref={cerrar}
@@ -142,6 +183,27 @@ function VisorPieza({ pieza, onCerrar }: { pieza: PiezaPortafolio | null; onCerr
                 Una pieza nacida en nuestro estudio. El portafolio es para inspirarte; las piezas disponibles para
                 comprar viven en NUMA Store.
               </p>
+              <div className="mt-8 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => mover(-1)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-cafe/25 hover:border-cafe"
+                  aria-label="Pieza anterior"
+                >
+                  <Icono.flechaIzq tam={18} />
+                </button>
+                <span className="cifra min-w-[3.5rem] text-center text-[1.1rem] tabular-nums" aria-live="polite">
+                  {(indice ?? 0) + 1} / {total}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => mover(1)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-cafe/25 hover:border-cafe"
+                  aria-label="Pieza siguiente"
+                >
+                  <Icono.flecha tam={18} />
+                </button>
+              </div>
               <div className="mt-auto space-y-4 pt-10">
                 <p className="text-nota text-cafe/70">¿Te gustaría algo así para ti?</p>
                 <EnlaceFlecha to="/numa-store">Ver NUMA Store y encargos</EnlaceFlecha>

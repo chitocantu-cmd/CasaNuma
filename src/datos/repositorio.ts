@@ -1,7 +1,7 @@
 import type {
-  Aviso, ClienteAdmin, EstadoPago, EstadoReserva, MembresiaAdmin, MesMembresia, Pago, Producto,
+  Aviso, CambiosTaller, ClienteAdmin, Integraciones, EstadoPago, EstadoReserva, MembresiaAdmin, MesMembresia, Pago, Producto,
   Registro, Reserva, ResultadoPago, ResumenAdmin, Sesion, SesionAdmin, SolicitudManual,
-  SolicitudReserva, Taller, Usuario,
+  SolicitudReserva, Taller, TallerCatalogo, TallerNuevo, Usuario,
 } from './tipos';
 
 
@@ -27,8 +27,12 @@ export interface Repositorio {
   disponibilidad(sesionIds: string[]): Promise<Sesion[]>;
   /** Valida cupo y aparta los lugares mientras se paga. Requiere sesión. */
   apartar(solicitud: SolicitudReserva): Promise<Reserva>;
-  /** Cobra un apartado. En producción puede devolver una redirección a Stripe. */
-  pagar(reservaId: string): Promise<ResultadoPago>;
+  /**
+   * Cobra un apartado. Con Supabase devuelve la redirección a Stripe Checkout.
+   * En la demo no hay cobro: `simulacion` decide si el pago se aprueba o se
+   * rechaza (un rechazo lanza PAGO_RECHAZADO y el lugar sigue apartado).
+   */
+  pagar(reservaId: string, opciones?: { simulacion?: 'aprobado' | 'rechazado' }): Promise<ResultadoPago>;
   /** Libera un apartado que no se va a pagar. */
   liberar(reservaId: string): Promise<void>;
   misReservas(): Promise<Reserva[]>;
@@ -78,10 +82,19 @@ export interface RepositorioAdmin {
   talleres(): Promise<SesionAdmin[]>;
   /** Cupo de una sesión; null = sin confirmar. */
   ajustarCupo(sesionId: string, cupo: number | null): Promise<void>;
+
+  /** Catálogo de talleres (activos e inactivos) para administrarlo. */
+  catalogo(): Promise<TallerCatalogo[]>;
+  crearTaller(nuevo: TallerNuevo): Promise<TallerCatalogo>;
+  editarTaller(id: string, cambios: CambiosTaller): Promise<TallerCatalogo>;
+  /** Inactivo = deja de verse en el sitio; las reservas hechas siguen vigentes. */
+  activarTaller(id: string, activo: boolean): Promise<void>;
   membresias(): Promise<MembresiaAdmin[]>;
   clientes(): Promise<ClienteAdmin[]>;
   pagos(): Promise<Pago[]>;
   avisos(reservaId?: string): Promise<Aviso[]>;
+  /** Correo, WhatsApp y Google Calendar: si ya funcionan o qué les falta. */
+  integraciones(): Promise<Integraciones>;
 }
 
 export type CodigoError =
@@ -97,6 +110,8 @@ export type CodigoError =
   /** La cuenta existe pero falta abrir el enlace del correo de confirmación. */
   | 'CONFIRMAR_CORREO'
   | 'APARTADO_VENCIDO'
+  /** Demo: el pago simulado se rechazó; la reserva sigue sin confirmar. */
+  | 'PAGO_RECHAZADO'
   | 'NO_ENCONTRADO'
   | 'NO_CONECTADO'
   | 'SIN_ACCESO';

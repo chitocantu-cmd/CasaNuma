@@ -11,6 +11,7 @@ import CeramicShape, { type NombreSilueta } from '../componentes/marca/CeramicSh
 import { enlaceWhatsapp, mostrarPendientes } from '../config/site';
 import { mensajeEvento } from '../contenido/whatsapp';
 import { useSeo } from '../lib/seo';
+import { hoy } from '../lib/calendario';
 
 // Texto: documento de contenido, sección 6.
 
@@ -29,22 +30,36 @@ export default function Eventos() {
       'Cumpleaños, baby showers, despedidas y eventos empresariales con experiencias privadas de cerámica en San Pedro Garza García. Cotización personalizada por WhatsApp.',
   });
 
+  const [nombre, setNombre] = useState('');
   const [tipo, setTipo] = useState('');
   const [fecha, setFecha] = useState('');
   const [personas, setPersonas] = useState('');
   const [comentarios, setComentarios] = useState('');
+  const [errores, setErrores] = useState<Record<string, string>>({});
   const [sinNumero, setSinNumero] = useState(false);
+  /** Enlace que se abrió: queda a la vista por si el navegador bloqueó la ventana. */
+  const [abierto, setAbierto] = useState<string | null>(null);
 
-  const mensaje = mensajeEvento({ tipo, fecha: fecha ? fechaLegible(fecha) : '', personas, comentarios });
+  const mensaje = mensajeEvento({ nombre: nombre.trim(), tipo, fecha: fecha ? fechaLegible(fecha) : '', personas, comentarios });
 
+  // Los datos se quedan escritos pase lo que pase: nada se borra al enviar.
   function cotizar(e: FormEvent) {
     e.preventDefault();
+    const errs: Record<string, string> = {};
+    if (!nombre.trim()) errs.nombre = 'Escribe tu nombre.';
+    if (!tipo) errs.tipo = 'Elige el tipo de evento.';
+    if (!personas || Number(personas) < 1) errs.personas = 'Indica cuántas personas, al menos 1.';
+    if (fecha && fecha < hoy()) errs.fecha = 'Elige una fecha de hoy en adelante.';
+    setErrores(errs);
+    if (Object.keys(errs).length) return;
+
     const href = enlaceWhatsapp(mensaje);
     if (!href) {
       setSinNumero(true);
       return;
     }
     window.open(href, '_blank', 'noopener,noreferrer');
+    setAbierto(href);
   }
 
   return (
@@ -122,14 +137,17 @@ export default function Eventos() {
           <Revelar retraso={0.1} className="lg:col-span-6 lg:col-start-7">
             <form onSubmit={cotizar} className="rounded-suave bg-crema p-6 sm:p-10" noValidate>
               <div className="grid gap-7 sm:grid-cols-2">
-                <Selector id="e-tipo" label="Tipo de evento" value={tipo} onChange={(e) => setTipo(e.target.value)}>
+                <div className="sm:col-span-2">
+                  <Campo id="e-nombre" label="Tu nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="name" error={errores.nombre} />
+                </div>
+                <Selector id="e-tipo" label="Tipo de evento" value={tipo} onChange={(e) => setTipo(e.target.value)} error={errores.tipo}>
                   <option value="">Elige una opción</option>
                   {['Cumpleaños', 'Baby shower', 'Despedida de soltera', 'Tarde entre amigas o amigos', 'Reunión familiar', 'Evento empresarial', 'Otra celebración'].map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </Selector>
-                <Campo id="e-fecha" label="Fecha tentativa" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-                <Campo id="e-personas" label="Número de personas" type="number" inputMode="numeric" min={1} value={personas} onChange={(e) => setPersonas(e.target.value)} placeholder="Ej. 10" />
+                <Campo id="e-fecha" label="Fecha tentativa" type="date" min={hoy()} value={fecha} onChange={(e) => setFecha(e.target.value)} error={errores.fecha} opcional />
+                <Campo id="e-personas" label="Número de personas" type="number" inputMode="numeric" min={1} value={personas} onChange={(e) => setPersonas(e.target.value)} placeholder="Ej. 10" error={errores.personas} />
                 <div className="sm:col-span-2">
                   <AreaTexto
                     id="e-comentarios" label="Comentarios o necesidades especiales" opcional value={comentarios}
@@ -154,6 +172,17 @@ export default function Eventos() {
                   ) : (
                     <Aviso>Estamos actualizando nuestro WhatsApp. Intenta de nuevo en unos minutos.</Aviso>
                   )}
+                </div>
+              )}
+
+              {abierto && (
+                <div className="mt-6">
+                  <Aviso tipo="exito">
+                    Abrimos WhatsApp con tu mensaje listo.{' '}
+                    <a href={abierto} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                      Si no se abrió, toca aquí.
+                    </a>
+                  </Aviso>
                 </div>
               )}
 

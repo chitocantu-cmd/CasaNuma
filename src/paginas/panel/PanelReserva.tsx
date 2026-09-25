@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ErrorDatos, repoAdmin } from '../../datos';
 import type { CambiosReserva } from '../../datos/repositorio';
@@ -8,6 +8,8 @@ import { fechaCompleta, rango, yaPaso } from '../../lib/calendario';
 import { enlaceWhatsapp as waDe, soloDigitos } from '../../lib/formato';
 import { Icono } from '../../componentes/base/Iconos';
 import { Aviso } from '../../componentes/base/Campos';
+import ErrorCarga from '../../componentes/base/ErrorCarga';
+import { CargandoBloque } from '../../componentes/base/Cargando';
 import {
   DemoPill, ETIQUETA_AVISO, ETIQUETA_METODO, ETIQUETA_TIPO, EstadoPill, PagoPill, Tarjeta, dinero, fechaHora, horaCorta,
 } from './ui';
@@ -25,7 +27,7 @@ function Dato({ k, children }: { k: string; children: ReactNode }) {
 
 export default function PanelReserva() {
   const { id = '' } = useParams();
-  const { datos: r, cargando, recargar } = useConsulta(`admin:reserva:${id}`, () => repoAdmin.reserva(id));
+  const { datos: r, cargando, error, recargar } = useConsulta(`admin:reserva:${id}`, () => repoAdmin.reserva(id));
   const { datos: avisos, recargar: recargarAvisos } = useConsulta(`admin:avisos:${id}`, () => repoAdmin.avisos(id));
   const [notas, setNotas] = useState('');
   const [guardando, setGuardando] = useState<string | null>(null);
@@ -38,7 +40,10 @@ export default function PanelReserva() {
     if (notaGuardada !== undefined) setNotas(notaGuardada);
   }, [notaGuardada]);
 
+  const enCurso = useRef(false);
   async function cambiar(cambios: CambiosReserva, exito: string) {
+    if (enCurso.current) return;
+    enCurso.current = true;
     setGuardando(exito);
     setMensaje(null);
     try {
@@ -50,12 +55,14 @@ export default function PanelReserva() {
     } catch (e) {
       setMensaje({ tipo: 'error', texto: e instanceof ErrorDatos ? e.message : 'No pudimos guardar el cambio.' });
     } finally {
+      enCurso.current = false;
       setGuardando(null);
       setConfirmarCancelacion(false);
     }
   }
 
-  if (cargando && !r) return <div className="h-80" aria-busy="true" />;
+  if (cargando && !r) return <CargandoBloque className="h-80" />;
+  if (error && !r) return <ErrorCarga onReintentar={recargar} />;
   if (!r) {
     return (
       <div className="py-20 text-center">

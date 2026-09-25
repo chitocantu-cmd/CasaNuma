@@ -6,6 +6,8 @@ import type { EstadoPago, EstadoReserva, Reserva, TipoExperiencia } from '../../
 import { diaSemana, hoy, sumarDias } from '../../lib/calendario';
 import { soloDigitos } from '../../lib/formato';
 import { Icono } from '../../componentes/base/Iconos';
+import ErrorCarga from '../../componentes/base/ErrorCarga';
+import { CargandoBloque } from '../../componentes/base/Cargando';
 import {
   DemoPill, ETIQUETA_ESTADO, ETIQUETA_PAGO, ETIQUETA_TIPO, EncabezadoPanel, EstadoPill, NuevaPill, PagoPill,
   claseCampo, claseTabla, diaMes, dinero, esNueva, horaCorta, useEnVivo,
@@ -54,7 +56,7 @@ function coincide(r: Reserva, q: string): boolean {
 export default function PanelReservas() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const { datos, cargando, recargar } = useConsulta('admin:reservas', () => repoAdmin.reservas());
+  const { datos, cargando, error, recargar } = useConsulta('admin:reservas', () => repoAdmin.reservas());
   useEnVivo(recargar);
 
   const [rango, setRango] = useState<Rango>('todas');
@@ -152,8 +154,10 @@ export default function PanelReservas() {
         </p>
       </div>
 
-      {cargando && !datos ? (
-        <div className="h-60" aria-busy="true" />
+      {error && !datos ? (
+        <ErrorCarga onReintentar={recargar} />
+      ) : cargando && !datos ? (
+        <CargandoBloque className="h-60" />
       ) : lista.length === 0 ? (
         <p className="rounded-suave border border-dashed border-cafe/20 p-8 text-center text-nota text-cafe/65">
           No hay reservas con estos filtros.
@@ -191,10 +195,10 @@ export default function PanelReservas() {
                       <span className="text-[0.7rem] text-cafe/55">{r.origen === 'panel' ? 'Registrada en el panel' : 'Web'}</span>
                     </td>
                     <td className={`${claseTabla.td} whitespace-nowrap`}>
-                      {diaMes(r.sesiones[0].fecha)}
+                      {r.sesiones[0] ? diaMes(r.sesiones[0].fecha) : '—'}
                       {r.sesiones.length > 1 && <span className="text-cafe/55"> +{r.sesiones.length - 1}</span>}
                     </td>
-                    <td className={`${claseTabla.td} whitespace-nowrap`}>{horaCorta(r.sesiones[0].inicio)}</td>
+                    <td className={`${claseTabla.td} whitespace-nowrap`}>{r.sesiones[0] ? horaCorta(r.sesiones[0].inicio) : '—'}</td>
                     <td className={`${claseTabla.td} text-right`}>{r.participantes}</td>
                     <td className={`${claseTabla.td} whitespace-nowrap text-right`}>{dinero(r.total)}</td>
                     <td className={claseTabla.td}><PagoPill pago={r.pago} /></td>
@@ -218,7 +222,7 @@ export default function PanelReservas() {
                     {r.contacto.nombre} {esNueva(r) && <NuevaPill />} {r.demo && <DemoPill />}
                   </span>
                   <span className="mt-1 block text-[0.8rem] text-cafe/70">
-                    {r.titulo} · {diaMes(r.sesiones[0].fecha)} · {horaCorta(r.sesiones[0].inicio)} · {r.participantes} pers.
+                    {r.titulo}{r.sesiones[0] ? ` · ${diaMes(r.sesiones[0].fecha)} · ${horaCorta(r.sesiones[0].inicio)}` : ''} · {r.participantes} pers.
                   </span>
                   <span className="mt-3 flex items-center justify-between">
                     <span className="cifra text-[1.2rem]">{dinero(r.total)}</span>

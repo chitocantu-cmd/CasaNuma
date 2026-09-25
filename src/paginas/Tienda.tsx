@@ -11,6 +11,9 @@ import { mensajeEncargo } from '../contenido/whatsapp';
 import { useProductos } from '../datos/hooks';
 import type { Producto } from '../datos/tipos';
 import { useSeo } from '../lib/seo';
+import ErrorCarga from '../componentes/base/ErrorCarga';
+import { BotonEnlace } from '../componentes/base/Boton';
+import { CargandoBloque } from '../componentes/base/Cargando';
 
 // Texto: documento de contenido, sección 7.
 
@@ -23,7 +26,7 @@ export default function Tienda() {
       'Tazas, vajillas, objetos decorativos y piezas por encargo hechas a mano en Casa Numa. Compra y cotiza por WhatsApp.',
   });
 
-  const { datos: productos } = useProductos();
+  const { datos: productos, error, recargar } = useProductos();
   const [categoria, setCategoria] = useState<(typeof CATEGORIAS)[number]>('Todas');
   const filtrados = useMemo(
     () => (productos ?? []).filter((p) => categoria === 'Todas' || p.categoria === categoria),
@@ -91,7 +94,18 @@ export default function Tienda() {
           </div>
           <CeramicShape nombre="taza" className="hidden h-12 w-auto sm:block" />
         </div>
-        {disponibles.length ? (
+        {error && !productos ? (
+          <ErrorCarga className="mt-10" onReintentar={recargar} />
+        ) : !productos ? (
+          <CargandoBloque className="mt-10 h-72" />
+        ) : productos.length === 0 ? (
+          <div className="mt-10 rounded-suave border border-dashed border-cafe/20 p-8 sm:p-10">
+            <CeramicShape nombre="jarron" className="h-10 w-auto" />
+            <h3 className="mt-6 font-display text-t3 font-light">Estamos preparando nuevas piezas.</h3>
+            <p className="mt-3 text-cuerpo text-cafe/75">Muy pronto encontrarás nuevas creaciones de Casa Numa.</p>
+            <BotonEnlace to="/" tamano="chico" variante="secundario" className="mt-6">Volver al inicio</BotonEnlace>
+          </div>
+        ) : disponibles.length ? (
           <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-12 sm:gap-x-6 lg:grid-cols-4 lg:gap-x-8">
             {disponibles.map((p, i) => (
               <Revelar key={p.id} retraso={(i % 4) * 0.05}>
@@ -100,7 +114,12 @@ export default function Tienda() {
             ))}
           </div>
         ) : (
-          <p className="mt-10 text-cuerpo text-cafe/70">No hay piezas disponibles en esta categoría por ahora.</p>
+          <div className="mt-10 rounded-suave border border-dashed border-cafe/20 p-8">
+            <p className="text-cuerpo text-cafe/75">No hay piezas disponibles en esta categoría por ahora.</p>
+            <button type="button" onClick={() => setCategoria('Todas')} className="subrayado-fijo mt-4 pb-0.5 text-nota">
+              Ver todas las piezas
+            </button>
+          </div>
         )}
       </section>
 

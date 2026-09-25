@@ -9,6 +9,8 @@ import { Icono, type NombreIcono } from '../../componentes/base/Iconos';
 import { useSeo } from '../../lib/seo';
 import { ContextoPanel } from './ui';
 import PanelEntrar from './PanelEntrar';
+import LimiteError from '../../componentes/base/LimiteError';
+import { CargandoPagina } from '../../componentes/base/Cargando';
 
 // ---------------------------------------------------------------------------
 // Panel de Casa Numa: el centro de operaciones.
@@ -40,11 +42,12 @@ const NAV: { to: string; label: string; icono: NombreIcono; fin?: boolean }[] = 
 ];
 
 function Cargando() {
-  return <div className="min-h-[60vh]" aria-busy="true" />;
+  return <CargandoPagina alto="min-h-[60vh]" />;
 }
 
 function Layout({ admin, onSalir }: { admin: Usuario; onSalir: () => Promise<void> }) {
   const Ic = (n: NombreIcono) => Icono[n];
+  const { pathname } = useLocation();
   return (
     <ContextoPanel.Provider value={{ admin, salir: onSalir }}>
       <div className="min-h-screen bg-crema text-cafe">
@@ -120,7 +123,9 @@ function Layout({ admin, onSalir }: { admin: Usuario; onSalir: () => Promise<voi
           )}
           <div className="mx-auto max-w-[80rem] px-4 py-8 sm:px-8 lg:py-10">
             <Suspense fallback={<Cargando />}>
-              <Outlet />
+              <LimiteError key={pathname}>
+                <Outlet />
+              </LimiteError>
             </Suspense>
           </div>
         </main>

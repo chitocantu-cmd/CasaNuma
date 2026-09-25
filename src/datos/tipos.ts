@@ -292,6 +292,54 @@ export interface ResumenAdmin {
   hoy: SesionAdmin[];
 }
 
+/**
+ * Estado de una integración externa, deducido de lo que hizo el servidor:
+ * 'demo' = simulado en la demo; 'sin_datos' = todavía no hay nada que la use.
+ */
+export type EstadoIntegracion = 'activo' | 'sin_configurar' | 'error' | 'demo' | 'sin_datos';
+
+export interface Integraciones {
+  correo: { estado: EstadoIntegracion; detalle?: string };
+  whatsapp: { estado: EstadoIntegracion; detalle?: string };
+  calendario: { estado: EstadoIntegracion; detalle?: string };
+}
+
+/** Taller del catálogo como lo administra el equipo en el panel. */
+export interface TallerCatalogo {
+  id: string;
+  slug: string;
+  titulo: string;
+  resumen: string;
+  categoria: CategoriaTaller;
+  /** Por persona; null = sin precio publicado (se pide información). */
+  precio: number | null;
+  foto: IdFoto;
+  /** Inactivo = no se ve en el sitio; sus reservas siguen vigentes. */
+  activo: boolean;
+  /** 'agenda' = viene de la agenda publicada; 'panel' = lo creó el equipo. */
+  origen: 'agenda' | 'panel';
+  /** Cambiado desde el panel: la carga de la agenda ya no lo sobrescribe. */
+  editado: boolean;
+  flujo: Taller['flujo'];
+  fecha: string;
+  sesiones: { id: string; inicio: string; fin: string | null; cupo: number | null; ocupados: number }[];
+}
+
+/** Lo que captura el equipo para abrir un taller nuevo. */
+export interface TallerNuevo {
+  titulo: string;
+  resumen: string;
+  categoria: CategoriaTaller;
+  precio: number | null;
+  foto: IdFoto;
+  fecha: string;
+  horarios: { inicio: string; fin: string | null }[];
+  cupo: number | null;
+}
+
+/** Lo que se puede cambiar de un taller existente (fecha y horarios no: tienen reservas). */
+export type CambiosTaller = Partial<Pick<TallerNuevo, 'titulo' | 'resumen' | 'categoria' | 'precio' | 'foto'>>;
+
 /** Reserva registrada por el equipo (p. ej. un taller "Info DM" apartado por mensaje). */
 export interface SolicitudManual {
   sesionId: string;

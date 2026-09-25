@@ -56,10 +56,9 @@ Deno.serve(async (req: Request) => {
   for (const job of jobs as Job[]) {
     try {
       const nota = await ejecutar(job);
-      await db.rpc('completar_job', { p_id: job.id });
-      // Terminado sin enviar (p. ej. WhatsApp sin configurar): queda anotado
-      // para que el panel no lo muestre como enviado.
-      if (nota) await db.from('integration_jobs').update({ last_error: nota }).eq('id', job.id);
+      // Terminado sin enviar (p. ej. WhatsApp sin configurar): la nota entra
+      // con el cierre, para que el panel no lo muestre como enviado.
+      await db.rpc('completar_job', { p_id: job.id, p_nota: nota || null });
       hechos++;
     } catch (e) {
       const mensaje = e instanceof Error ? e.message : String(e);

@@ -13,6 +13,8 @@ import { Icono } from '../../componentes/base/Iconos';
 import { MarcaDemo } from '../../componentes/base/Pendiente';
 import EnlaceAncla from '../../componentes/base/EnlaceAncla';
 import CeramicShape from '../../componentes/marca/CeramicShape';
+import ErrorCarga from '../../componentes/base/ErrorCarga';
+import { CargandoBloque, CargandoPagina } from '../../componentes/base/Cargando';
 
 const TIPO: Record<Reserva['tipo'], string> = { taller: 'Taller', membresia: 'Membresía', kids: 'NUMA Kids' };
 const ESTADO: Record<Reserva['estado'], string> = {
@@ -29,10 +31,10 @@ interface Fila {
 export default function Cuenta() {
   useSeo({ titulo: 'Mi cuenta | Casa Numa', descripcion: 'Tus reservas, tu membresía y tu perfil en Casa Numa.', indexar: false });
   const { usuario, cargando, salir } = useSesion();
-  const { datos: reservas } = useMisReservas(usuario?.id ?? null);
+  const { datos: reservas, error, recargar } = useMisReservas(usuario?.id ?? null);
   const navigate = useNavigate();
 
-  if (cargando) return <div className="min-h-[80vh]" aria-busy="true" />;
+  if (cargando) return <CargandoPagina />;
   if (!usuario) return <Navigate to="/cuenta/entrar" replace state={{ desde: '/cuenta' }} />;
 
   const activas = (reservas ?? []).filter((r) => ['confirmada', 'pendiente_pago', 'completada'].includes(r.estado));
@@ -73,13 +75,15 @@ export default function Cuenta() {
           <section id="proximas" aria-labelledby="c-proximas" className="scroll-mt-28">
             <p className="eyebrow text-cafe/55">Mis reservas</p>
             <h2 id="c-proximas" className="mt-2 font-display text-t3 font-light">Próximas</h2>
-            {reservas === null ? (
-              <div className="mt-6 h-32" aria-busy="true" />
+            {reservas === null && error ? (
+              <ErrorCarga className="mt-6" onReintentar={recargar} />
+            ) : reservas === null ? (
+              <CargandoBloque className="mt-6 h-32" />
             ) : proximas.length === 0 ? (
               <div className="mt-6 rounded-suave border border-dashed border-cafe/20 p-8">
-                <p className="text-cuerpo text-cafe/80">Todavía no tienes experiencias próximas.</p>
+                <p className="font-display text-t4 font-light">Todavía no tienes experiencias reservadas.</p>
                 <div className="mt-6 flex flex-wrap gap-3">
-                  <BotonEnlace to="/talleres" tamano="chico" flecha>Ver talleres</BotonEnlace>
+                  <BotonEnlace to="/talleres" tamano="chico" flecha>Descubrir talleres</BotonEnlace>
                   <BotonEnlace to="/membresia" tamano="chico" variante="secundario">Membresía</BotonEnlace>
                 </div>
               </div>
@@ -184,7 +188,7 @@ function TarjetaMembresia({ reserva: r }: { reserva: Reserva }) {
       <p className="mt-6 flex items-baseline gap-2">
         <span className="cifra text-[3.4rem] leading-none">{hechas}</span>
         <span className="cifra text-[1.6rem] text-crema/50">/ {total}</span>
-        <span className="ml-2 text-nota text-crema/75">clases realizadas</span>
+        <span className="ml-2 text-nota text-crema/75">utilizadas</span>
       </p>
       <div
         className="mt-5 grid gap-1.5"
@@ -200,7 +204,9 @@ function TarjetaMembresia({ reserva: r }: { reserva: Reserva }) {
         ))}
       </div>
       <p className="mt-4 text-nota text-crema/75">
-        {total - hechas === 0 ? 'Completaste tus clases de este mes.' : `Te ${total - hechas === 1 ? 'queda 1 clase' : `quedan ${total - hechas} clases`}.`}
+        {total - hechas === 0
+          ? 'Completaste tus clases de este mes.'
+          : `${total - hechas} ${total - hechas === 1 ? 'clase disponible' : 'clases disponibles'}, ya con fecha reservada.`}
       </p>
 
       {siguientes.length > 0 && (

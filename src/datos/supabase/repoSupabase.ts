@@ -26,10 +26,11 @@ import { correoValido, soloDigitos } from '../../lib/formato';
 import { avisosReservaConfirmada } from '../avisos';
 import { PRODUCTOS_SEMILLA } from '../demo/semilla';
 import { ErrorDatos, type CambiosReserva, type CodigoError, type Repositorio, type RepositorioAdmin } from '../repositorio';
+import { CATEGORIA_DB, slugTaller, validarCambiosTaller, validarTallerNuevo } from '../catalogo';
 import type {
-  Asistente, Aviso, ClaseMembresia, ClienteAdmin, Contacto, EstadoPago, EstadoReserva, MembresiaAdmin,
+  Asistente, Aviso, CambiosTaller, ClaseMembresia, ClienteAdmin, Contacto, EstadoPago, EstadoReserva, MembresiaAdmin,
   MesMembresia, MetodoPago, Nino, Pago, Reserva, ResumenAdmin, Sesion, SesionAdmin, SolicitudManual,
-  Taller, TipoExperiencia, Usuario,
+  Taller, TallerCatalogo, TallerNuevo, TipoExperiencia, Usuario,
 } from '../tipos';
 
 // --- Filas de la base ---------------------------------------------------------
@@ -51,6 +52,7 @@ interface FilaTaller {
   is_featured: boolean;
   booking_type: 'online' | 'membership' | 'inquiry';
   booking_mode: 'paid' | 'quote';
+  origen?: 'agenda' | 'panel';
 }
 
 interface FilaSesion {
@@ -194,7 +196,7 @@ async function funcion<T>(nombre: string, cuerpo: unknown): Promise<T> {
 // --- Catálogo ---------------------------------------------------------------------
 
 const COLUMNAS_TALLER =
-  'id, slug, title, category, description, label, price, price_label, age_min, age_max, image_key, gallery, includes, is_featured, booking_type, booking_mode';
+  'id, slug, title, category, description, label, price, price_label, age_min, age_max, image_key, gallery, includes, is_featured, booking_type, booking_mode, origen';
 const COLUMNAS_SESION = 'id, experience_type, workshop_id, date, start_time, end_time, capacity, price, seats_available';
 
 function aSesion(s: FilaSesion): Sesion {
@@ -219,6 +221,8 @@ const porHorario = (a: { fecha: string; inicio: string }, b: { fecha: string; in
 const precioDe = (w: FilaTaller) => (w.booking_mode === 'paid' && num(w.price) > 0 ? num(w.price) : null);
 
 function flujoDe(w: FilaTaller): Taller['flujo'] {
+  // Lo que crea el equipo en el panel se aparta siempre como taller.
+  if (w.origen === 'panel') return 'taller';
   if (w.booking_type === 'membership') return 'membresia';
   if (w.category === 'kids' && w.booking_type === 'online' && precioDe(w) !== null) return 'kids';
   return 'taller';
@@ -489,6 +493,7 @@ export const repoSupabase: Repositorio = {
     return aReserva(fila, contactoDe(usuario));
   },
 
+  // `opciones.simulacion` es solo de la demo: aquí cobra Stripe de verdad.
   async pagar(reservaId) {
     await exigirSesion();
     const r = await funcion<{ checkout_url: string }>('create-checkout-session', { reservation_id: reservaId });
@@ -971,5 +976,185 @@ export const repoAdminSupabase: RepositorioAdmin = {
         creadoEn: j.created_at,
       }];
     });
+  },
+
+  async integraciones() {
+    await exigirAdmin();
+    // El último trabajo de cada tipo dice si la integración ya funciona.
+    const ultimo = async (tipo: string, filtro?: (q: ReturnType<typeof consulta>) => ReturnType<typeof consulta>) => {
+      let q = consulta(tipo);
+      if (filtro) q = filtro(q);
+      const { data } = await q.order('updated_at', { ascending: false }).limit(1).maybeSingle();
+      return data as { status: string; last_error: string | null } | null;
+    };
+    // Solo trabajos terminados: uno en cola todavía no dice si funciona.
+    const consulta = (tipo: string) =>
+      supabase.from('integration_jobs').select('status, last_error').eq('type', tipo).in('status', ['done', 'failed']);
+    const leer = (j: { status: string; last_error: string | null } | null, faltaSi: RegExp) => {
+      if (!j) return { estado: 'sin_datos' as const, detalle: 'Todavía no hay avisos que la usen.' };
+      if (j.last_error && faltaSi.test(j.last_error)) return { estado: 'sin_configurar' as const, detalle: j.last_error };
+      if (j.status === 'done') return { estado: 'activo' as const };
+      return { estado: 'error' as const, detalle: j.last_error ?? undefined };
+    };
+    const [correo, whatsapp, calendario] = await Promise.all([
+      ultimo('email_send', (q) => q.eq('entity_type', 'reservation')),
+      ultimo('whatsapp_send'),
+      ultimo('calendar_sync', (q) => q.eq('entity_type', 'session')),
+    ]);
+    return {
+      correo: leer(correo, /RESEND_API_KEY|RESEND_FROM|Falta la variable/),
+      whatsapp: leer(whatsapp, /^OMITIDO/),
+      calendario: leer(calendario, /^OMITIDO|GOOGLE_/),
+    };
+  },
+
+  async catalogo() {
+    await exigirAdmin();
+    // Del mes pasado en adelante; los talleres de ejemplo de v1 (otras
+    // categorías) no son parte del catálogo.
+    const desde = sumarDias(`${claveMes(hoy())}-01`, -31);
+    const [talleresR, sesionesR] = await Promise.all([
+      supabase
+        .from('workshops')
+        .select(`${COLUMNAS_TALLER}, status, date, editado_en`)
+        .in('category', ['adults', 'kids', 'seasonal'])
+        .gte('date', desde),
+      supabase
+        .from('sesiones_ocupacion')
+        .select('id, workshop_id, date, start_time, end_time, capacity, status, occupied')
+        .gte('date', desde)
+        .order('start_time'),
+    ]);
+    if (talleresR.error) throw errorBase(talleresR.error, 'No pudimos cargar el catálogo. Intenta de nuevo.');
+    if (sesionesR.error) throw errorBase(sesionesR.error, 'No pudimos cargar el catálogo. Intenta de nuevo.');
+    type Fila = FilaTaller & { status: string; date: string; editado_en: string | null };
+    const sesiones = (sesionesR.data ?? []) as FilaSesion[];
+    return ((talleresR.data ?? []) as unknown as Fila[])
+      .map((w): TallerCatalogo => ({
+        id: w.id,
+        slug: w.slug,
+        titulo: w.title,
+        resumen: w.description?.[0] ?? '',
+        categoria: w.category === 'kids' ? 'ninos' : w.category === 'adults' ? 'adultos' : 'temporada',
+        precio: precioDe(w),
+        foto: esFoto(w.image_key) ? w.image_key : 'taller-clases',
+        activo: w.status === 'published',
+        origen: w.origen ?? 'agenda',
+        editado: Boolean(w.editado_en),
+        flujo: flujoDe(w),
+        fecha: w.date,
+        sesiones: sesiones
+          .filter((s) => s.workshop_id === w.id && s.status !== 'cancelled')
+          .map((s) => ({ id: s.id, inicio: hhmm(s.start_time), fin: hhmmONulo(s.end_time), cupo: s.capacity, ocupados: s.occupied ?? 0 })),
+      }))
+      .sort((a, b) => (a.fecha + (a.sesiones[0]?.inicio ?? '')).localeCompare(b.fecha + (b.sesiones[0]?.inicio ?? '')));
+  },
+
+  async crearTaller(n: TallerNuevo) {
+    await exigirAdmin();
+    validarTallerNuevo(n);
+    const horarios = [...n.horarios].sort((x, y) => x.inicio.localeCompare(y.inicio));
+    const base = slugTaller(n.titulo, n.fecha);
+    const conPrecio = n.precio !== null;
+
+    // El slug es único: si ya existe, se prueba con -2, -3…
+    let id: string | null = null;
+    for (let k = 1; k <= 6 && !id; k++) {
+      const { data, error } = await supabase
+        .from('workshops')
+        .insert({
+          slug: k === 1 ? base : `${base}-${k}`,
+          title: n.titulo.trim(),
+          category: CATEGORIA_DB[n.categoria],
+          short_description: n.resumen.trim(),
+          description: [n.resumen.trim()],
+          date: n.fecha,
+          start_time: horarios[0].inicio,
+          end_time: horarios[0].fin,
+          timezone: 'America/Monterrey',
+          price: n.precio ?? 0,
+          currency: 'MXN',
+          capacity: n.cupo,
+          price_label: conPrecio ? null : 'Info DM',
+          image_key: n.foto,
+          gallery: [n.foto],
+          includes: [],
+          is_featured: false,
+          status: 'published',
+          booking_mode: conPrecio ? 'paid' : 'quote',
+          booking_type: conPrecio ? 'online' : 'inquiry',
+          origen: 'panel',
+        })
+        .select('id')
+        .single();
+      if (!error) id = (data as { id: string }).id;
+      else if (error.code !== '23505') throw errorBase(error, 'No pudimos crear el taller. Intenta de nuevo.');
+    }
+    if (!id) throw new ErrorDatos('DATOS_INVALIDOS', 'Ya hay varios talleres con ese nombre ese día. Cambia el nombre.');
+
+    const { error } = await supabase.from('workshop_sessions').insert(
+      horarios.map((h) => ({
+        experience_type: 'taller',
+        workshop_id: id,
+        date: n.fecha,
+        start_time: h.inicio,
+        end_time: h.fin,
+        capacity: n.cupo,
+        price: n.precio,
+      })),
+    );
+    if (error) throw errorBase(error, 'El taller se creó, pero no sus horarios. Revísalo en el catálogo.');
+    const creado = (await repoAdminSupabase.catalogo()).find((t) => t.id === id);
+    if (!creado) throw new ErrorDatos('NO_ENCONTRADO', 'El taller se creó; recarga la página para verlo.');
+    return creado;
+  },
+
+  async editarTaller(tallerId: string, c: CambiosTaller) {
+    await exigirAdmin();
+    validarCambiosTaller(c);
+    const actual = (await repoAdminSupabase.catalogo()).find((t) => t.id === tallerId);
+    if (!actual) throw new ErrorDatos('NO_ENCONTRADO', 'Ese taller ya no existe.');
+    const cambiaPrecio = c.precio !== undefined && c.precio !== actual.precio;
+    if (cambiaPrecio && actual.flujo !== 'taller') {
+      throw new ErrorDatos('DATOS_INVALIDOS', 'El precio de NUMA Kids y de la membresía se define en su propia página, no por fecha.');
+    }
+
+    const cambios: Record<string, unknown> = { editado_en: new Date().toISOString() };
+    if (c.titulo !== undefined) cambios.title = c.titulo.trim();
+    if (c.resumen !== undefined) {
+      cambios.short_description = c.resumen.trim();
+      const { data } = await supabase.from('workshops').select('description').eq('id', tallerId).single();
+      cambios.description = [c.resumen.trim(), ...(((data as { description: string[] | null } | null)?.description ?? []).slice(1))];
+    }
+    if (c.categoria !== undefined) cambios.category = CATEGORIA_DB[c.categoria];
+    if (c.foto !== undefined) {
+      cambios.image_key = c.foto;
+      cambios.gallery = [c.foto];
+    }
+    if (cambiaPrecio) {
+      const precio = c.precio ?? null;
+      cambios.price = precio ?? 0;
+      cambios.booking_mode = precio !== null ? 'paid' : 'quote';
+      cambios.price_label = precio !== null ? null : 'Info DM';
+      cambios.booking_type = precio !== null ? 'online' : 'inquiry';
+    }
+    const { error } = await supabase.from('workshops').update(cambios).eq('id', tallerId);
+    if (error) throw errorBase(error, 'No pudimos guardar los cambios. Intenta de nuevo.');
+    if (cambiaPrecio) {
+      const { error: e2 } = await supabase.from('workshop_sessions').update({ price: c.precio ?? null }).eq('workshop_id', tallerId);
+      if (e2) throw errorBase(e2, 'El taller se guardó, pero no el precio de sus horarios.');
+    }
+    const nuevo = (await repoAdminSupabase.catalogo()).find((t) => t.id === tallerId);
+    if (!nuevo) throw new ErrorDatos('NO_ENCONTRADO', 'Ese taller ya no existe.');
+    return nuevo;
+  },
+
+  async activarTaller(tallerId: string, activo: boolean) {
+    await exigirAdmin();
+    const { error } = await supabase
+      .from('workshops')
+      .update({ status: activo ? 'published' : 'draft', editado_en: new Date().toISOString() })
+      .eq('id', tallerId);
+    if (error) throw errorBase(error, 'No pudimos cambiar el estado del taller. Intenta de nuevo.');
   },
 };
