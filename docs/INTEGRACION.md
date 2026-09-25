@@ -178,8 +178,27 @@ Panel (`RepositorioAdmin`):
   propósito hasta que Casa Numa dé el correo: no se inventa.
 - **Correo a la clienta:** confirmación con folio y enlace a Mi cuenta.
 - **WhatsApp al equipo:** `supabase/functions/_shared/whatsapp.ts`, API de
-  WhatsApp Business Cloud con plantilla aprobada por Meta. No es un enlace
-  `wa.me`. Sin configurar, se omite sin error.
+  WhatsApp Business Cloud con plantilla aprobada por Meta (`aviso_reserva`,
+  categoría Utilidad, es_MX, 6 variables). No es un enlace `wa.me`. Puede
+  avisar a varios números (`WHATSAPP_ADMIN_TO` separados por coma). Sin
+  configurar, se omite sin error y el panel lo muestra como «pendiente de
+  integrar».
+
+## Google Calendar
+
+Un evento por **sesión** (cada horario de taller, NUMA Kids y clase de
+membresía) en el calendario del equipo, con cupo, reservas confirmadas,
+teléfono y, en NUMA Kids, los niños. Migración `calendario_por_sesion`:
+
+- Se encola solo al crear o cambiar una sesión (cupo, horario, estado) y
+  cuando una reserva entra o sale de confirmada/completada.
+- `encolar_calendario()` (o `admin-actions` → `sync_calendar` sin id)
+  sincroniza toda la agenda próxima: hay que correrlo una vez al conectar.
+- Acceso con **cuenta de servicio** de Google (no caduca): la llave JSON va
+  en `dev/google-calendar.json` y `node dev/desplegar.mjs` la sube como
+  `GOOGLE_SERVICE_ACCOUNT`; el calendario se comparte con el correo de esa
+  cuenta («Hacer cambios en los eventos») y su id va en `GOOGLE_CALENDAR_ID`.
+- Sin configurar, cada trabajo se cierra con la nota «OMITIDO».
 
 ## Agenda sin precio o sin cupo
 

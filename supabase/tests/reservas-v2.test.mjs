@@ -411,6 +411,48 @@ seccion('Cancelaciones y novedades');
 }
 
 // ---------------------------------------------------------------------------
+seccion('Google Calendar: un evento por sesión');
+{
+  const pendientes = async (id) => (await db.query(
+    `select count(*)::int n from integration_jobs where type = 'calendar_sync' and entity_type = 'session'
+        and entity_id = $1 and status = 'pending'`, [id])).rows[0].n;
+  const hecho = (id) => db.query(`update integration_jobs set status = 'done' where entity_id = $1`, [id]);
+
+  const s8 = await sesion(`insert into workshop_sessions (experience_type, workshop_id, date, start_time, end_time, capacity, price)
+                            values ('taller', '${taller}', current_date + 46, '16:00', '18:00', 16, 800)`);
+  ok('una sesión nueva se encola para el calendario', await pendientes(s8) === 1);
+  await hecho(s8);
+  await db.query(`update workshop_sessions set capacity = 12 where id = $1`, [s8]);
+  ok('cambiar el cupo la vuelve a encolar', await pendientes(s8) === 1);
+  await hecho(s8);
+  await db.query(`update workshop_sessions set google_calendar_event_id = 'ev_1' where id = $1`, [s8]);
+  ok('guardar el id del evento no la encola (sin bucle)', await pendientes(s8) === 0);
+
+  const r = await reservar(db, { tipo: 'taller', sesiones: [s8], personas: 2, nombre: 'Lucía Calendario', correo: 'cal@ejemplo.com' });
+  ok('un apartado todavía no toca el calendario', await pendientes(s8) === 0);
+  await pagar(db, r.rows[0].r.reservation_id, 88);
+  ok('al confirmarse el pago se encola su sesión', await pendientes(s8) === 1);
+  const r2 = await reservar(db, { tipo: 'taller', sesiones: [s8], personas: 1, nombre: 'Otra Persona', correo: 'cal2@ejemplo.com' });
+  await pagar(db, r2.rows[0].r.reservation_id, 89);
+  ok('…una sola vez aunque se confirme otra antes de sincronizar', await pendientes(s8) === 1);
+
+  const { rows: [{ e }] } = await db.query(`select resumen_sesion($1) e`, [s8]);
+  ok('resumen_sesion: confirmados, cupo y quién va', e.confirmed === 3 && e.capacity === 12
+     && e.reservations[0].name === 'Lucía Calendario' && /^NUMA-\d{5}$/.test(e.reservations[0].folio), JSON.stringify(e));
+
+  const { rows: [{ k }] } = await db.query(`select resumen_sesion($1) k`, [S.kids]);
+  ok('resumen_sesion de NUMA Kids trae a los niños', k.reservations.some((x) => x.children.length > 0), JSON.stringify(k.reservations));
+
+  await db.query(`insert into integration_jobs (type, entity_type, entity_id, dedupe_key)
+                  values ('calendar_sync', 'workshop', '${taller}', 'calendar:${taller}')`);
+  ok('los encolados por taller de v1 se descartan', (await db.query(
+    `select count(*)::int n from integration_jobs where entity_type = 'workshop' and type = 'calendar_sync'`)).rows[0].n === 0);
+
+  const { rows: [{ n }] } = await db.query(`select encolar_calendario() n`);
+  ok('encolar_calendario() encola la agenda próxima', n > 0, String(n));
+}
+
+// ---------------------------------------------------------------------------
 seccion('Seguridad');
 {
   const { rows: [{ ana }] } = await db.query(`insert into auth.users (email) values ('ana@cuenta.com') returning id as ana`);

@@ -17,7 +17,7 @@ import {
   confirmacion, avisoAdminReserva, cancelacion, avisoLead, enviar,
   type DatosReserva, type DatosLead,
 } from '../_shared/emails.ts';
-import { sincronizarTaller, type ResumenTaller } from '../_shared/google-calendar.ts';
+import { calendarioConfigurado, sincronizarSesion, type ResumenSesion } from '../_shared/google-calendar.ts';
 import { avisarReservaPorWhatsApp } from '../_shared/whatsapp.ts';
 
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
@@ -84,21 +84,25 @@ async function ejecutar(job: Job): Promise<string | void> {
   throw new Error(`Tipo de trabajo desconocido: ${job.type}`);
 }
 
-async function sincronizarCalendario(job: Job): Promise<void> {
-  const { data, error } = await db.rpc('resumen_taller', {
-    p_workshop_id: job.entity_id,
-  });
+async function sincronizarCalendario(job: Job): Promise<string | void> {
+  // Sin Google configurado no es un error: se anota y el panel no se llena
+  // de alertas.
+  if (!calendarioConfigurado()) return 'OMITIDO: Google Calendar sin configurar';
+  // Los trabajos por taller de v1 ya no se crean (ver calendario_por_sesion).
+  if (job.entity_type !== 'session') return 'OMITIDO: sincronización por taller de v1; ahora es por sesión';
+
+  const { data, error } = await db.rpc('resumen_sesion', { p_session_id: job.entity_id });
   if (error) throw error;
-  if (!data) throw new Error(`Taller ${job.entity_id} no encontrado`);
+  if (!data) throw new Error(`Sesión ${job.entity_id} no encontrada`);
 
-  const eventId = await sincronizarTaller(data as ResumenTaller);
+  const s = data as ResumenSesion;
+  const eventId = await sincronizarSesion(s);
 
-  // Se guarda siempre: si el evento se había borrado en Google y se recreó,
-  // el id nuevo tiene que quedar registrado.
-  await db.rpc('guardar_evento_calendar', {
-    p_workshop_id: job.entity_id,
-    p_event_id: eventId,
-  });
+  // Si el evento se había borrado en Google y se recreó, el id nuevo tiene
+  // que quedar registrado.
+  if (eventId && eventId !== s.google_calendar_event_id) {
+    await db.rpc('guardar_evento_sesion', { p_session_id: job.entity_id, p_event_id: eventId });
+  }
 }
 
 async function mandarCorreo(job: Job): Promise<void> {
@@ -152,11 +156,12 @@ async function mandarWhatsApp(job: Job): Promise<string | void> {
   const { data, error } = await db.rpc('datos_reserva', { p_reservation_id: job.entity_id });
   if (error) throw error;
   if (!data) throw new Error(`Reserva ${job.entity_id} no encontrada`);
-  const enviado = await avisarReservaPorWhatsApp(data as DatosReserva);
-  if (!enviado) {
+  const resultado = await avisarReservaPorWhatsApp(data as DatosReserva);
+  if (!resultado) {
     console.info(`[process-jobs/whatsapp] omitido: WhatsApp Business sin configurar (${job.entity_id})`);
     return OMITIDO_WHATSAPP;
   }
+  if (resultado.fallidos.length) return `PARCIAL: no llegó a ${resultado.fallidos.join(', ')}`;
 }
 
 function json(body: unknown): Response {

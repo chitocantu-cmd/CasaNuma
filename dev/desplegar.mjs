@@ -79,6 +79,19 @@ if (existsSync(SECRETOS)) {
   const ejemplo = existsSync(`${SECRETOS}.example`) ? leer(`${SECRETOS}.example`) : {};
   const subir = Object.entries(reales).filter(([n, v]) =>
     v && !/^(\.\.\.|sk_test_\.\.\.|re_\.\.\.|cambia|TU_|xxx)/i.test(v) && v !== ejemplo[n]);
+  // La llave de Google Calendar (cuenta de servicio) viene en su propio
+  // archivo JSON, tal como la descarga Google; se sube en una sola línea.
+  const llaveGoogle = join(AQUI, 'google-calendar.json');
+  if (existsSync(llaveGoogle)) {
+    try {
+      const sa = JSON.parse(readFileSync(llaveGoogle, 'utf8'));
+      if (!sa.client_email || !sa.private_key) throw new Error('no es la llave de una cuenta de servicio');
+      subir.push(['GOOGLE_SERVICE_ACCOUNT', `'${JSON.stringify({ client_email: sa.client_email, private_key: sa.private_key })}'`]);
+      console.log(`  Google Calendar: cuenta de servicio ${sa.client_email}`);
+    } catch (e) {
+      console.error(`  dev/google-calendar.json no sirve: ${e.message}`);
+    }
+  }
   definidos = new Set(subir.map(([n]) => n));
   const omitidos = Object.keys(reales).filter((n) => !definidos.has(n));
   console.log(`  Secretos con valor real: ${definidos.size}`);

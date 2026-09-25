@@ -10,7 +10,7 @@
 //   · create_manual_reservation — reserva que registra el equipo (y su pago)
 //   · mark_refunded             — reembolso hecho fuera (Stripe, transferencia)
 //   · set_capacity              — cupo de una sesión (nunca menor a lo reservado)
-//   · sync_calendar             — fuerza la sincronización de un taller
+//   · sync_calendar             — sincroniza una sesión, o toda la agenda próxima
 //   · retry_job                 — reintenta un trabajo que quedó en 'failed'
 //
 // Todas verifican en el SERVIDOR que quien llama sea admin. Ocultar un botón
@@ -193,20 +193,14 @@ Deno.serve(async (req: Request) => {
       // se queda colgado, y el reintento ya está resuelto por el worker.
       // ---------------------------------------------------------------------
       case 'sync_calendar': {
-        const id = String(body.workshop_id ?? '');
-        if (!id) return json({ error: 'INVALID_INPUT' }, 400, origin);
-
-        const { error } = await db.from('integration_jobs').insert({
-          type: 'calendar_sync',
-          entity_type: 'workshop',
-          entity_id: id,
-          dedupe_key: `calendar:${id}`,
+        // Una sesión (session_id) o, sin id, toda la agenda próxima. Se
+        // encola en vez de llamar a Google aquí: si Google tarda, el panel no
+        // se queda colgado, y los reintentos los resuelve el worker.
+        const { data, error } = await db.rpc('encolar_calendario', {
+          p_session_id: body.session_id ? String(body.session_id) : null,
         });
-        // Un choque contra el índice único significa que ya hay una
-        // sincronización pendiente para ese taller: no es un error.
-        if (error && !error.message.includes('duplicate')) throw error;
-
-        return json({ ok: true, queued: true }, 200, origin);
+        if (error) throw error;
+        return json({ ok: true, queued: data }, 200, origin);
       }
 
       // ---------------------------------------------------------------------

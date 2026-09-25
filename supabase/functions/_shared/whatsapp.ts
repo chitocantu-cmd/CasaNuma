@@ -14,11 +14,12 @@
 // Variables de entorno (Supabase → Edge Functions → Secrets):
 //   WHATSAPP_TOKEN            token permanente del usuario del sistema
 //   WHATSAPP_PHONE_NUMBER_ID  id del número emisor (no el número)
-//   WHATSAPP_ADMIN_TO         número del equipo en formato 52XXXXXXXXXX
-//   WHATSAPP_TEMPLATE         nombre de la plantilla aprobada
+//   WHATSAPP_ADMIN_TO         número(s) del equipo, 52 + 10 dígitos, separados
+//                             por coma: 528111111111,528122222222
+//   WHATSAPP_TEMPLATE         nombre de la plantilla aprobada (aviso_reserva)
 //   WHATSAPP_TEMPLATE_LANG    opcional, por omisión es_MX
 //
-// Mientras falte cualquiera de las cuatro primeras, el aviso se OMITE (el
+// Mientras falte cualquiera de las tres primeras, el aviso se OMITE (el
 // trabajo se marca hecho con nota) en vez de fallar cinco veces y ensuciar
 // las alertas del panel. El correo al equipo sigue saliendo.
 // ---------------------------------------------------------------------------
@@ -30,20 +31,27 @@ const API = 'https://graph.facebook.com/v21.0';
 function config() {
   const token = Deno.env.get('WHATSAPP_TOKEN') ?? '';
   const numeroId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID') ?? '';
-  const para = (Deno.env.get('WHATSAPP_ADMIN_TO') ?? '').replace(/\D/g, '');
-  const plantilla = Deno.env.get('WHATSAPP_TEMPLATE') ?? '';
+  const para = (Deno.env.get('WHATSAPP_ADMIN_TO') ?? '')
+    .split(',').map((n) => n.replace(/\D/g, '')).filter((n) => n.length >= 12);
+  const plantilla = Deno.env.get('WHATSAPP_TEMPLATE') || 'aviso_reserva';
   const idioma = Deno.env.get('WHATSAPP_TEMPLATE_LANG') || 'es_MX';
-  return token && numeroId && para && plantilla ? { token, numeroId, para, plantilla, idioma } : null;
+  return token && numeroId && para.length && plantilla ? { token, numeroId, para, plantilla, idioma } : null;
 }
 
 export function whatsappConfigurado(): boolean {
   return config() !== null;
 }
 
-/** Devuelve false si no está configurado (se omite sin error). */
-export async function avisarReservaPorWhatsApp(r: DatosReserva): Promise<boolean> {
+/**
+ * Manda el aviso a cada número del equipo. Devuelve null si no está
+ * configurado (se omite sin error); si falla con todos, lanza para que se
+ * reintente.
+ */
+export async function avisarReservaPorWhatsApp(
+  r: DatosReserva,
+): Promise<{ enviados: string[]; fallidos: string[] } | null> {
   const c = config();
-  if (!c) return false;
+  if (!c) return null;
 
   const primera = r.sessions?.[0] ?? { date: r.workshop.date, start_time: r.workshop.start_time };
   const variables = [
@@ -55,23 +63,33 @@ export async function avisarReservaPorWhatsApp(r: DatosReserva): Promise<boolean
     r.folio ?? r.reservation_code,
   ];
 
-  const res = await fetch(`${API}/${c.numeroId}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to: c.para,
-      type: 'template',
-      template: {
-        name: c.plantilla,
-        language: { code: c.idioma },
-        components: [{ type: 'body', parameters: variables.map((text) => ({ type: 'text', text })) }],
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`WhatsApp respondió ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const enviados: string[] = [];
+  const fallidos: string[] = [];
+  let ultimoError = '';
+  for (const para of c.para) {
+    const res = await fetch(`${API}/${c.numeroId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${c.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: para,
+        type: 'template',
+        template: {
+          name: c.plantilla,
+          language: { code: c.idioma },
+          components: [{ type: 'body', parameters: variables.map((text) => ({ type: 'text', text })) }],
+        },
+      }),
+    });
+    if (res.ok) enviados.push(para);
+    else {
+      fallidos.push(para);
+      ultimoError = `WhatsApp respondió ${res.status}: ${(await res.text()).slice(0, 300)}`;
+    }
   }
-  return true;
+
+  // Con nadie avisado se reintenta; si llegó a alguien, no se repite (se
+  // mandaría dos veces a quien sí lo recibió).
+  if (!enviados.length) throw new Error(ultimoError);
+  return { enviados, fallidos };
 }

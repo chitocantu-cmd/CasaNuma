@@ -9,6 +9,7 @@ tsconfig.tsbuildinfo
 # secretos reales de Edge Functions
 dev/secretos.env
 dev/acceso-admin.txt
+dev/google-calendar.json
 supabase/.temp/
 *-tmp.mjs
 
