@@ -111,7 +111,7 @@ export default function Kids() {
             Las piezas requieren secado, horneado y acabado, por lo que no se entregan el mismo día del taller.
           </p>
         </Revelar>
-        <Pendiente className="mt-4 max-w-2xl">Plazo estimado de entrega de las piezas y cupo por sesión.</Pendiente>
+        <Pendiente className="mt-4 max-w-2xl">Plazo estimado de entrega de las piezas.</Pendiente>
       </section>
 
       {/* Próximos jueves ----------------------------------------------------------- */}

@@ -6,8 +6,8 @@ import type { Registro, Usuario } from '../../datos/tipos';
 // ---------------------------------------------------------------------------
 // Sesión de la clienta
 // ---------------------------------------------------------------------------
-// Distinta de la sesión del panel (features/admin/auth.tsx): aquí la cuenta
-// sirve para reservar y ver "Mi cuenta"; allá, para administrar el estudio.
+// La cuenta sirve para reservar y ver "Mi cuenta". El panel (/admin) exige
+// además el rol de equipo (repoAdmin.adminActual).
 // ---------------------------------------------------------------------------
 
 interface ContextoSesion {

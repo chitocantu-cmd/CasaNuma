@@ -24,7 +24,7 @@ import { cuandoTaller, precioTaller, publicoTaller, rutaReserva } from '../lib/t
 import { ldEvento, useSeo } from '../lib/seo';
 
 const PASOS = ['Fecha y horario', 'Personas', 'Tus datos', 'Pago'];
-/** Tope por reserva mientras no haya cupo confirmado. PENDIENTE: confirmar con Casa Numa. */
+/** Tope por reserva en línea; grupos más grandes se organizan por mensaje. */
 const MAX_PERSONAS = 6;
 
 /** Las demás fotos del taller, en miniatura. */
@@ -340,7 +340,7 @@ function Checkout({ taller }: { taller: Taller }) {
               <p className="mt-2 text-nota text-cafe/60">
                 {sesion.disponibles !== null && sesion.disponibles <= MAX_PERSONAS
                   ? `Solo ${sesion.disponibles === 1 ? 'queda 1 lugar disponible' : `quedan ${sesion.disponibles} lugares disponibles`}.`
-                  : `Cupo limitado. Hasta ${MAX_PERSONAS} personas por reserva; si son más, escríbenos.`}
+                  : `${sesion.disponibles === null ? 'Cupo limitado. ' : ''}Hasta ${MAX_PERSONAS} personas por reserva; si son más, escríbenos.`}
               </p>
               <button type="button" onClick={() => setPaso(0)} className="subrayado-fijo mt-10 pb-0.5 text-nota">
                 Cambiar horario

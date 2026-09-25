@@ -57,21 +57,20 @@ npm run dev                    # http://localhost:5173
 src/
   config/site.ts           datos pendientes de Casa Numa (WhatsApp, dirección…)
   contenido/               oferta confirmada, fotos, portafolio, navegación
-  datos/                   contrato de datos + implementación demo
+  datos/                   contrato de datos + demo y Supabase (VITE_FUENTE_DATOS)
   features/cuenta/         sesión de la clienta
   componentes/             marca/, base/, reservas/, secciones/ y
                            Header, Footer, Hero, tarjetas…
-  paginas/                 público + paginas/admin/ (panel, sin cambios)
-  lib/supabase/client.ts   cliente con la anon key (solo panel y pagos)
+  paginas/                 público + paginas/panel/ (panel /admin)
+  lib/supabase/client.ts   cliente con la anon key (modo Supabase y pagos)
   lib/formato.ts           dinero, cupo, validaciones
   lib/calendario.ts        fechas sin pasar por UTC
   lib/ics.ts               calendario del cliente (.ics)
   lib/seo.ts               title, OpenGraph, canonical, JSON-LD
-  services/                api, workshops, reservations, forms, cloudinary
+  services/                api, workshops, reservations (estado del pago)
   features/
-    workshops/hooks.ts     useTitulo (panel)
+    workshops/hooks.ts     useTitulo
     reservations/          pantalla de estado de reserva (Stripe)
-    admin/auth.tsx         sesión de admin y guardián de rutas
 supabase/
   migrations/              esquema, funciones, RLS, cron
   functions/               7 Edge Functions

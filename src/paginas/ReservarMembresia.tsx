@@ -262,7 +262,6 @@ export default function ReservarMembresia() {
                   </p>
                 </div>
               )}
-              <Pendiente className="mt-8">Cupo por sesión de membresía (aquí 8 de ejemplo).</Pendiente>
             </section>
           )}
 

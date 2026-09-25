@@ -59,11 +59,14 @@ export interface RegistroTaller {
   booking_type: 'online' | 'membership' | 'inquiry';
 }
 
+/** Confirmado por Casa Numa (25 sep 2026): 16 lugares por sesión. */
+const CUPO = 16;
+
 const sesion = (start_time: string, end_time: string | null = null): SesionRegistro => ({
   start_time,
   end_time,
-  capacity: null, // cupo pendiente de Casa Numa
-  available_spots: null,
+  capacity: CUPO,
+  available_spots: CUPO,
   is_sold_out: false,
 });
 

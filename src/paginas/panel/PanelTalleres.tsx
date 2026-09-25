@@ -56,8 +56,8 @@ export default function PanelTalleres() {
     <div className="space-y-6">
       <EncabezadoPanel eyebrow="Agenda y cupos" titulo="Talleres" />
       <p className="max-w-3xl text-[0.82rem] text-cafe/75">
-        Captura el cupo de cada sesión cuando Casa Numa lo confirme: a partir de ahí el sitio cuenta lugares,
-        muestra «Solo quedan N» y cambia el botón a «Agotado» al llenarse. Vacío = «Cupo limitado», sin número.
+        Cupo de cada sesión (16 por omisión). El sitio cuenta lugares, muestra «Solo quedan N» y cambia el botón a
+        «Agotado» al llenarse. Vacío = «Cupo limitado», sin número.
         {fuenteDatos === 'demo' && ' En la demo, el cupo que captures aquí solo vive en este navegador.'}
       </p>
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Tipo de sesión">

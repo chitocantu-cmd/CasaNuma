@@ -183,6 +183,13 @@ Panel (`RepositorioAdmin`):
 
 ## Agenda sin precio o sin cupo
 
+**Cupo confirmado por Casa Numa (25 sep 2026): 16 lugares por sesión**, en
+talleres, NUMA Kids y clases de membresía. Está en `src/datos/agenda.ts` (las
+sesiones nuevas se cargan con él) y se aplicó a las 29 sesiones de la base
+real con `admin_ajustar_cupo` (queda en la bitácora). Cada sesión se puede
+cambiar en `/admin/talleres`. En línea se aparta hasta 6 personas por
+reserva; grupos más grandes, por mensaje.
+
 - `price: null` → «Info DM» y botón de «Solicitar información».
   `crear_reserva_sesiones` rechaza esas sesiones aunque alguien llame a la
   función a mano.

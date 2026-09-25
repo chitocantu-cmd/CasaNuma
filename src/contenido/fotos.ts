@@ -71,42 +71,57 @@ export interface EntradaFoto {
   posicion?: string;
 }
 
+/** Anchos generados para cada foto de producción (ver `anchos`). */
+const VERTICAL = [640, 1280] as const;
+const HORIZONTAL = [640, 1280, 1920] as const;
+
+// Fotos de producción de Casa Numa: WeTransfer «Fotos WEB - NUMA» (25 sep
+// 2026) en /public/fotos/{estudio,eventos,kids,membresia,nosotras,piezas}.
+// Los talleres de temporada (Halloween, Catrina, calabazas, lámparas) siguen
+// esperando su foto: mientras, en producción se ve el marcador.
 export const FOTOS = {
   // --- Inicio --------------------------------------------------------------
   'inicio-hero': {
-    alt: 'Manos amasando barro sobre la mesa de trabajo',
+    alt: 'Manos dando forma a una placa de barro con una herramienta de madera',
     encuadre: 'Manos amasando barro sobre mesa manchada, luz natural lateral. Vertical.',
-    referencia: 'manos-amasando', tono: 'terracota', silueta: 'jarron', posicion: '50% 60%',
+    src: '/fotos/estudio/manos-placa', anchos: VERTICAL,
+    tono: 'terracota', silueta: 'jarron', posicion: '55% 50%',
   },
   'inicio-hero-mesa': {
-    alt: 'Piezas de cerámica secándose sobre la mesa del estudio',
+    alt: 'Platos de cerámica apilados con lunares rojos y ondas amarillas en relieve',
     encuadre: 'Piezas recién hechas secándose en la mesa del estudio. Horizontal.',
-    referencia: 'mesa-piezas', tono: 'crema', silueta: 'olla',
+    src: '/fotos/piezas/platos-relieve', anchos: HORIZONTAL,
+    tono: 'crema', silueta: 'olla',
   },
   'exp-talleres': {
-    alt: 'Pinturas y esmaltes listos para decorar piezas',
+    alt: 'Tres alumnas modelando barro en la mesa del estudio',
     encuadre: 'Mesa de un taller de fin de semana: esmaltes, pinceles y piezas a medio pintar. Vertical.',
-    referencia: 'esmaltes', tono: 'amarillo', silueta: 'taza',
+    src: '/fotos/estudio/alumnas-trabajando', anchos: VERTICAL,
+    tono: 'amarillo', silueta: 'taza',
   },
   'exp-membresia': {
-    alt: 'Mano dando forma al interior de una pieza de barro',
+    alt: 'Tarjeta «Cerámica & Arte» en la mano, con una clase en el estudio al fondo',
     encuadre: 'Alumna de membresía trabajando su pieza, plano cerrado de manos. Vertical.',
-    referencia: 'mano-interior', tono: 'terracota', silueta: 'guaje', posicion: '60% 50%',
+    src: '/fotos/membresia/tarjeta-membresia', anchos: HORIZONTAL,
+    tono: 'terracota', silueta: 'guaje', posicion: '72% 50%',
   },
   'exp-kids': {
-    alt: 'Niñas y niños modelando barro en NUMA Kids',
+    alt: 'Niña modelando una flor de barro',
     encuadre: 'Niños de 10 a 14 años modelando barro en la mesa, manos y caras concentradas (con permiso de sus papás). Vertical.',
-    referencia: 'pin-tazas-ninos', tono: 'amarillo', silueta: 'tarro',
+    src: '/fotos/kids/nina-modelando', anchos: VERTICAL,
+    tono: 'amarillo', silueta: 'tarro',
   },
   'eventos-grupo': {
-    alt: 'Grupo celebrando alrededor de la mesa de trabajo',
+    alt: 'Grupo trabajando barro alrededor de la mesa larga del estudio',
     encuadre: 'Grupo pequeño celebrando alrededor de la mesa larga, risas y barro. Horizontal amplia.',
+    src: '/fotos/eventos/evento-mesa', anchos: HORIZONTAL,
     tono: 'indigo', silueta: 'doble',
   },
   'hola-estudio': {
-    alt: 'El estudio de Casa Numa con luz de mañana',
+    alt: 'Alumna sonriendo en la mesa del estudio, con pinceles en primer plano',
     encuadre: 'El estudio completo con luz de mañana: mesa, repisas con piezas, horno al fondo. Vertical.',
-    tono: 'crema', silueta: 'anfora',
+    src: '/fotos/estudio/alumna-pinceles', anchos: HORIZONTAL,
+    tono: 'crema', silueta: 'anfora', posicion: '35% 50%',
   },
   'hola-fundadoras': {
     alt: 'Mónica y Gloria en la mesa de trabajo',
@@ -121,14 +136,16 @@ export const FOTOS = {
 
   // --- Membresía -----------------------------------------------------------
   'membresia-hero': {
-    alt: 'Manos trabajando una pieza grande de barro',
+    alt: 'Tarjeta «Cerámica & Arte» en la mano, con una clase en el estudio al fondo',
     encuadre: 'Alumna de membresía modelando una pieza en el estudio, plano medio. Horizontal amplia.',
-    referencia: 'manos-pieza', tono: 'terracota', silueta: 'guaje', posicion: '50% 40%',
+    src: '/fotos/membresia/tarjeta-membresia', anchos: HORIZONTAL,
+    tono: 'terracota', silueta: 'guaje', posicion: '50% 55%',
   },
   'membresia-proyecto-clase': {
-    alt: 'Pieza pequeña terminada en una sola clase',
+    alt: 'Alumna extendiendo una placa de barro sobre la mesa',
     encuadre: 'Varias piezas pequeñas distintas, cada una hecha en una clase. Cuadrada.',
-    referencia: 'cuenco-corazon', tono: 'crema', silueta: 'cuenco',
+    src: '/fotos/estudio/placa-barro', anchos: HORIZONTAL,
+    tono: 'crema', silueta: 'cuenco',
   },
   'membresia-gran-formato': {
     alt: 'Detalle de textura en una pieza de gran formato',
@@ -138,39 +155,46 @@ export const FOTOS = {
 
   // --- Talleres (agenda) ------------------------------------------------------
   'taller-tardes-ninos': {
-    alt: 'Tazas decoradas con dibujos hechos por niños',
+    alt: 'Niño pintando una taza en la mesa del taller',
     encuadre: 'Niñas y niños de 10 a 14 años modelando barro en la mesa (con permiso de sus papás). Horizontal 4:3.',
-    referencia: 'pin-tazas-ninos', tono: 'amarillo', silueta: 'tarro',
+    src: '/fotos/kids/nino-pintando', anchos: HORIZONTAL,
+    tono: 'amarillo', silueta: 'tarro',
   },
   'taller-tardes-adultos': {
-    alt: 'Botes de cerámica pintados a rayas y a lunares',
+    alt: 'Tres alumnas conversando mientras trabajan en la mesa del estudio',
     encuadre: 'Mesa de una tarde de cerámica: piezas de bizcochito, pinceles y pinturas. Horizontal 4:3.',
-    referencia: 'pin-botes', tono: 'terracota', silueta: 'cuenco',
+    src: '/fotos/estudio/mesa-conversacion', anchos: HORIZONTAL,
+    tono: 'terracota', silueta: 'cuenco',
   },
   'taller-tardes-adultos-2': {
-    alt: 'Juego de sake de cerámica rosa sobre charola de madera',
+    alt: 'Alumna sonriendo en la mesa del estudio, con pinceles en primer plano',
     encuadre: 'Pieza terminada en una Tarde de Cerámica. Horizontal 4:3.',
-    referencia: 'pin-juego-sake', tono: 'terracota', silueta: 'jarron',
+    src: '/fotos/estudio/alumna-pinceles', anchos: HORIZONTAL,
+    tono: 'terracota', silueta: 'jarron', posicion: '35% 50%',
   },
   'taller-tardes-adultos-3': {
-    alt: 'Organizador de cerámica blanca moteada con asas',
+    alt: 'Alumna extendiendo una placa de barro sobre la mesa',
     encuadre: 'Pieza terminada en una Tarde de Cerámica. Horizontal 4:3.',
-    referencia: 'pin-organizador', tono: 'crema', silueta: 'cuenco',
+    src: '/fotos/estudio/placa-barro', anchos: HORIZONTAL,
+    tono: 'crema', silueta: 'cuenco',
   },
   'taller-clases': {
-    alt: 'Jarrones de cerámica de distintas formas y colores',
+    alt: 'Tarjeta «Cerámica & Arte» en la mano, con una clase en el estudio al fondo',
     encuadre: 'Alumna trabajando su proyecto con acompañamiento, plano de manos. Horizontal 4:3.',
-    referencia: 'pin-jarrones', tono: 'terracota', silueta: 'guaje',
+    src: '/fotos/membresia/tarjeta-membresia', anchos: HORIZONTAL,
+    tono: 'terracota', silueta: 'guaje',
   },
   'taller-clases-2': {
-    alt: 'Dos esculturas de cerámica de figuras de pie',
+    alt: 'Manos dando forma a una placa de barro con una herramienta de madera',
     encuadre: 'Proyecto de una alumna de las Clases de Cerámica. Horizontal 4:3.',
-    referencia: 'pin-esculturas', tono: 'crema', silueta: 'botellon',
+    src: '/fotos/estudio/manos-placa', anchos: VERTICAL,
+    tono: 'crema', silueta: 'botellon', posicion: '50% 55%',
   },
   'taller-clases-3': {
-    alt: 'Bases de cerámica en tono arena',
+    alt: 'Alumna extendiendo una placa de barro sobre la mesa',
     encuadre: 'Proyecto de una alumna de las Clases de Cerámica. Horizontal 4:3.',
-    referencia: 'pin-bases', tono: 'crema', silueta: 'cuenco',
+    src: '/fotos/estudio/placa-barro', anchos: HORIZONTAL,
+    tono: 'crema', silueta: 'cuenco',
   },
   'taller-halloween': {
     alt: 'Tazas decoradas con motivos de Halloween: fantasmas, arañas y una calabaza',
@@ -198,9 +222,10 @@ export const FOTOS = {
     referencia: 'pin-calabazas-apiladas', tono: 'naranja', silueta: 'olla',
   },
   'taller-ceramica-libre': {
-    alt: 'Plato de cerámica verde a lunares con patas de colores',
+    alt: 'Tres alumnas modelando barro en la mesa del estudio',
     encuadre: 'Piezas distintas hechas en una sesión de Cerámica Libre, sobre la mesa del estudio. Horizontal 4:3.',
-    referencia: 'pin-plato-lunares', tono: 'verde', silueta: 'jarron',
+    src: '/fotos/estudio/alumnas-trabajando', anchos: VERTICAL,
+    tono: 'verde', silueta: 'jarron', posicion: '50% 25%',
   },
   'taller-catrina': {
     alt: 'Taza rosa decorada con una calavera de Día de Muertos',
@@ -248,44 +273,51 @@ export const FOTOS = {
 
   // --- NUMA Kids -----------------------------------------------------------
   'kids-hero': {
-    alt: 'Niña mostrando su pieza de barro',
+    alt: 'Niña mostrando la pieza de barro que modeló',
     encuadre: 'Niña o niño mostrando orgulloso su pieza, luz natural (con permiso). Horizontal amplia.',
+    src: '/fotos/kids/nina-pieza', anchos: HORIZONTAL,
     tono: 'amarillo', silueta: 'olla',
   },
   'kids-mesa': {
-    alt: 'Mesa de NUMA Kids con barro y herramientas',
+    alt: 'Niña modelando una flor de barro',
     encuadre: 'La mesa del taller infantil desde arriba: barro, herramientas, manos pequeñas. Vertical.',
-    tono: 'verde', silueta: 'taza',
+    src: '/fotos/kids/nina-modelando', anchos: VERTICAL,
+    tono: 'verde', silueta: 'taza', posicion: '50% 70%',
   },
 
   // --- Eventos -------------------------------------------------------------
   'eventos-hero': {
-    alt: 'Celebración privada en el estudio de Casa Numa',
+    alt: 'Cuatro amigas celebrando un cumpleaños en Casa Numa con sus piezas',
     encuadre: 'Mesa puesta para un evento privado: barro, flores, copas. Horizontal amplia.',
+    src: '/fotos/eventos/cumpleanos-grupo', anchos: HORIZONTAL,
     tono: 'indigo', silueta: 'doble',
   },
   'eventos-detalle': {
-    alt: 'Manos de varias personas trabajando juntas',
+    alt: 'Mesa de un festejo en el estudio: flores, banderines y piezas por pintar',
     encuadre: 'Varias manos trabajando barro al mismo tiempo sobre la mesa. Vertical.',
+    src: '/fotos/eventos/festejo-mesa', anchos: VERTICAL,
     tono: 'naranja', silueta: 'jarron',
   },
 
   // --- Store ---------------------------------------------------------------
   'store-hero': {
-    alt: 'Repisa con piezas NUMA disponibles',
+    alt: 'Piezas NUMA: rostros de barro, tazas, platos y una charola con jarritas',
     encuadre: 'Repisa del estudio con piezas terminadas a la venta, fondo limpio. Horizontal amplia.',
+    src: '/fotos/piezas/coleccion', anchos: [640, 977],
     tono: 'crema', silueta: 'botellon',
   },
 
   // --- Nosotras ------------------------------------------------------------
   'nosotras-hero': {
-    alt: 'Piezas terminadas en la mesa del estudio',
+    alt: 'Mónica en la mesa de trabajo del estudio',
     encuadre: 'El estudio de Casa Numa en un día normal de trabajo. Horizontal amplia.',
-    referencia: 'mesa-piezas', tono: 'crema', silueta: 'olla',
+    src: '/fotos/nosotras/monica-estudio', anchos: HORIZONTAL,
+    tono: 'crema', silueta: 'olla',
   },
   'retrato-monica': {
-    alt: 'Mónica, artista ceramista y diseñadora industrial',
+    alt: 'Mónica sonriendo con un ramo de alcatraces',
     encuadre: 'Retrato de Mónica trabajando una pieza de gran formato. Vertical.',
+    src: '/fotos/nosotras/monica-alcatraces', anchos: [640, 875],
     tono: 'terracota', silueta: 'anfora',
   },
   'retrato-gloria': {
@@ -294,16 +326,18 @@ export const FOTOS = {
     tono: 'amarillo', silueta: 'jarron',
   },
   'nosotras-comunidad': {
-    alt: 'Personas conversando alrededor de la mesa de trabajo',
+    alt: 'Tres alumnas conversando mientras trabajan en la mesa del estudio',
     encuadre: 'Conversación alrededor de la mesa durante una clase, plano abierto. Horizontal.',
-    tono: 'verde', silueta: 'doble',
+    src: '/fotos/estudio/mesa-conversacion', anchos: HORIZONTAL,
+    tono: 'verde', silueta: 'doble', posicion: '40% 50%',
   },
 
   // --- Cuenta --------------------------------------------------------------
   'cuenta-acceso': {
-    alt: 'Barro trabajado a mano',
+    alt: 'Manos dando forma a una placa de barro con una herramienta de madera',
     encuadre: 'Detalle de textura de barro trabajado. Vertical.',
-    referencia: 'manos-amasando', tono: 'terracota', silueta: 'cuenco',
+    src: '/fotos/estudio/manos-placa', anchos: VERTICAL,
+    tono: 'terracota', silueta: 'cuenco',
   },
 } satisfies Record<string, EntradaFoto>;
 

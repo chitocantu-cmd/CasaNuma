@@ -4,9 +4,10 @@ import type { EntradaFoto } from './fotos';
 // Portafolio NUMA · galería editorial de piezas propias
 // ---------------------------------------------------------------------------
 // Inspiración, no tienda: aquí no hay precios ni botón de compra (documento,
-// sección 2). Cada entrada espera su fotografía real; las categorías salen
-// del documento: tazas, vajillas, jarrones, piezas decorativas y obras de
-// Niki/Mónica.
+// sección 2). Piezas hechas en Casa Numa, de la sesión de producción
+// (WeTransfer «Fotos WEB - NUMA», 25 sep 2026). El orden sigue la retícula de
+// EditorialGallery: vertical grande, cuadrada, vertical, horizontal 16:10,
+// vertical 3:4, cuadrada, horizontal 4:3.
 // ===========================================================================
 
 export interface PiezaPortafolio {
@@ -17,77 +18,84 @@ export interface PiezaPortafolio {
   foto: EntradaFoto;
 }
 
+const VERTICAL = [640, 1280] as const;
+
 export const PORTAFOLIO: PiezaPortafolio[] = [
   {
-    id: 'jarrones',
-    titulo: 'Jarrones',
+    id: 'vasija-rostro',
+    titulo: 'Vasija con rostro',
+    categoria: 'Piezas escultóricas',
+    foto: {
+      alt: 'Vasija de barro terracota con un rostro y tocado en relieve',
+      encuadre: 'Pieza escultórica sobre mesa de madera. Vertical 4:5.',
+      src: '/fotos/piezas/vasija-rostro', anchos: VERTICAL,
+      tono: 'terracota', silueta: 'olla', posicion: '50% 55%',
+    },
+  },
+  {
+    id: 'taza-carita',
+    titulo: 'Taza con carita',
+    categoria: 'Tazas',
+    foto: {
+      alt: 'Taza blanca con una carita y flores en relieve',
+      encuadre: 'Taza sobre mesa de madera. Cuadrada.',
+      src: '/fotos/piezas/taza-carita', anchos: VERTICAL,
+      tono: 'crema', silueta: 'taza', posicion: '50% 55%',
+    },
+  },
+  {
+    id: 'rostro-ojos-turquesa',
+    titulo: 'Rostro de ojos turquesa',
     categoria: 'Piezas decorativas',
     foto: {
-      alt: 'Jarrones hechos a mano en Casa Numa',
-      encuadre: 'Jarrones NUMA de distintas alturas sobre repisa, luz lateral. Vertical 4:5.',
-      referencia: 'jarrones', tono: 'terracota', silueta: 'botellon',
+      alt: 'Pieza con rostro de ojos turquesa, cabello en relieve y hojas a los lados',
+      encuadre: 'Pieza decorativa sobre mesa de madera. Vertical 4:5.',
+      src: '/fotos/piezas/rostro-ojos-turquesa', anchos: VERTICAL,
+      tono: 'amarillo', silueta: 'tarro', posicion: '50% 55%',
     },
   },
   {
-    id: 'tazas',
-    titulo: 'Tazas',
-    categoria: 'Uso diario',
+    id: 'platos-relieve',
+    titulo: 'Platos con relieve',
+    categoria: 'Vajillas',
     foto: {
-      alt: 'Tazas hechas en Casa Numa',
-      encuadre: 'Tazas NUMA en fila sobre la mesa de trabajo, fondo liso. Cuadrada.',
-      tono: 'amarillo', silueta: 'taza',
-    },
-  },
-  {
-    id: 'cuenco',
-    titulo: 'Cuencos pintados',
-    categoria: 'Piezas decorativas',
-    foto: {
-      alt: 'Cuenco pintado a mano',
-      encuadre: 'Cuenco decorado a mano, plano cerrado con las manos que lo sostienen. Cuadrada.',
-      referencia: 'cuenco-corazon', tono: 'crema', silueta: 'cuenco',
-    },
-  },
-  {
-    id: 'vajilla',
-    titulo: 'Vajillas',
-    categoria: 'Mesa',
-    foto: {
-      alt: 'Vajilla NUMA puesta en la mesa',
-      encuadre: 'Vajilla NUMA completa puesta en una mesa, vista cenital. Horizontal 16:10.',
+      alt: 'Platos de cerámica apilados con lunares rojos y ondas amarillas en relieve',
+      encuadre: 'Vajilla sobre mesa de madera. Horizontal 16:10.',
+      src: '/fotos/piezas/platos-relieve', anchos: [640, 1280, 1920],
       tono: 'naranja', silueta: 'cuenco',
     },
   },
   {
-    id: 'gran-formato',
-    titulo: 'Gran formato',
-    categoria: 'Obra',
-    autora: 'Mónica',
+    id: 'charola-jarritas',
+    titulo: 'Charola con jarritas',
+    categoria: 'Mesa',
     foto: {
-      alt: 'Pieza de gran formato de Mónica',
-      encuadre: 'Pieza o mural de gran formato de Mónica, con escala humana a cuadro. Vertical 3:4.',
-      tono: 'indigo', silueta: 'anfora',
+      alt: 'Charola roja con asa y tres jarritas: amarilla, de lunares y de rayas',
+      encuadre: 'Juego de mesa sobre madera. Vertical 3:4.',
+      src: '/fotos/piezas/charola-jarritas', anchos: VERTICAL,
+      tono: 'naranja', silueta: 'jarron', posicion: '50% 60%',
     },
   },
   {
-    id: 'experimentales',
-    titulo: 'Piezas experimentales',
-    categoria: 'Estudio',
+    id: 'porta-anillos',
+    titulo: 'Porta anillos',
+    categoria: 'Objetos',
     foto: {
-      alt: 'Pruebas de esmalte y piezas experimentales',
-      encuadre: 'Pruebas de esmalte y piezas experimentales sobre la repisa del estudio. Cuadrada.',
-      tono: 'verde', silueta: 'guaje',
+      alt: 'Porta anillos de cerámica blanca moteada',
+      encuadre: 'Objeto pequeño sobre mesa de madera. Cuadrada.',
+      src: '/fotos/piezas/porta-anillos', anchos: VERTICAL,
+      tono: 'crema', silueta: 'cuenco', posicion: '50% 60%',
     },
   },
   {
-    id: 'raices',
-    titulo: 'Raíces',
-    categoria: 'Obra',
-    autora: 'Mónica',
+    id: 'taza-van-gogh',
+    titulo: 'Taza Van Gogh',
+    categoria: 'Tazas',
     foto: {
-      alt: 'Pieza de Mónica inspirada en el arte maya',
-      encuadre: 'Obra de Mónica inspirada en el arte maya y las piezas arqueológicas. Horizontal 4:3.',
-      tono: 'terracota', silueta: 'olla',
+      alt: 'Taza azul con espirales en relieve inspiradas en La noche estrellada',
+      encuadre: 'Taza sobre mesa de madera. Horizontal 4:3.',
+      src: '/fotos/piezas/taza-van-gogh-azul', anchos: VERTICAL,
+      tono: 'indigo', silueta: 'taza', posicion: '50% 55%',
     },
   },
 ];

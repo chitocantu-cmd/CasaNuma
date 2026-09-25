@@ -34,7 +34,7 @@ import { PRODUCTOS_SEMILLA, mesesMembresiaSemilla, sesionesKidsSemilla, sesiones
 // generadas que ya no existen). Lo guardado por versiones anteriores se descarta.
 const CLAVE = 'numa:demo:v4';
 const MINUTOS_APARTADO = 15;
-/** PENDIENTE: tope por reserva mientras no haya cupo confirmado. */
+/** Tope por reserva en línea; grupos más grandes se organizan por mensaje. */
 const MAX_PERSONAS_TALLER = 6;
 const MAX_NINOS = 4;
 

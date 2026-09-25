@@ -25,8 +25,8 @@ export default {
         amarillo: token('amarillo'),
         verde: token('verde'),
 
-        // Alias del panel administrativo (src/paginas/admin). Se escribió con
-        // la paleta anterior; así adopta la del brandbook sin reescribirlo.
+        // Alias de la paleta anterior que aún usan la pantalla de estado del
+        // pago (features/reservations) y componentes/ui.
         tinta: token('cafe'),
         papel: token('crema'),
         olivo: token('indigo'),

@@ -159,7 +159,6 @@ export default function ReservarKids() {
                   />
                 ))}
               </div>
-              <Pendiente className="mt-8">Cupo por sesión de NUMA Kids.</Pendiente>
             </section>
           )}
 

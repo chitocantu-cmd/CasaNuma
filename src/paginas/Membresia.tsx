@@ -197,7 +197,7 @@ export default function Membresia() {
           </div>
         </Revelar>
         <Pendiente className="mt-6">
-          Reglas de reprogramación, vigencia de las clases no usadas y cupo por sesión (el documento pide confirmarlas con
+          Reglas de reprogramación y vigencia de las clases no usadas (el documento pide confirmarlas con
           Casa Numa antes de implementarlas). ¿La sesión del sábado 11:00 comparte espacio con los talleres de fin de
           semana de la misma hora?
         </Pendiente>

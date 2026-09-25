@@ -54,11 +54,12 @@ export const siteConfig = {
 
   // --- Avisos al equipo -----------------------------------------------------
   /**
-   * PENDIENTE · correo donde el equipo recibe cada reserva confirmada.
-   * En el backend real es ADMIN_NOTIFICATION_EMAIL (secreto de Supabase); esta
-   * copia pública solo sirve para que la demo muestre a quién se enviaría.
+   * Confirmado por Casa Numa (25 sep 2026): correo donde el equipo recibe
+   * cada reserva confirmada. Quien lo envía es el backend
+   * (ADMIN_NOTIFICATION_EMAIL, secreto de Supabase); esta copia pública solo
+   * sirve para que el panel muestre a dónde van los avisos.
    */
-  correoAvisosEquipo: (env.VITE_ADMIN_NOTIFICATION_EMAIL as string | undefined) ?? '',
+  correoAvisosEquipo: (env.VITE_ADMIN_NOTIFICATION_EMAIL as string | undefined) || 'casanuma5@gmail.com',
 
   // --- Tipografía ----------------------------------------------------------
   /**

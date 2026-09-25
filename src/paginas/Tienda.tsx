@@ -59,7 +59,8 @@ export default function Tienda() {
           <span className="flex items-center gap-2.5"><Icono.pieza tam={18} className="text-terracota" /> Cada pieza es única</span>
         </Revelar>
         <Pendiente className="mt-6">
-          Fichas de ejemplo. Casa Numa subirá y administrará su catálogo (fotos, precios, medidas y disponibilidad) desde el panel.
+          Faltan precio, medidas y disponibilidad de cada pieza: mientras, se cotizan por WhatsApp. Las dos fichas por encargo son
+          de ejemplo.
         </Pendiente>
       </section>
 

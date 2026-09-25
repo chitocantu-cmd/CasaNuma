@@ -51,9 +51,9 @@ const publico = join(raiz, 'public');
 const dataUri = (ruta, tipo) => `data:${tipo};base64,${readFileSync(join(publico, ruta)).toString('base64')}`;
 
 // Foto.tsx usa el segundo tamaño de cada foto (1280, o 810 en jarrones):
-// referencias del brandbook y fotos reales de /fotos/talleres.
+// referencias del brandbook y todas las fotos reales de /fotos/*.
 const recursos = {};
-for (const carpeta of ['referencia', 'talleres']) {
+for (const carpeta of readdirSync(join(publico, 'fotos'))) {
   const porFoto = new Map();
   for (const archivo of readdirSync(join(publico, 'fotos', carpeta))) {
     const [, nombre, ancho] = archivo.match(/^(.+)-(\d+)\.webp$/) ?? [];

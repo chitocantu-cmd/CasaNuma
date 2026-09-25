@@ -11,13 +11,14 @@
 // · El historial de las reservas DEMO en meses sin agenda publicada usa el
 //   patrón del PDF (viernes, sábados y domingos) solo para que el panel no
 //   arranque vacío.
-// · Productos de NUMA Store: fichas de ejemplo; Casa Numa subirá las reales.
+// · NUMA Store: piezas reales, pero sin precio ni medidas todavía.
 //
 // Las fechas se generan respecto a hoy para que la demo nunca "caduque".
 // ===========================================================================
 
 import { MEMBRESIA } from '../../contenido/oferta';
 import { claveMes, diaSemana, diasDelMes, etiquetaMes, hoy } from '../../lib/calendario';
+import type { EntradaFoto } from '../../contenido/fotos';
 import type { MesMembresia, Producto, Sesion } from '../tipos';
 import { AGENDA, flujoAgenda, idSesionAgenda } from '../agenda';
 
@@ -63,71 +64,79 @@ export function sesionesKidsSemilla(): Sesion[] {
 }
 
 // ---------------------------------------------------------------------------
-// NUMA Store · fichas de ejemplo
+// NUMA Store
 // ---------------------------------------------------------------------------
+// Piezas reales de Casa Numa (sesión de producción, 25 sep 2026). Nombre y
+// descripción salen de la foto; precio, medidas y acabados aún no los da
+// Casa Numa, así que se cotizan por WhatsApp (precio null = «Cotizar»).
+// Las dos fichas por encargo siguen siendo de ejemplo (demo: true).
+// ---------------------------------------------------------------------------
+const VERTICAL = [640, 1280] as const;
+const pieza = (nombre: string, alt: string, tono: EntradaFoto['tono'], silueta: EntradaFoto['silueta']): EntradaFoto => ({
+  alt, encuadre: 'Pieza sobre mesa de madera, fondo del estudio.', src: `/fotos/piezas/${nombre}`, anchos: VERTICAL,
+  tono, silueta, posicion: '50% 55%',
+});
+
 export const PRODUCTOS_SEMILLA: Producto[] = [
   {
-    id: 'p1', slug: 'taza-esmaltada', nombre: 'Taza esmaltada', categoria: 'Tazas',
-    modalidad: 'disponible', disponibilidad: 'disponible', precio: 450,
-    descripcion: 'Taza de gres modelada a mano, con asa cómoda y esmalte brillante por dentro.',
-    dimensiones: 'Aprox. 9 cm de alto · 300 ml', acabados: 'Esmalte crema con borde terracota',
-    fotos: [{ alt: 'Taza esmaltada', encuadre: 'Taza sobre fondo crema, luz lateral. Cuadrada.', tono: 'terracota', silueta: 'taza' }],
-    demo: true,
+    id: 'p1', slug: 'taza-con-carita', nombre: 'Taza con carita', categoria: 'Tazas',
+    modalidad: 'disponible', disponibilidad: 'disponible', precio: null,
+    descripcion: 'Taza blanca hecha a mano, con una carita y flores en relieve.',
+    fotos: [pieza('taza-carita', 'Taza blanca con una carita y flores en relieve', 'crema', 'taza')],
+    demo: false,
   },
   {
-    id: 'p2', slug: 'tarro-alto', nombre: 'Tarro alto', categoria: 'Tazas',
-    modalidad: 'disponible', disponibilidad: 'disponible', precio: 520,
-    descripcion: 'Tarro alto para café o té, con textura de barro visible en la base.',
-    dimensiones: 'Aprox. 12 cm de alto · 400 ml', acabados: 'Esmalte mate',
-    fotos: [{ alt: 'Tarro alto', encuadre: 'Tarro alto de perfil, fondo liso. Cuadrada.', tono: 'amarillo', silueta: 'tarro' }],
-    demo: true,
+    id: 'p2', slug: 'taza-van-gogh', nombre: 'Taza Van Gogh', categoria: 'Tazas',
+    modalidad: 'disponible', disponibilidad: 'disponible', precio: null,
+    descripcion: 'Taza azul con espirales en relieve inspiradas en La noche estrellada de Van Gogh.',
+    fotos: [pieza('taza-van-gogh-azul', 'Taza azul con espirales en relieve', 'indigo', 'taza')],
+    demo: false,
   },
   {
-    id: 'p3', slug: 'cuenco-hondo', nombre: 'Cuenco hondo', categoria: 'Vajillas',
-    modalidad: 'disponible', disponibilidad: 'disponible', precio: 380,
-    descripcion: 'Cuenco para sopa, cereal o para tenerlo en la mesa con fruta.',
-    dimensiones: 'Aprox. 15 cm de diámetro', acabados: 'Esmalte crema',
-    fotos: [{ alt: 'Cuenco hondo', encuadre: 'Cuenco visto desde arriba sobre mantel de lino. Cuadrada.', tono: 'crema', silueta: 'cuenco' }],
-    demo: true,
+    id: 'p3', slug: 'charola-con-jarritas', nombre: 'Charola con jarritas', categoria: 'Vajillas',
+    modalidad: 'disponible', disponibilidad: 'disponible', precio: null,
+    descripcion: 'Charola roja con asa y tres jarritas pintadas a mano: amarilla, de lunares y de rayas.',
+    fotos: [pieza('charola-jarritas', 'Charola roja con asa y tres jarritas', 'naranja', 'jarron')],
+    demo: false,
   },
   {
-    id: 'p4', slug: 'jarron-doble', nombre: 'Jarrón doble', categoria: 'Objetos decorativos',
-    modalidad: 'disponible', disponibilidad: 'agotado', precio: 1200,
-    descripcion: 'Jarrón de dos cuerpos, pensado para una sola rama o para lucir vacío.',
-    dimensiones: 'Aprox. 24 cm de alto', acabados: 'Esmalte índigo',
-    fotos: [{ alt: 'Jarrón doble', encuadre: 'Jarrón doble con una rama, fondo crema. Vertical.', tono: 'indigo', silueta: 'doble' }],
-    demo: true,
+    id: 'p4', slug: 'rostro-ojos-turquesa', nombre: 'Rostro de ojos turquesa', categoria: 'Objetos decorativos',
+    modalidad: 'disponible', disponibilidad: 'disponible', precio: null,
+    descripcion: 'Pieza con rostro de ojos turquesa, cabello en relieve y hojas a los lados.',
+    fotos: [pieza('rostro-ojos-turquesa', 'Pieza con rostro de ojos turquesa y cabello en relieve', 'amarillo', 'tarro')],
+    demo: false,
   },
   {
-    id: 'p5', slug: 'florero-guaje', nombre: 'Florero guaje', categoria: 'Objetos decorativos',
-    modalidad: 'disponible', disponibilidad: 'disponible', precio: 950,
-    descripcion: 'Florero de silueta orgánica inspirado en el guaje.',
-    dimensiones: 'Aprox. 20 cm de alto', acabados: 'Engobe verde y barro natural',
-    fotos: [{ alt: 'Florero guaje', encuadre: 'Florero guaje sobre repisa de madera. Vertical.', tono: 'verde', silueta: 'guaje' }],
-    demo: true,
+    id: 'p5', slug: 'porta-anillos', nombre: 'Porta anillos', categoria: 'Objetos decorativos',
+    modalidad: 'disponible', disponibilidad: 'disponible', precio: null,
+    descripcion: 'Porta anillos de cerámica blanca moteada, con tres postes para tus anillos.',
+    fotos: [pieza('porta-anillos', 'Porta anillos de cerámica blanca moteada', 'crema', 'cuenco')],
+    demo: false,
   },
   {
-    id: 'p6', slug: 'juego-de-platos', nombre: 'Juego de platos', categoria: 'Vajillas',
+    id: 'p6', slug: 'vasija-con-rostro', nombre: 'Vasija con rostro', categoria: 'Creaciones especiales',
+    modalidad: 'disponible', disponibilidad: 'disponible', precio: null,
+    descripcion: 'Vasija de barro terracota con un rostro y tocado en relieve.',
+    fotos: [pieza('vasija-rostro', 'Vasija de barro terracota con un rostro y tocado en relieve', 'terracota', 'olla')],
+    demo: false,
+  },
+  {
+    id: 'p7', slug: 'juego-de-platos', nombre: 'Juego de platos', categoria: 'Vajillas',
     modalidad: 'encargo', disponibilidad: 'bajo-pedido', precio: null,
     descripcion: 'Platos hechos a la medida de tu mesa: número de piezas, color y acabado a elegir.',
     acabados: 'A elegir',
-    fotos: [{ alt: 'Juego de platos', encuadre: 'Mesa puesta con platos NUMA, vista cenital. Horizontal.', tono: 'naranja', silueta: 'cuenco' }],
+    fotos: [{
+      alt: 'Platos de cerámica con lunares rojos y ondas amarillas en relieve', encuadre: 'Platos NUMA sobre mesa de madera.',
+      src: '/fotos/piezas/platos-relieve', anchos: [640, 1280, 1920], tono: 'naranja', silueta: 'cuenco',
+    }],
     demo: true,
   },
   {
-    id: 'p7', slug: 'anfora-gran-formato', nombre: 'Ánfora de gran formato', categoria: 'Creaciones especiales',
+    id: 'p8', slug: 'anfora-gran-formato', nombre: 'Ánfora de gran formato', categoria: 'Creaciones especiales',
     modalidad: 'encargo', disponibilidad: 'bajo-pedido', precio: null,
     descripcion: 'Pieza escultórica de gran formato, diseñada contigo para un espacio concreto.',
     acabados: 'A definir en la cotización',
     fotos: [{ alt: 'Ánfora de gran formato', encuadre: 'Pieza de gran formato en su espacio final. Vertical.', tono: 'terracota', silueta: 'anfora' }],
-    demo: true,
-  },
-  {
-    id: 'p8', slug: 'olla-con-asas', nombre: 'Olla con asas', categoria: 'Objetos decorativos',
-    modalidad: 'disponible', disponibilidad: 'disponible', precio: 1100,
-    descripcion: 'Olla decorativa con dos asas, para centro de mesa o para guardar lo que quieras.',
-    dimensiones: 'Aprox. 18 cm de alto', acabados: 'Esmalte amarillo',
-    fotos: [{ alt: 'Olla con asas', encuadre: 'Olla con asas sobre mesa de trabajo. Cuadrada.', tono: 'amarillo', silueta: 'olla' }],
     demo: true,
   },
 ];
