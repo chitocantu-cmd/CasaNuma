@@ -39,18 +39,27 @@ export const siteConfig = {
   /** Confirmado en el documento de contenido. */
   zona: 'Casco de San Pedro Garza García, Nuevo León',
   /**
-   * PROVISIONAL · tomada de la publicación de la agenda de octubre 2026.
-   * Sin código postal ni colonia: no están confirmados.
+   * Confirmado con la ficha de Google Maps de Casa NUMA (25 sep 2026):
+   * Los Aldama 345a, Casco de San Pedro, 66200 San Pedro Garza García, N.L.
    */
   direccion: (env.VITE_NUMA_DIRECCION as string | undefined) || 'Los Aldama 345A',
+  codigoPostal: '66200',
   /** true mientras la dirección no esté confirmada con su ficha de Google Maps. */
-  direccionProvisional: !(env.VITE_NUMA_DIRECCION as string | undefined),
-  /** PENDIENTE · enlace de Google Maps para "Cómo llegar". */
-  googleMapsUrl: (env.VITE_NUMA_MAPS_URL as string | undefined) ?? '',
-  /** PENDIENTE · URL de inserción (Compartir → Insertar un mapa → src del iframe). */
+  direccionProvisional: false,
+  /** Ficha de Google Maps de Casa NUMA: el botón "Cómo llegar" la abre. */
+  googleMapsUrl: (env.VITE_NUMA_MAPS_URL as string | undefined) || 'https://maps.app.goo.gl/Uwmiy6q9Rc1PzUHB6',
+  /** src del iframe del mapa. Vacío = se genera con el nombre y la dirección de la ficha. */
   googleMapsEmbedUrl: (env.VITE_NUMA_MAPS_EMBED as string | undefined) ?? '',
-  /** PENDIENTE · horario de atención del estudio (no confundir con horarios de clase). */
-  horarios: [] as Horario[],
+  /**
+   * Horario de atención del estudio, tal como está en la ficha de Google Maps
+   * (25 sep 2026). No confundir con los horarios de clase.
+   */
+  horarios: [
+    { dia: 'Jueves y viernes', horas: '5:00 – 9:00 p.m.' },
+    { dia: 'Sábado', horas: '10:00 a.m. – 5:00 p.m.' },
+    { dia: 'Domingo', horas: '10:00 a.m. – 2:00 p.m.' },
+    { dia: 'Lunes a miércoles', horas: 'Cerrado' },
+  ] as Horario[],
 
   // --- Avisos al equipo -----------------------------------------------------
   /**
@@ -108,7 +117,8 @@ export function enlaceWhatsapp(mensaje?: string): string | null {
 export function enlaceMapaEmbebido(): string | null {
   if (siteConfig.googleMapsEmbedUrl) return siteConfig.googleMapsEmbedUrl;
   if (!siteConfig.direccion) return null;
-  return `https://maps.google.com/maps?q=${encodeURIComponent(`${siteConfig.direccion}, San Pedro Garza García, Nuevo León`)}&z=16&output=embed`;
+  const lugar = `Casa NUMA, ${siteConfig.direccion}, Casco de San Pedro, ${siteConfig.codigoPostal} San Pedro Garza García, N.L.`;
+  return `https://maps.google.com/maps?q=${encodeURIComponent(lugar)}&z=17&output=embed`;
 }
 
 export function enlaceComoLlegar(): string | null {

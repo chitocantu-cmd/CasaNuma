@@ -81,6 +81,7 @@ export function ldNegocio(): JsonLd | null {
     address: {
       '@type': 'PostalAddress',
       streetAddress: siteConfig.direccion,
+      postalCode: siteConfig.codigoPostal,
       addressLocality: 'San Pedro Garza García',
       addressRegion: 'Nuevo León',
       addressCountry: 'MX',
