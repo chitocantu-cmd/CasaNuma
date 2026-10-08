@@ -20,6 +20,8 @@ const Membresia = lazy(() => import('./paginas/Membresia'));
 const ReservarMembresia = lazy(() => import('./paginas/ReservarMembresia'));
 const Kids = lazy(() => import('./paginas/Kids'));
 const ReservarKids = lazy(() => import('./paginas/ReservarKids'));
+const PintaTuPieza = lazy(() => import('./paginas/PintaTuPieza'));
+const ReservarPinta = lazy(() => import('./paginas/ReservarPinta'));
 const Eventos = lazy(() => import('./paginas/Eventos'));
 const Tienda = lazy(() => import('./paginas/Tienda'));
 const Producto = lazy(() => import('./paginas/Producto'));
@@ -82,6 +84,8 @@ export default function App() {
                   <Route path="/membresia/reservar" element={<ReservarMembresia />} />
                   <Route path="/numa-kids" element={<Kids />} />
                   <Route path="/numa-kids/reservar" element={<ReservarKids />} />
+                  <Route path="/pinta-tu-pieza" element={<PintaTuPieza />} />
+                  <Route path="/pinta-tu-pieza/reservar" element={<ReservarPinta />} />
                   <Route path="/eventos" element={<Eventos />} />
                   <Route path="/numa-store" element={<Tienda />} />
                   <Route path="/numa-store/:slug" element={<Producto />} />
@@ -99,6 +103,8 @@ export default function App() {
                   <Route path="/contacto" element={<Navigate to="/#ubicacion" replace />} />
                   <Route path="/ubicacion" element={<Navigate to="/#ubicacion" replace />} />
                   <Route path="/kids" element={<Navigate to="/numa-kids" replace />} />
+                  <Route path="/pinta" element={<Navigate to="/pinta-tu-pieza" replace />} />
+                  <Route path="/pinta-tu-pieza/reserva" element={<Navigate to="/pinta-tu-pieza/reservar" replace />} />
                   <Route path="/tienda" element={<Navigate to="/numa-store" replace />} />
                   <Route path="/store" element={<Navigate to="/numa-store" replace />} />
                   <Route path="/store/:slug" element={<Redirigir a="/numa-store/:slug" />} />

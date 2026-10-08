@@ -16,17 +16,21 @@
 // ===========================================================================
 
 import { EDADES_KIDS, KIDS, MEMBRESIA } from '../../contenido/oferta';
+import { PIEZAS_PINTA, type RegistroPieza } from '../../contenido/piezasPinta';
+import { mostrarPendientes } from '../../config/site';
+import { montoEnLinea, montoPagado, saldoDe, saldoPendiente } from '../../lib/anticipo';
 import { claveMes, etiquetaMes, hoy, minutosEntre, sumarDias, yaPaso } from '../../lib/calendario';
 import { sinLugar } from '../../lib/cupo';
 import { correoValido, soloDigitos } from '../../lib/formato';
 import { AGENDA, flujoAgenda, idSesionAgenda, type RegistroTaller } from '../agenda';
 import { CATEGORIA_DB, slugTaller, validarCambiosTaller, validarTallerNuevo } from '../catalogo';
 import { avisoClienteManual, avisosReservaConfirmada } from '../avisos';
-import { ErrorDatos, type CambiosReserva, type Repositorio, type RepositorioAdmin } from '../repositorio';
+import { aPiezaPinta, cobroInicial, exigirPiezaReservable, sesionPintaDeId, sesionesPinta, sesionesPintaAbiertas } from '../pinta';
+import { ErrorDatos, type CambiosPieza, type CambiosReserva, type Repositorio, type RepositorioAdmin } from '../repositorio';
 import type {
-  Asistente, Aviso, CambiosTaller, ClaseMembresia, ClienteAdmin, Contacto, MembresiaAdmin, MesMembresia, Nino, Pago,
-  Registro, Reserva, ResumenAdmin, Sesion, SesionAdmin, SesionReservada, SolicitudManual, SolicitudReserva,
-  Taller, TallerCatalogo, TallerNuevo, TipoExperiencia, Usuario,
+  Asistente, Aviso, CambiosTaller, ClaseMembresia, ClienteAdmin, Contacto, MembresiaAdmin, MesMembresia, MetodoPago, Nino,
+  Pago, PiezaPinta, Registro, Reserva, ResumenAdmin, Sesion, SesionAdmin, SesionReservada, SolicitudManual,
+  SolicitudReserva, Taller, TallerCatalogo, TallerNuevo, TipoExperiencia, Usuario,
 } from '../tipos';
 import { PRODUCTOS_SEMILLA, mesesMembresiaSemilla, sesionesKidsSemilla, sesionesMembresiaDelMes } from './semilla';
 
@@ -66,6 +70,14 @@ interface Estado {
   talleresPanel?: RegistroTaller[];
   cambiosTaller?: Record<string, Partial<RegistroTaller>>;
   inactivos?: string[];
+  /** Pinta tu pieza: precio, existencias y estado capturados en el panel. */
+  piezas?: Record<string, CambiosPieza>;
+  /**
+   * Reservas de Pinta tu pieza que ya descontaron su pieza del inventario
+   * (reservaId → piezaId). Se descuenta al confirmar el anticipo y se
+   * devuelve al cancelar o al cambiar de pieza.
+   */
+  descuentos?: Record<string, string>;
 }
 
 // --- Almacenamiento ---------------------------------------------------------
@@ -251,6 +263,73 @@ function catalogoKids(e: Estado): Sesion[] {
   return sesionesKidsSemilla(registros(e)).map((s) => conDisponibles(e, s));
 }
 
+// --- Pinta tu pieza ---------------------------------------------------------------
+
+/** Horarios que todavía no empiezan, con su cupo vigente. */
+function catalogoPinta(e: Estado): Sesion[] {
+  return sesionesPintaAbiertas().filter((s) => !yaPaso(s.fecha, s.inicio)).map((s) => conDisponibles(e, s));
+}
+
+/** El catálogo de piezas con lo que el equipo capturó en el panel. */
+function registrosPieza(e: Estado): RegistroPieza[] {
+  return PIEZAS_PINTA.map((r) => ({ ...r, ...e.piezas?.[r.id] }));
+}
+
+/** Apartados vigentes (aún sin pagar) de una pieza: la reservan mientras se paga. */
+function piezasApartadas(e: Estado, piezaId: string): number {
+  return e.reservas.filter((r) => r.tipo === 'pinta' && r.estado === 'pendiente_pago' && ocupaLugar(r) && r.pieza?.id === piezaId).length;
+}
+
+/**
+ * Piezas con existencias vigentes. Con datos de demostración visibles, las
+ * que no tienen precio toman el de ejemplo, salvo que el equipo ya haya
+ * capturado (o borrado) el suyo en el panel.
+ */
+function catalogoPiezas(e: Estado): PiezaPinta[] {
+  return registrosPieza(e).map((r) =>
+    aPiezaPinta(r, piezasApartadas(e, r.id), mostrarPendientes && !(e.piezas?.[r.id] && 'precio' in e.piezas[r.id])),
+  );
+}
+
+/**
+ * Existencias: se descuentan al confirmarse el anticipo (no al apartar; el
+ * apartado solo las bloquea 15 minutos) y se devuelven al cancelar o al
+ * cambiar de pieza. Una pieza sin conteo (stock null) no se toca.
+ */
+function moverInventario(e: Estado, piezaId: string, delta: number): boolean {
+  const r = registrosPieza(e).find((x) => x.id === piezaId);
+  if (!r || r.stock === null) return false;
+  e.piezas = { ...e.piezas, [piezaId]: { ...e.piezas?.[piezaId], stock: Math.max(0, r.stock + delta) } };
+  return true;
+}
+
+function descontarPieza(e: Estado, reservaId: string, piezaId: string) {
+  if (moverInventario(e, piezaId, -1)) e.descuentos = { ...e.descuentos, [reservaId]: piezaId };
+}
+
+function devolverPieza(e: Estado, reservaId: string) {
+  const piezaId = e.descuentos?.[reservaId];
+  if (!piezaId) return;
+  moverInventario(e, piezaId, +1);
+  const resto = { ...e.descuentos };
+  delete resto[reservaId];
+  e.descuentos = resto;
+}
+
+/** Sesiones de Pinta tu pieza para el panel: las recientes, las abiertas y las de cualquier reserva. */
+function sesionesPintaPanel(e: Estado): Sesion[] {
+  const h = hoy();
+  const base = sesionesPinta(sumarDias(h, -42), sumarDias(h, 7 * 8));
+  const ids = new Set(base.map((s) => s.id));
+  const deReservas = e.reservas
+    .filter((r) => r.tipo === 'pinta')
+    .flatMap((r) => r.sesiones.map((s) => s.id))
+    .filter((sid) => !ids.has(sid) && ids.add(sid))
+    .map(sesionPintaDeId)
+    .filter((s): s is Sesion => s !== null);
+  return [...base, ...deReservas].map((s) => conDisponibles(e, s));
+}
+
 /** Todas las sesiones reservables, con a qué experiencia pertenecen. */
 type SesionCatalogo = Omit<SesionAdmin, 'ocupados' | 'asistentes'>;
 
@@ -271,6 +350,11 @@ function todasLasSesiones(e: Estado): SesionCatalogo[] {
     ...membresia.map((s) => ({
       sesion: s, tipo: 'membresia' as const, titulo: 'Membresía NUMA', slug: null,
       precio: null, etiquetaPrecio: `$${MEMBRESIA.precio.toLocaleString('es-MX')} al mes`, reservaEnLinea: true,
+    })),
+    // El precio depende de la pieza: no hay precio por persona.
+    ...sesionesPintaPanel(e).map((s) => ({
+      sesion: s, tipo: 'pinta' as const, titulo: 'Pinta tu pieza', slug: null,
+      precio: null, etiquetaPrecio: 'Según la pieza', reservaEnLinea: true,
     })),
   ];
 }
@@ -295,6 +379,8 @@ interface Semilla {
   usuarioId?: string;
   ninos?: Nino[];
   notas?: string;
+  /** Pinta tu pieza: la pieza, y si ya liquidó el saldo en el estudio. */
+  pieza?: { id: string; nombre: string; precio: number; liquidada: boolean };
 }
 
 const sr = (s: Sesion): SesionReservada => ({ id: s.id, fecha: s.fecha, inicio: s.inicio, fin: s.fin });
@@ -351,6 +437,23 @@ function semillas(usuarioAna: UsuarioGuardado): Semilla[] {
     });
   }
 
+  // Pinta tu pieza: solo con piezas que tienen precio (de ejemplo en la demo).
+  const conPrecio = catalogoPiezas(vacio()).filter((p) => p.precio !== null);
+  const sabados = sesionesPintaAbiertas().filter((s) => s.inicio === '16:00' && s.fecha > sumarDias(hoyIso, 1));
+  const pinta = (piezaId: string, nombre: string, n: number, hace: number, liquidada: boolean) => {
+    const p = conPrecio.find((x) => x.id === piezaId);
+    const s = sabados[0];
+    if (!p || p.precio === null || !s) return;
+    lista.push({
+      tipo: 'pinta', titulo: 'Pinta tu pieza', referencia: 'pinta', sesiones: [sr(s)], participantes: 1,
+      precioUnitario: p.precio, hace, pagado: true, metodo: 'tarjeta', origen: 'web',
+      pieza: { id: p.id, nombre: p.nombre, precio: p.precio, liquidada },
+      contacto: { nombre, email: `${nombre.split(' ')[0].toLowerCase()}@demo.casanuma.mx`, telefono: tel(n) },
+    });
+  };
+  pinta('florero-dulce', 'Sofía Garza', 18, 28, false);
+  pinta('taza-recta', 'Lucía Hernández', 19, 52, true);
+
   const mesSiguiente = mesesMembresiaSemilla().find((m) => m.sesiones.filter((s) => !yaPaso(s.fecha, s.inicio)).length >= 4);
   if (mesSiguiente) {
     const clases = mesSiguiente.sesiones.filter((s) => !yaPaso(s.fecha, s.inicio)).slice(0, 4);
@@ -382,6 +485,13 @@ async function sembrar(e: Estado): Promise<Estado> {
   for (const s of semillas(ana)) {
     const creada = new Date(Date.now() - s.hace * 3600_000).toISOString();
     const total = s.precioUnitario * s.participantes;
+    // Pinta tu pieza: anticipo pagado en línea y, si ya liquidó, el saldo en el estudio.
+    const inicial = s.pieza ? cobroInicial(s.pieza.precio) : undefined;
+    const cobro = inicial && s.pieza
+      ? s.pieza.liquidada
+        ? { ...inicial, pagado: inicial.saldo + inicial.anticipo, pagoFinal: inicial.saldo, saldo: 0 }
+        : { ...inicial, pagado: inicial.anticipo, saldo: saldoPendiente(total, inicial.anticipo) }
+      : undefined;
     const r: Reserva = {
       id: id('res'),
       // Las del panel llevan folio desde que se registran; las de la web,
@@ -389,7 +499,10 @@ async function sembrar(e: Estado): Promise<Estado> {
       folio: s.pagado || s.origen === 'panel' ? siguienteFolio(nuevo) : null,
       tipo: s.tipo, titulo: s.titulo, referencia: s.referencia, sesiones: s.sesiones,
       participantes: s.participantes, ninos: s.ninos, precioUnitario: s.precioUnitario, subtotal: total, total,
-      estado: s.pagado ? 'confirmada' : 'pendiente_pago', pago: s.pagado ? 'pagado' : 'pendiente',
+      pieza: s.pieza ? { id: s.pieza.id, nombre: s.pieza.nombre, precio: s.pieza.precio, cambios: [] } : undefined,
+      cobro,
+      estado: s.pagado ? 'confirmada' : 'pendiente_pago',
+      pago: !s.pagado ? 'pendiente' : cobro && cobro.saldo > 0 ? 'anticipo_pagado' : 'pagado',
       metodoPago: s.metodo, referenciaPago: s.pagado ? `demo_pi_${Math.random().toString(36).slice(2, 10)}` : null,
       pagadaEn: s.pagado ? creada : null, expiraEn: null, creadaEn: creada, actualizadaEn: creada,
       usuarioId: s.usuarioId ?? null, contacto: s.contacto, notasInternas: s.notas ?? '', origen: s.origen, demo: true,
@@ -398,8 +511,14 @@ async function sembrar(e: Estado): Promise<Estado> {
     nuevo.pagos.push({
       id: id('pag'), reservaId: r.id, folio: r.folio, cliente: r.contacto.nombre,
       proveedor: s.origen === 'panel' ? 'manual' : 'demo', referencia: r.referenciaPago, metodo: r.metodoPago,
-      monto: r.total, estado: r.pago, creadoEn: creada, demo: true,
+      monto: montoEnLinea(r), concepto: cobro ? 'anticipo' : 'total', estado: s.pagado ? 'pagado' : 'pendiente', creadoEn: creada, demo: true,
     });
+    if (cobro?.pagoFinal) {
+      nuevo.pagos.push({
+        id: id('pag'), reservaId: r.id, folio: r.folio, cliente: r.contacto.nombre, proveedor: 'manual', referencia: null,
+        metodo: 'efectivo', monto: cobro.pagoFinal, concepto: 'saldo', estado: 'pagado', creadoEn: creada, demo: true,
+      });
+    }
   }
   guardar(nuevo);
   return nuevo;
@@ -427,6 +546,8 @@ interface Resuelto {
   titulo: string;
   precioUnitario: number;
   sesiones: Sesion[];
+  /** Pinta tu pieza: la pieza tal como está en el catálogo ahora. */
+  pieza?: PiezaPinta & { precio: number };
 }
 
 function resolver(e: Estado, s: SolicitudReserva): Resuelto {
@@ -463,6 +584,17 @@ function resolver(e: Estado, s: SolicitudReserva): Resuelto {
     const sesiones = unicos.map((sid) => mes.sesiones.find((x) => x.id === sid));
     if (sesiones.some((x) => !x)) throw new ErrorDatos('SESION_INVALIDA', `Todas tus clases deben ser de ${mes.etiqueta}.`);
     return { titulo: `Membresía ${mes.etiqueta.split(' ')[0]}`, precioUnitario: MEMBRESIA.precio, sesiones: sesiones as Sesion[] };
+  }
+
+  if (s.tipo === 'pinta') {
+    // El precio sale del catálogo, nunca de la página: solo llega el id.
+    if (s.participantes !== 1) throw new ErrorDatos('DATOS_INVALIDOS', 'Cada reservación es para una persona y su pieza.');
+    if (unicos.length !== 1) throw new ErrorDatos('SESION_INVALIDA', 'Elige una fecha y un horario.');
+    const sesion = catalogoPinta(e).find((x) => x.id === unicos[0]);
+    if (!sesion) throw new ErrorDatos('SESION_INVALIDA', 'Ese horario ya no está disponible. Elige otro.');
+    const pieza = catalogoPiezas(e).find((p) => p.id === s.piezaId);
+    exigirPiezaReservable(pieza);
+    return { titulo: 'Pinta tu pieza', precioUnitario: pieza.precio, sesiones: [sesion], pieza };
   }
 
   // kids
@@ -506,14 +638,20 @@ function validarContacto(c: Contacto) {
 const sesionReservada = ({ id: sid, fecha, inicio, fin }: Sesion): SesionReservada => ({ id: sid, fecha, inicio, fin });
 const porFecha = (a: SesionReservada, b: SesionReservada) => (a.fecha + a.inicio).localeCompare(b.fecha + b.inicio);
 
-/** Confirma el cobro: folio, pago registrado y avisos. */
+/**
+ * Confirma el cobro: folio, pago registrado y avisos. En Pinta tu pieza lo
+ * cobrado es el anticipo: la reserva queda confirmada con el saldo pendiente
+ * y la pieza sale del inventario.
+ */
 function confirmar(e: Estado, r: Reserva, pago: { proveedor: Pago['proveedor']; metodo: Reserva['metodoPago']; referencia: string | null }, avisar: 'todos' | 'cliente' | 'nadie'): Reserva {
   const t = ahora();
+  const cobro = r.cobro ? { ...r.cobro, pagado: r.cobro.anticipo, saldo: saldoPendiente(r.total, r.cobro.anticipo) } : undefined;
   const confirmada: Reserva = {
     ...r,
     folio: r.folio ?? siguienteFolio(e),
     estado: 'confirmada',
-    pago: 'pagado',
+    pago: cobro && cobro.saldo > 0 ? 'anticipo_pagado' : 'pagado',
+    cobro,
     metodoPago: pago.metodo,
     referenciaPago: pago.referencia,
     pagadaEn: t,
@@ -524,10 +662,11 @@ function confirmar(e: Estado, r: Reserva, pago: { proveedor: Pago['proveedor']; 
   const existente = e.pagos.find((p) => p.reservaId === r.id);
   const registro: Pago = {
     id: existente?.id ?? id('pag'), reservaId: r.id, folio: confirmada.folio, cliente: r.contacto.nombre,
-    proveedor: pago.proveedor, referencia: pago.referencia, metodo: pago.metodo, monto: r.total, estado: 'pagado',
-    creadoEn: t, demo: false,
+    proveedor: pago.proveedor, referencia: pago.referencia, metodo: pago.metodo, monto: montoEnLinea(r),
+    concepto: cobro ? 'anticipo' : 'total', estado: 'pagado', creadoEn: t, demo: false,
   };
   e.pagos = existente ? e.pagos.map((p) => (p.id === existente.id ? registro : p)) : [...e.pagos, registro];
+  if (r.tipo === 'pinta' && r.pieza) descontarPieza(e, r.id, r.pieza.id);
   if (avisar !== 'nadie') {
     const avisos = avisar === 'todos' ? avisosReservaConfirmada(confirmada, () => id('av')) : avisoClienteManual(confirmada, () => id('av'));
     e.avisos = [...e.avisos, ...avisos];
@@ -556,6 +695,16 @@ export const repoDemo: Repositorio = {
   async sesionesKids() {
     await espera(240);
     return catalogoKids(await estado());
+  },
+
+  async sesionesPinta() {
+    await espera(240);
+    return catalogoPinta(await estado());
+  },
+
+  async piezasPinta() {
+    await espera(220);
+    return catalogoPiezas(await estado());
   },
 
   async productos() {
@@ -603,6 +752,9 @@ export const repoDemo: Repositorio = {
       sesiones: r.sesiones.map(sesionReservada).sort(porFecha),
       participantes: solicitud.participantes,
       ninos: solicitud.ninos,
+      pieza: r.pieza ? { id: r.pieza.id, nombre: r.pieza.nombre, precio: r.pieza.precio, cambios: [] } : undefined,
+      // Anticipo calculado aquí, con el precio del catálogo (lib/anticipo.ts).
+      cobro: r.pieza ? cobroInicial(r.pieza.precio) : undefined,
       precioUnitario: r.precioUnitario,
       subtotal: total,
       total,
@@ -647,7 +799,8 @@ export const repoDemo: Repositorio = {
       const previo = e.pagos.find((p) => p.reservaId === r.id);
       const intento: Pago = {
         id: previo?.id ?? id('pag'), reservaId: r.id, folio: null, cliente: r.contacto.nombre, proveedor: 'demo',
-        referencia: null, metodo: 'tarjeta', monto: r.total, estado: 'fallido', creadoEn: t, demo: false,
+        referencia: null, metodo: 'tarjeta', monto: montoEnLinea(r), concepto: r.cobro ? 'anticipo' : 'total',
+        estado: 'fallido', creadoEn: t, demo: false,
       };
       e.pagos = previo ? e.pagos.map((p) => (p.id === previo.id ? intento : p)) : [...e.pagos, intento];
       guardar({ ...e });
@@ -767,6 +920,7 @@ function asistentesDe(e: Estado, sesionId: string): Asistente[] {
     .map((r) => ({
       reservaId: r.id, folio: r.folio, nombre: r.contacto.nombre, telefono: r.contacto.telefono,
       personas: r.participantes, estado: r.estado, pago: r.pago, ninos: r.ninos,
+      pieza: r.pieza?.nombre, saldo: r.cobro?.saldo,
     }));
 }
 
@@ -827,8 +981,10 @@ export const repoAdminDemo: RepositorioAdmin = {
       reservasHoy: deHoy.length,
       personasHoy: deHoy.reduce((n, r) => n + r.participantes, 0),
       proximos7: vivas.filter((r) => r.sesiones.some((s) => s.fecha >= hoyIso && s.fecha < en7)).length,
-      ingresosConfirmados: e.reservas.filter((r) => r.pago === 'pagado').reduce((n, r) => n + r.total, 0),
+      ingresosConfirmados: e.reservas.reduce((n, r) => n + montoPagado(r), 0),
       pagosPendientes: vivas.filter((r) => r.pago === 'pendiente').length,
+      saldoPorCobrar: vivas.filter((r) => r.cobro && r.estado !== 'pendiente_pago').reduce((n, r) => n + Math.max(0, saldoDe(r)), 0),
+      revisionManual: e.reservas.filter((r) => r.cobro && r.cobro.saldo < 0 && r.estado !== 'cancelada').length,
       cupoBajo: sesiones.filter((x) => x.tipo !== 'membresia' && !yaPaso(x.sesion.fecha, x.sesion.inicio) && x.sesion.disponibles !== null && x.sesion.disponibles <= 3).length,
       ultimas: [...e.reservas].filter((r) => r.estado !== 'expirada').sort((a, b) => b.creadaEn.localeCompare(a.creadaEn)).slice(0, 6),
       hoy: sesiones.filter((x) => x.sesion.fecha === hoyIso).map((x) => aSesionAdmin(e, x)).filter((x) => x.tipo === 'taller' || x.asistentes.length),
@@ -859,6 +1015,12 @@ export const repoAdminDemo: RepositorioAdmin = {
     let nueva: Reserva = { ...r, actualizadaEn: ahora() };
     if (cambios.notasInternas !== undefined) nueva.notasInternas = cambios.notasInternas;
 
+    // Pinta tu pieza no se marca «pagado» a mano: el anticipo lo confirma el
+    // pago en línea y el resto se cobra con «Marcar saldo como pagado».
+    if (r.cobro && cambios.pago === 'pagado') {
+      throw new ErrorDatos('DATOS_INVALIDOS', 'En Pinta tu pieza, registra lo cobrado en el estudio con «Marcar saldo como pagado».');
+    }
+
     // Registrar un pago recibido en el estudio (transferencia, efectivo):
     // confirma la reserva y le da folio si no lo tenía.
     if (cambios.pago === 'pagado' && r.pago !== 'pagado') {
@@ -870,9 +1032,11 @@ export const repoAdminDemo: RepositorioAdmin = {
     }
 
     if (cambios.estado && cambios.estado !== nueva.estado) {
-      if (cambios.estado === 'confirmada' && nueva.pago !== 'pagado') {
+      if (cambios.estado === 'confirmada' && nueva.pago !== 'pagado' && nueva.pago !== 'anticipo_pagado') {
         throw new ErrorDatos('DATOS_INVALIDOS', 'Registra el pago antes de confirmar la reserva.');
       }
+      // Cancelada: su pieza vuelve al inventario.
+      if (cambios.estado === 'cancelada') devolverPieza(e, r.id);
       nueva = { ...nueva, estado: cambios.estado };
     }
 
@@ -890,6 +1054,9 @@ export const repoAdminDemo: RepositorioAdmin = {
     if (!(s.total >= 0)) throw new ErrorDatos('DATOS_INVALIDOS', 'Captura el importe.');
     const x = todasLasSesiones(e).find((y) => y.sesion.id === s.sesionId);
     if (!x) throw new ErrorDatos('SESION_INVALIDA', 'Elige una sesión de la agenda.');
+    if (x.tipo === 'pinta') {
+      throw new ErrorDatos('SESION_INVALIDA', 'Pinta tu pieza se reserva desde el sitio: el anticipo depende de la pieza elegida.');
+    }
     if (x.tipo === 'kids' && (!s.ninos?.length || s.ninos.some((n) => !n.nombre.trim() || n.edad < KIDS.edadMinima || n.edad > KIDS.edadMaxima))) {
       throw new ErrorDatos('EDAD_MINIMA', `Captura el nombre y la edad (${EDADES_KIDS}) de cada niño.`);
     }
@@ -933,6 +1100,97 @@ export const repoAdminDemo: RepositorioAdmin = {
       : base;
     guardar({ ...e });
     return final;
+  },
+
+  async liquidarSaldo(reservaId, metodo: MetodoPago) {
+    await espera(350);
+    const e = { ...(await estado()) };
+    exigirAdmin(e);
+    const r = e.reservas.find((x) => x.id === reservaId);
+    if (!r) throw new ErrorDatos('NO_ENCONTRADO', 'No encontramos esa reserva.');
+    if (!r.cobro) throw new ErrorDatos('DATOS_INVALIDOS', 'Esta reserva no se paga por anticipo.');
+    if (r.estado !== 'confirmada' && r.estado !== 'completada') {
+      throw new ErrorDatos('DATOS_INVALIDOS', 'Solo se cobra el saldo de una reserva confirmada.');
+    }
+    if (r.cobro.saldo < 0) throw new ErrorDatos('DATOS_INVALIDOS', 'Pagó más de lo que vale la pieza: requiere revisión manual.');
+    if (r.cobro.saldo === 0) throw new ErrorDatos('DATOS_INVALIDOS', 'Esta reserva ya no tiene saldo pendiente.');
+
+    const t = ahora();
+    const cobrado = r.cobro.saldo;
+    // El anticipo y su registro se conservan: el pago final queda aparte.
+    const nueva: Reserva = {
+      ...r,
+      pago: 'pagado',
+      cobro: { ...r.cobro, pagado: r.cobro.pagado + cobrado, pagoFinal: (r.cobro.pagoFinal ?? 0) + cobrado, saldo: 0 },
+      actualizadaEn: t,
+    };
+    e.reservas = e.reservas.map((x) => (x.id === r.id ? nueva : x));
+    e.pagos = [...e.pagos, {
+      id: id('pag'), reservaId: r.id, folio: r.folio, cliente: r.contacto.nombre, proveedor: 'manual', referencia: null,
+      metodo, monto: cobrado, concepto: 'saldo', estado: 'pagado', creadoEn: t, demo: false,
+    }];
+    guardar({ ...e });
+    return nueva;
+  },
+
+  async cambiarPieza(reservaId, piezaId) {
+    await espera(350);
+    const e = { ...(await estado()) };
+    exigirAdmin(e);
+    const r = e.reservas.find((x) => x.id === reservaId);
+    if (!r?.pieza || !r.cobro) throw new ErrorDatos('NO_ENCONTRADO', 'Esa reserva no es de Pinta tu pieza.');
+    if (r.estado !== 'confirmada' && r.estado !== 'completada') {
+      throw new ErrorDatos('DATOS_INVALIDOS', 'Solo se cambia la pieza de una reserva confirmada.');
+    }
+    if (r.pieza.id === piezaId) throw new ErrorDatos('DATOS_INVALIDOS', 'Es la misma pieza que ya tiene.');
+    const nuevaPieza = catalogoPiezas(e).find((p) => p.id === piezaId);
+    exigirPiezaReservable(nuevaPieza);
+
+    // La pieza anterior vuelve al inventario y sale la nueva.
+    devolverPieza(e, r.id);
+    descontarPieza(e, r.id, nuevaPieza.id);
+
+    // SALDO = PRECIO FINAL − TOTAL YA PAGADO (no «el otro 50 %»).
+    const saldo = saldoPendiente(nuevaPieza.precio, r.cobro.pagado);
+    const de = { id: r.pieza.id, nombre: r.pieza.nombre, precio: r.pieza.precio };
+    const a = { id: nuevaPieza.id, nombre: nuevaPieza.nombre, precio: nuevaPieza.precio };
+    const nueva: Reserva = {
+      ...r,
+      pieza: { ...a, cambios: [...r.pieza.cambios, { de, a, en: ahora() }] },
+      precioUnitario: a.precio,
+      subtotal: a.precio,
+      total: a.precio,
+      cobro: { ...r.cobro, saldo },
+      // Con saldo a favor (negativo) no se toca nada más: revisión manual.
+      pago: saldo > 0 ? (r.cobro.pagado > 0 ? 'anticipo_pagado' : 'pendiente') : 'pagado',
+      actualizadaEn: ahora(),
+    };
+    e.reservas = e.reservas.map((x) => (x.id === r.id ? nueva : x));
+    guardar({ ...e });
+    return nueva;
+  },
+
+  async piezas() {
+    await espera(200);
+    const e = await estado();
+    exigirAdmin(e);
+    return catalogoPiezas(e);
+  },
+
+  async editarPieza(piezaId, c: CambiosPieza) {
+    await espera(300);
+    const e = { ...(await estado()) };
+    exigirAdmin(e);
+    if (!PIEZAS_PINTA.some((p) => p.id === piezaId)) throw new ErrorDatos('NO_ENCONTRADO', 'Esa pieza ya no existe.');
+    if (c.precio !== undefined && c.precio !== null && !(Number.isFinite(c.precio) && c.precio > 0)) {
+      throw new ErrorDatos('DATOS_INVALIDOS', 'El precio debe ser mayor a cero, o déjalo vacío si aún no está definido.');
+    }
+    if (c.stock !== undefined && c.stock !== null && !(Number.isInteger(c.stock) && c.stock >= 0)) {
+      throw new ErrorDatos('DATOS_INVALIDOS', 'Las existencias deben ser un número entero (0 = agotada), o déjalas vacías.');
+    }
+    const nuevo = { ...e, piezas: { ...e.piezas, [piezaId]: { ...e.piezas?.[piezaId], ...c } } };
+    guardar(nuevo);
+    return catalogoPiezas(nuevo).find((p) => p.id === piezaId)!;
   },
 
   async agenda(mes) {
@@ -992,7 +1250,7 @@ export const repoAdminDemo: RepositorioAdmin = {
       const k = r.contacto.email.toLowerCase();
       const c = mapa.get(k) ?? { email: k, nombre: r.contacto.nombre, telefono: r.contacto.telefono, tieneCuenta: false, reservas: 0, pagado: 0, ultima: null, demo: r.demo };
       c.reservas += 1;
-      if (r.pago === 'pagado') c.pagado += r.total;
+      c.pagado += montoPagado(r);
       if (!c.ultima || r.creadaEn > c.ultima) c.ultima = r.creadaEn;
       mapa.set(k, c);
     }

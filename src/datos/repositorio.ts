@@ -1,6 +1,6 @@
 import type {
-  Aviso, CambiosTaller, ClienteAdmin, Integraciones, EstadoPago, EstadoReserva, MembresiaAdmin, MesMembresia, Pago, Producto,
-  Registro, Reserva, ResultadoPago, ResumenAdmin, Sesion, SesionAdmin, SolicitudManual,
+  Aviso, CambiosTaller, ClienteAdmin, Integraciones, EstadoPago, EstadoReserva, MembresiaAdmin, MesMembresia, MetodoPago,
+  Pago, PiezaPinta, Producto, Registro, Reserva, ResultadoPago, ResumenAdmin, Sesion, SesionAdmin, SolicitudManual,
   SolicitudReserva, Taller, TallerCatalogo, TallerNuevo, Usuario,
 } from './tipos';
 
@@ -19,6 +19,10 @@ export interface Repositorio {
   taller(slug: string): Promise<Taller | null>;
   mesesMembresia(): Promise<MesMembresia[]>;
   sesionesKids(): Promise<Sesion[]>;
+  /** Pinta tu pieza: horarios abiertos, con cupo. */
+  sesionesPinta(): Promise<Sesion[]>;
+  /** Pinta tu pieza: piezas para elegir, con precio y existencias vigentes. */
+  piezasPinta(): Promise<PiezaPinta[]>;
   productos(): Promise<Producto[]>;
   producto(slug: string): Promise<Producto | null>;
 
@@ -28,7 +32,8 @@ export interface Repositorio {
   /** Valida cupo y aparta los lugares mientras se paga. Requiere sesión. */
   apartar(solicitud: SolicitudReserva): Promise<Reserva>;
   /**
-   * Cobra un apartado. Con Supabase devuelve la redirección a Stripe Checkout.
+   * Cobra un apartado: el total o, en Pinta tu pieza, solo el anticipo
+   * (ver montoEnLinea). Con Supabase devuelve la redirección a Stripe Checkout.
    * En la demo no hay cobro: `simulacion` decide si el pago se aprueba o se
    * rechaza (un rechazo lanza PAGO_RECHAZADO y el lugar sigue apartado).
    */
@@ -65,6 +70,15 @@ export interface CambiosReserva {
   notasInternas?: string;
 }
 
+/** Lo que el equipo ajusta de una pieza de Pinta tu pieza. */
+export interface CambiosPieza {
+  /** null = precio pendiente (no se puede pagar). */
+  precio?: number | null;
+  /** null = sin conteo de existencias. */
+  stock?: number | null;
+  activa?: boolean;
+}
+
 export interface RepositorioAdmin {
   adminActual(): Promise<Usuario | null>;
   entrarAdmin(email: string, password: string): Promise<Usuario>;
@@ -75,6 +89,21 @@ export interface RepositorioAdmin {
   reserva(id: string): Promise<Reserva | null>;
   actualizarReserva(id: string, cambios: CambiosReserva): Promise<Reserva>;
   crearReservaManual(solicitud: SolicitudManual): Promise<Reserva>;
+
+  /**
+   * Pinta tu pieza: cobra en el estudio lo que falta (anticipo_pagado →
+   * pagado). Conserva el anticipo y registra el pago final aparte.
+   */
+  liquidarSaldo(id: string, metodo: MetodoPago): Promise<Reserva>;
+  /**
+   * Pinta tu pieza: cambio de pieza en el estudio. El saldo se recalcula como
+   * precio final − total ya pagado; si queda negativo, pide revisión manual
+   * (no hay reembolsos automáticos).
+   */
+  cambiarPieza(id: string, piezaId: string): Promise<Reserva>;
+  /** Inventario de Pinta tu pieza (activas e inactivas, sin precios de ejemplo). */
+  piezas(): Promise<PiezaPinta[]>;
+  editarPieza(id: string, cambios: CambiosPieza): Promise<PiezaPinta>;
 
   /** Sesiones del mes con sus asistentes (talleres, NUMA Kids y membresía). */
   agenda(mes: string): Promise<SesionAdmin[]>;
@@ -114,7 +143,9 @@ export type CodigoError =
   | 'PAGO_RECHAZADO'
   | 'NO_ENCONTRADO'
   | 'NO_CONECTADO'
-  | 'SIN_ACCESO';
+  | 'SIN_ACCESO'
+  /** Pinta tu pieza: sin pieza, agotada, inactiva o sin precio publicado. */
+  | 'SIN_PIEZA';
 
 /** Error con mensaje ya escrito para la persona: se puede mostrar tal cual. */
 export class ErrorDatos extends Error {

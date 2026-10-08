@@ -3,7 +3,9 @@ import { Link, useParams } from 'react-router-dom';
 import { ErrorDatos, repoAdmin } from '../../datos';
 import type { CambiosReserva } from '../../datos/repositorio';
 import { invalidarCupos, useConsulta } from '../../datos/hooks';
-import type { Aviso as AvisoT } from '../../datos/tipos';
+import type { Aviso as AvisoT, MetodoPago, Reserva } from '../../datos/tipos';
+import { sePuedeElegir } from '../../datos/pinta';
+import { saldoPendiente } from '../../lib/anticipo';
 import { fechaCompleta, rango, yaPaso } from '../../lib/calendario';
 import { enlaceWhatsapp as waDe, soloDigitos } from '../../lib/formato';
 import { Icono } from '../../componentes/base/Iconos';
@@ -11,7 +13,7 @@ import { Aviso } from '../../componentes/base/Campos';
 import ErrorCarga from '../../componentes/base/ErrorCarga';
 import { CargandoBloque } from '../../componentes/base/Cargando';
 import {
-  DemoPill, ETIQUETA_AVISO, ETIQUETA_METODO, ETIQUETA_TIPO, EstadoPill, PagoPill, Tarjeta, dinero, fechaHora, horaCorta,
+  DemoPill, ETIQUETA_AVISO, ETIQUETA_METODO, ETIQUETA_TIPO, EstadoPill, PagoPill, Tarjeta, claseCampo, dinero, fechaHora, horaCorta,
 } from './ui';
 
 const mayuscula = (t: string) => t.replace(/^./, (c) => c.toUpperCase());
@@ -29,6 +31,8 @@ export default function PanelReserva() {
   const { id = '' } = useParams();
   const { datos: r, cargando, error, recargar } = useConsulta(`admin:reserva:${id}`, () => repoAdmin.reserva(id));
   const { datos: avisos, recargar: recargarAvisos } = useConsulta(`admin:avisos:${id}`, () => repoAdmin.avisos(id));
+  const { datos: pagos, recargar: recargarPagos } = useConsulta('admin:pagos', () => repoAdmin.pagos());
+  const movimientos = (pagos ?? []).filter((p) => p.reservaId === id).sort((a, b) => a.creadoEn.localeCompare(b.creadoEn));
   const [notas, setNotas] = useState('');
   const [guardando, setGuardando] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
@@ -148,25 +152,97 @@ export default function PanelReserva() {
                 {r.sesiones.map((s) => (
                   <Dato key={s.id} k="Fecha y horario">{mayuscula(fechaCompleta(s.fecha))} · {rango(s.inicio, s.fin)}</Dato>
                 ))}
-                <Dato k={r.tipo === 'kids' ? 'Niños' : 'Participantes'}>{r.participantes}</Dato>
+                {r.pieza ? (
+                  <Dato k="Pieza"><span className="font-medium">{r.pieza.nombre}</span> · {dinero(r.pieza.precio)}</Dato>
+                ) : (
+                  <Dato k={r.tipo === 'kids' ? 'Niños' : 'Participantes'}>{r.participantes}</Dato>
+                )}
               </dl>
+            )}
+            {r.pieza && r.pieza.cambios.length > 0 && (
+              <div className="mt-4 border-t border-cafe/10 pt-4">
+                <p className="eyebrow text-[0.58rem] text-cafe/60">Cambios de pieza en el estudio</p>
+                <ol className="mt-2 space-y-1.5 text-[0.82rem]">
+                  {r.pieza.cambios.map((c, i) => (
+                    <li key={`${i}-${c.en}`}>
+                      {c.de.nombre} ({dinero(c.de.precio)}) → <span className="font-medium">{c.a.nombre}</span> ({dinero(c.a.precio)})
+                      <span className="text-cafe/55"> · {fechaHora(c.en)}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             )}
           </Tarjeta>
 
           <Tarjeta titulo="Pago">
-            <dl>
-              <Dato k="Precio unitario">{dinero(r.precioUnitario)} MXN</Dato>
-              <Dato k="Subtotal">{dinero(r.subtotal)} MXN</Dato>
-              <Dato k="Total"><span className="cifra text-[1.4rem]">{dinero(r.total)} MXN</span></Dato>
-              <Dato k="Método">{r.metodoPago ? ETIQUETA_METODO[r.metodoPago] : '—'}</Dato>
-              <Dato k="Referencia"><span className="font-mono text-[0.8rem]">{r.referenciaPago ?? '—'}</span></Dato>
-              <Dato k="Estado"><PagoPill pago={r.pago} /></Dato>
-              {r.pagadaEn && <Dato k="Pagado el">{fechaHora(r.pagadaEn)}</Dato>}
-            </dl>
+            {r.cobro ? (
+              <>
+                {r.cobro.saldo < 0 && r.estado !== 'cancelada' && (
+                  <div role="alert" className="mb-4 rounded-[0.6rem] border border-naranja bg-naranja/[0.12] p-3 text-[0.82rem]">
+                    <p className="eyebrow text-[0.62rem] text-cafe">Revisión manual requerida</p>
+                    <p className="mt-1 text-cafe/80">
+                      Pagó {dinero(r.cobro.pagado)} y la pieza actual vale {dinero(r.total)}: {dinero(-r.cobro.saldo)} a su favor.
+                      No hay reembolsos automáticos; resuélvelo según la política de Casa Numa.
+                    </p>
+                  </div>
+                )}
+                <dl>
+                  <Dato k="Precio de la pieza (total)"><span className="cifra text-[1.4rem]">{dinero(r.total)} MXN</span></Dato>
+                  <Dato k={`Anticipo en línea (${r.cobro.porcentaje} %)`}>{dinero(r.cobro.anticipo)} MXN</Dato>
+                  <Dato k="Pago final en el estudio">{r.cobro.pagoFinal !== null ? `${dinero(r.cobro.pagoFinal)} MXN` : '—'}</Dato>
+                  <Dato k="Pagado hasta hoy">{dinero(r.cobro.pagado)} MXN</Dato>
+                  <Dato k="Saldo pendiente">
+                    <span className={`cifra text-[1.4rem] ${r.cobro.saldo > 0 ? 'text-terracota' : ''}`} data-saldo-panel>
+                      {r.cobro.saldo < 0 ? 'Revisión' : `${dinero(r.cobro.saldo)} MXN`}
+                    </span>
+                  </Dato>
+                  <Dato k="Estado"><PagoPill pago={r.pago} /></Dato>
+                </dl>
+                {movimientos.length > 0 && (
+                  <div className="mt-4 border-t border-cafe/10 pt-4">
+                    <p className="eyebrow text-[0.58rem] text-cafe/60">Movimientos</p>
+                    <ul className="mt-2 space-y-1.5 text-[0.82rem]">
+                      {movimientos.map((p) => (
+                        <li key={p.id} className="flex flex-wrap justify-between gap-2">
+                          <span>
+                            {p.concepto === 'saldo' ? 'Saldo en el estudio' : p.concepto === 'anticipo' ? 'Anticipo en línea' : 'Pago'}
+                            <span className="text-cafe/55"> · {p.metodo ? ETIQUETA_METODO[p.metodo] : '—'} · {fechaHora(p.creadoEn)}</span>
+                          </span>
+                          <span className="flex items-center gap-2">{dinero(p.monto)} <PagoPill pago={p.estado} /></span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              <dl>
+                <Dato k="Precio unitario">{dinero(r.precioUnitario)} MXN</Dato>
+                <Dato k="Subtotal">{dinero(r.subtotal)} MXN</Dato>
+                <Dato k="Total"><span className="cifra text-[1.4rem]">{dinero(r.total)} MXN</span></Dato>
+                <Dato k="Método">{r.metodoPago ? ETIQUETA_METODO[r.metodoPago] : '—'}</Dato>
+                <Dato k="Referencia"><span className="font-mono text-[0.8rem]">{r.referenciaPago ?? '—'}</span></Dato>
+                <Dato k="Estado"><PagoPill pago={r.pago} /></Dato>
+                {r.pagadaEn && <Dato k="Pagado el">{fechaHora(r.pagadaEn)}</Dato>}
+              </dl>
+            )}
           </Tarjeta>
         </div>
 
         <div className="space-y-6 lg:col-span-5">
+          {r.cobro && (r.estado === 'confirmada' || r.estado === 'completada') && (
+            <AccionesPinta
+              reserva={r}
+              onListo={(texto, error = false) => {
+                setMensaje({ tipo: error ? 'error' : 'exito', texto });
+                if (!error) {
+                  invalidarCupos();
+                  recargar();
+                  recargarPagos();
+                }
+              }}
+            />
+          )}
           <Tarjeta titulo="Estado">
             <div className="flex flex-wrap gap-2">
               <EstadoPill estado={r.estado} />
@@ -193,8 +269,12 @@ export default function PanelReserva() {
               {(r.estado === 'confirmada' || r.estado === 'pendiente_pago') && (
                 confirmarCancelacion ? (
                   <div className="rounded-[0.6rem] border border-naranja/60 bg-naranja/[0.08] p-3 text-[0.8rem]">
-                    <p>¿Cancelar esta reserva? Los lugares se liberan de inmediato.</p>
-                    {r.pago === 'pagado' && <p className="mt-1 text-cafe/70">El pago queda como Pagado: si corresponde reembolso, hazlo en el proveedor y márcalo aquí.</p>}
+                    <p>¿Cancelar esta reserva? Los lugares se liberan de inmediato{r.pieza ? ' y la pieza vuelve al inventario' : ''}.</p>
+                    {(r.pago === 'pagado' || r.pago === 'anticipo_pagado') && (
+                      <p className="mt-1 text-cafe/70">
+                        El pago queda registrado: si corresponde reembolso, hazlo en el proveedor y márcalo aquí.
+                      </p>
+                    )}
                     <div className="mt-3 flex gap-2">
                       <button type="button" disabled={!!guardando} onClick={() => cambiar({ estado: 'cancelada' }, 'Reserva cancelada: los lugares quedaron libres.')}
                         className="min-h-9 rounded-full bg-cafe px-4 text-[0.72rem] font-medium uppercase tracking-[0.1em] text-crema">Sí, cancelar</button>
@@ -208,7 +288,7 @@ export default function PanelReserva() {
                   </button>
                 )
               )}
-              {r.estado === 'cancelada' && r.pago === 'pagado' && (
+              {r.estado === 'cancelada' && (r.pago === 'pagado' || r.pago === 'anticipo_pagado') && (
                 <button type="button" disabled={!!guardando} onClick={() => cambiar({ pago: 'reembolsado' }, 'Pago marcado como reembolsado.')}
                   className="min-h-10 rounded-full border border-cafe/25 px-5 text-[0.76rem] font-medium uppercase tracking-[0.12em] hover:border-cafe">
                   Marcar como reembolsado
@@ -250,6 +330,101 @@ export default function PanelReserva() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Pinta tu pieza en el estudio: cobrar lo que falta y, si la persona cambia
+ * de pieza, recalcular el saldo como precio final − total ya pagado.
+ */
+function AccionesPinta({ reserva: r, onListo }: { reserva: Reserva; onListo: (texto: string, error?: boolean) => void }) {
+  const { datos: piezas } = useConsulta('admin:piezas', () => repoAdmin.piezas());
+  const [metodo, setMetodo] = useState<MetodoPago | ''>('');
+  const [piezaId, setPiezaId] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const enCurso = useRef(false);
+  const cobro = r.cobro!;
+
+  const opciones = (piezas ?? []).filter((p) => p.id !== r.pieza?.id && sePuedeElegir(p));
+  const nueva = opciones.find((p) => p.id === piezaId);
+  const nuevoSaldo = nueva?.precio != null ? saldoPendiente(nueva.precio, cobro.pagado) : null;
+
+  async function correr(accion: () => Promise<unknown>, exito: string) {
+    if (enCurso.current) return;
+    enCurso.current = true;
+    setOcupado(true);
+    try {
+      await accion();
+      setMetodo('');
+      setPiezaId('');
+      onListo(exito);
+    } catch (e) {
+      onListo(e instanceof ErrorDatos ? e.message : 'No pudimos guardar el cambio.', true);
+    } finally {
+      enCurso.current = false;
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <Tarjeta titulo="Pinta tu pieza · cobro en el estudio">
+      {cobro.saldo > 0 ? (
+        <>
+          <p className="text-[0.86rem]">
+            Falta cobrar <span className="cifra text-[1.4rem]">{dinero(cobro.saldo)}</span>
+            <span className="block text-[0.76rem] text-cafe/65">
+              Precio final {dinero(r.total)} − ya pagado {dinero(cobro.pagado)}
+            </span>
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <select value={metodo} onChange={(e) => setMetodo(e.target.value as MetodoPago | '')} className={`${claseCampo} min-w-0 flex-1`} aria-label="Cómo pagó el saldo">
+              <option value="">¿Cómo pagó?</option>
+              {(['efectivo', 'tarjeta', 'transferencia', 'otro'] as MetodoPago[]).map((m) => <option key={m} value={m}>{ETIQUETA_METODO[m]}</option>)}
+            </select>
+            <button
+              type="button"
+              disabled={!metodo || ocupado}
+              onClick={() => metodo && correr(() => repoAdmin.liquidarSaldo(r.id, metodo), `Saldo de ${dinero(cobro.saldo)} cobrado: la reserva quedó pagada completa.`)}
+              className="min-h-10 rounded-full bg-cafe px-5 text-[0.74rem] font-medium uppercase tracking-[0.12em] text-crema disabled:opacity-40"
+            >
+              Marcar saldo como pagado
+            </button>
+          </div>
+        </>
+      ) : cobro.saldo === 0 ? (
+        <p className="flex items-center gap-2 text-[0.86rem]"><Icono.check tam={16} className="text-verde" /> Saldo liquidado: pagó {dinero(cobro.pagado)}.</p>
+      ) : (
+        <p className="text-[0.86rem] text-cafe/80">Revisión manual requerida: pagó {dinero(-cobro.saldo)} más de lo que vale su pieza.</p>
+      )}
+
+      <div className="mt-5 border-t border-cafe/10 pt-4">
+        <label htmlFor="cambiar-pieza" className="eyebrow text-[0.58rem] text-cafe/60">¿Cambió de pieza?</label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <select id="cambiar-pieza" value={piezaId} onChange={(e) => setPiezaId(e.target.value)} className={`${claseCampo} min-w-0 flex-1`}>
+            <option value="">Elige la nueva pieza</option>
+            {opciones.map((p) => <option key={p.id} value={p.id}>{p.nombre} · {dinero(p.precio ?? 0)}</option>)}
+          </select>
+          <button
+            type="button"
+            disabled={!nueva || ocupado}
+            onClick={() => nueva && correr(() => repoAdmin.cambiarPieza(r.id, nueva.id), `Pieza cambiada a «${nueva.nombre}».`)}
+            className="min-h-10 rounded-full border border-cafe/25 px-5 text-[0.74rem] font-medium uppercase tracking-[0.12em] hover:border-cafe disabled:opacity-40"
+          >
+            Cambiar pieza
+          </button>
+        </div>
+        {nueva && nueva.precio !== null && nuevoSaldo !== null && (
+          <p className={`mt-3 rounded-[0.5rem] px-3 py-2 text-[0.8rem] ${nuevoSaldo < 0 ? 'border border-naranja bg-naranja/10' : 'bg-cafe/[0.04]'}`} data-vista-cambio>
+            Nuevo total {dinero(nueva.precio)} · ya pagó {dinero(cobro.pagado)} ·{' '}
+            {nuevoSaldo < 0 ? (
+              <strong className="font-medium">REVISIÓN MANUAL REQUERIDA ({dinero(-nuevoSaldo)} a su favor)</strong>
+            ) : (
+              <strong className="font-medium">saldo {dinero(nuevoSaldo)}</strong>
+            )}
+          </p>
+        )}
+      </div>
+    </Tarjeta>
   );
 }
 

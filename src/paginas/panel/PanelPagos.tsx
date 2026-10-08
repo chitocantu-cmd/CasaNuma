@@ -41,7 +41,12 @@ export default function PanelPagos() {
                   <td className={`${claseTabla.td} whitespace-nowrap text-cafe/75`}>{fechaHora(p.creadoEn)}</td>
                   <td className={`${claseTabla.td} cifra text-[1rem] tracking-[0.04em]`}>{p.folio ?? '—'}</td>
                   <td className={claseTabla.td}><span className="flex items-center gap-1.5">{p.cliente} {p.demo && <DemoPill />}</span></td>
-                  <td className={`${claseTabla.td} whitespace-nowrap`}>{dinero(p.monto)}</td>
+                  <td className={`${claseTabla.td} whitespace-nowrap`}>
+                    {dinero(p.monto)}
+                    {p.concepto && p.concepto !== 'total' && (
+                      <span className="block text-[0.7rem] text-cafe/60">{p.concepto === 'anticipo' ? 'Anticipo · Pinta tu pieza' : 'Saldo en el estudio'}</span>
+                    )}
+                  </td>
                   <td className={claseTabla.td}>{PROVEEDOR[p.proveedor]}</td>
                   <td className={claseTabla.td}>{p.metodo ? ETIQUETA_METODO[p.metodo] : '—'}</td>
                   <td className={`${claseTabla.td} font-mono text-[0.74rem]`}>{p.referencia ?? '—'}</td>

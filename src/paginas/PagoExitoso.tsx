@@ -72,6 +72,7 @@ const CONFIRMACION: Record<Reserva['tipo'], Pick<Parameters<typeof Confirmacion>
   taller: { silueta: 'taza', volver: { to: '/talleres', texto: 'Volver a talleres' } },
   kids: { titulo: '¡Nos vemos el jueves!', silueta: 'tarro', volver: { to: '/numa-kids', texto: 'Volver a NUMA Kids' } },
   membresia: { titulo: '¡Tu membresía está lista!', silueta: 'guaje', volver: { to: '/talleres', texto: 'Volver a talleres' } },
+  pinta: { silueta: 'jarron', volver: { to: '/', texto: 'Volver al inicio' } },
 };
 
 function ConfirmacionEnCuenta({ code, reservaId }: { code: string; reservaId: string }) {

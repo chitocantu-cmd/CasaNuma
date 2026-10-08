@@ -25,6 +25,7 @@ const Reserva = lazy(() => import('./PanelReserva'));
 const NuevaReserva = lazy(() => import('./PanelNuevaReserva'));
 const Calendario = lazy(() => import('./PanelCalendario'));
 const Talleres = lazy(() => import('./PanelTalleres'));
+const Piezas = lazy(() => import('./PanelPiezas'));
 const Membresias = lazy(() => import('./PanelMembresias'));
 const Clientes = lazy(() => import('./PanelClientes'));
 const Pagos = lazy(() => import('./PanelPagos'));
@@ -35,6 +36,7 @@ const NAV: { to: string; label: string; icono: NombreIcono; fin?: boolean }[] = 
   { to: '/admin/reservas', label: 'Reservas', icono: 'lista' },
   { to: '/admin/calendario', label: 'Calendario', icono: 'calendario' },
   { to: '/admin/talleres', label: 'Talleres', icono: 'pieza' },
+  { to: '/admin/piezas', label: 'Piezas', icono: 'pincel' },
   { to: '/admin/membresias', label: 'Membresías', icono: 'arcilla' },
   { to: '/admin/clientes', label: 'Clientes', icono: 'personas' },
   { to: '/admin/pagos', label: 'Pagos', icono: 'tarjeta' },
@@ -168,6 +170,7 @@ export default function Panel() {
         <Route path="reservas/:id" element={<Reserva />} />
         <Route path="calendario" element={<Calendario />} />
         <Route path="talleres" element={<Talleres />} />
+        <Route path="piezas" element={<Piezas />} />
         <Route path="membresias" element={<Membresias />} />
         <Route path="clientes" element={<Clientes />} />
         <Route path="pagos" element={<Pagos />} />

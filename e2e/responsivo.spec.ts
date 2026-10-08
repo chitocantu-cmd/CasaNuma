@@ -4,7 +4,7 @@ import { entrarAlPanel, preparar, sinErrores } from './apoyo';
 const ANCHOS = [320, 375, 390, 430, 768, 1024, 1440];
 const RUTAS = [
   '/', '/talleres', '/talleres/tazas-de-halloween-03-oct', '/membresia', '/membresia/reservar', '/numa-kids',
-  '/numa-kids/reservar', '/eventos', '/numa-store', '/numa-store/vasija-con-rostro', '/nosotras', '/cuenta/entrar',
+  '/numa-kids/reservar', '/pinta-tu-pieza', '/pinta-tu-pieza/reservar', '/eventos', '/numa-store', '/numa-store/vasija-con-rostro', '/nosotras', '/cuenta/entrar',
   '/esta-ruta-no-existe', '/admin/entrar',
 ];
 
@@ -31,7 +31,7 @@ test('panel sin desborde en celular y tableta', async ({ page }) => {
   const desbordes: string[] = [];
   for (const ancho of [375, 768]) {
     await page.setViewportSize({ width: ancho, height: 900 });
-    for (const ruta of ['/admin', '/admin/reservas', '/admin/calendario', '/admin/talleres', '/admin/membresias', '/admin/clientes', '/admin/pagos', '/admin/avisos']) {
+    for (const ruta of ['/admin', '/admin/reservas', '/admin/calendario', '/admin/talleres', '/admin/piezas', '/admin/membresias', '/admin/clientes', '/admin/pagos', '/admin/avisos']) {
       await page.goto(ruta);
       await page.waitForLoadState('networkidle');
       const { scroll, vista } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, vista: window.innerWidth }));

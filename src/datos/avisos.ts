@@ -36,6 +36,17 @@ function cuando(r: Reserva): string[] {
   return ['Clases:', ...r.sesiones.map((s, i) => `  ${i + 1}. ${fechaCompleta(s.fecha)} · ${hora(s.inicio)}`)];
 }
 
+/** Pinta tu pieza: la pieza y cómo va el pago (anticipo en línea, saldo en el estudio). */
+function cobro(r: Reserva): string[] {
+  if (!r.cobro) return [`Total: ${pesosCortos(r.total)}`];
+  return [
+    ...(r.pieza ? [`Pieza: ${r.pieza.nombre}`] : []),
+    `Precio de la pieza: ${pesosCortos(r.total)}`,
+    `Anticipo pagado (${r.cobro.porcentaje} %): ${pesosCortos(r.cobro.pagado)}`,
+    `Saldo pendiente: ${pesosCortos(Math.max(0, r.cobro.saldo))} — se paga en Casa Numa`,
+  ];
+}
+
 function personas(r: Reserva): string[] {
   if (r.ninos?.length) {
     return [
@@ -43,6 +54,7 @@ function personas(r: Reserva): string[] {
       `Niños: ${r.ninos.map((n) => `${n.nombre} (${n.edad} años)`).join(', ')}`,
     ];
   }
+  if (r.tipo === 'pinta') return [];
   return [`Participantes: ${r.participantes}`];
 }
 
@@ -68,8 +80,8 @@ export function avisosReservaConfirmada(r: Reserva, id: () => string): Aviso[] {
       ...cuando(r),
       ...personas(r),
       '',
-      `Total: ${pesosCortos(r.total)}`,
-      `Estado: ${r.pago === 'pagado' ? 'PAGADO' : 'PAGO PENDIENTE'}`,
+      ...cobro(r),
+      `Estado: ${r.pago === 'pagado' ? 'PAGADO' : r.pago === 'anticipo_pagado' ? 'ANTICIPO PAGADO · SALDO EN EL ESTUDIO' : 'PAGO PENDIENTE'}`,
       `Folio: ${r.folio ?? '—'}`,
     ],
     enlace: { texto: 'Ver reservación', ruta: `/admin/reservas/${r.id}` },
@@ -94,8 +106,11 @@ export function avisosReservaConfirmada(r: Reserva, id: () => string): Aviso[] {
       ...(r.sesiones.length === 1
         ? [`${fechaCompleta(primera.fecha).replace(/^./, (c) => c.toUpperCase())} · ${hora(primera.inicio)}`]
         : r.sesiones.map((s, i) => `Clase ${i + 1}: ${fechaCompleta(s.fecha)} · ${hora(s.inicio)}`)),
-      r.ninos?.length ? `Niños: ${r.ninos.map((n) => n.nombre).join(', ')}` : `${r.participantes} ${r.participantes === 1 ? 'participante' : 'participantes'}`,
-      `Total: ${pesosCortos(r.total)}`,
+      ...(r.tipo === 'pinta'
+        ? []
+        : [r.ninos?.length ? `Niños: ${r.ninos.map((n) => n.nombre).join(', ')}` : `${r.participantes} ${r.participantes === 1 ? 'participante' : 'participantes'}`]),
+      ...cobro(r),
+      ...(r.cobro ? ['', 'Tu reservación está confirmada. El saldo restante se liquida en Casa Numa.'] : []),
       '',
       `Te esperamos en ${siteConfig.direccion ? `${siteConfig.direccion}, ` : ''}${siteConfig.zona}.`,
     ],
@@ -111,7 +126,11 @@ export function avisosReservaConfirmada(r: Reserva, id: () => string): Aviso[] {
     destinatario: 'equipo',
     para: null,
     asunto: `Nueva reserva ${r.folio ?? ''} · ${r.titulo}`.trim(),
-    lineas: [`${r.contacto.nombre} · ${r.participantes} · ${pesosCortos(r.total)}`],
+    lineas: [
+      r.cobro
+        ? `${r.contacto.nombre} · ${r.pieza?.nombre ?? r.titulo} · total ${pesosCortos(r.total)} · pagó ${pesosCortos(r.cobro.pagado)} · saldo ${pesosCortos(Math.max(0, r.cobro.saldo))}`
+        : `${r.contacto.nombre} · ${r.participantes} · ${pesosCortos(r.total)}`,
+    ],
     enlace: { texto: 'Ver reservación', ruta: `/admin/reservas/${r.id}` },
     reservaId: r.id,
     estado: 'pendiente_integracion',

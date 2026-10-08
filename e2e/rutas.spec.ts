@@ -4,7 +4,7 @@ import { PRODUCTOS_SEMILLA } from '../src/datos/demo/semilla';
 import { preparar, sinErrores } from './apoyo';
 
 const PUBLICAS = [
-  '/', '/talleres', '/membresia', '/membresia/reservar', '/numa-kids', '/numa-kids/reservar', '/eventos',
+  '/', '/talleres', '/membresia', '/membresia/reservar', '/numa-kids', '/numa-kids/reservar', '/pinta-tu-pieza', '/pinta-tu-pieza/reservar', '/eventos',
   '/numa-store', '/nosotras', '/cuenta/entrar', '/cuenta/registro', '/cuenta/recuperar',
   '/aviso-de-privacidad', '/terminos', '/politica-de-reservaciones', '/pago/exitoso', '/pago/cancelado',
   ...AGENDA.filter((a) => a.is_active).map((a) => `/talleres/${a.slug}`),
@@ -35,6 +35,7 @@ test('direcciones comunes llevan a su página', async ({ page }) => {
     ['/recuperar-password', /\/cuenta\/recuperar$/],
     ['/mi-cuenta', /\/cuenta\/entrar/],
     ['/kids', /\/numa-kids$/],
+    ['/pinta', /\/pinta-tu-pieza$/],
     ['/checkout', /\/talleres$/],
     ['/ubicacion', /\/#ubicacion$/],
     ['/admin/login', /\/admin\/entrar$/],

@@ -14,7 +14,8 @@ import { Icono } from '../componentes/base/Iconos';
 import CeramicShape from '../componentes/marca/CeramicShape';
 import { PORTAFOLIO } from '../contenido/portafolio';
 import { TESTIMONIOS } from '../contenido/testimonios';
-import { EDADES_KIDS, MEMBRESIA } from '../contenido/oferta';
+import { EDADES_KIDS, MEMBRESIA, PINTA } from '../contenido/oferta';
+import { GALERIA_PINTA } from '../contenido/piezasPinta';
 import { useProductos, useTalleres } from '../datos/hooks';
 import { pesosCortos } from '../lib/formato';
 import { MESES } from '../lib/calendario';
@@ -89,7 +90,8 @@ export default function Inicio() {
           <Revelar retraso={0.1} className="max-w-[26rem] lg:pb-3">
             <p className="flex gap-3 text-nota text-cafe/75">
               <Icono.candado tam={18} className="mt-0.5 shrink-0 text-terracota" />
-              Talleres de fin de semana, membresía y NUMA Kids se reservan y pagan en línea.
+              Talleres de fin de semana, membresía y NUMA Kids se reservan y pagan en línea. Pinta tu pieza se aparta en
+              línea con el 50 % del valor de tu pieza.
             </p>
           </Revelar>
         </div>
@@ -123,6 +125,35 @@ export default function Inicio() {
                 detalle={`De ${EDADES_KIDS}`} cta="Ver talleres infantiles" to="/numa-kids"
                 foto="exp-kids" silueta="tarro"
               />
+            </Revelar>
+          </div>
+        </div>
+      </section>
+
+      {/* Pinta tu pieza ------------------------------------------------------ */}
+      <section className="mt-seccion-s bg-amarillo/[0.22] py-seccion-s" aria-labelledby="titulo-pinta">
+        <div className="contenedor grid items-center gap-12 lg:grid-cols-12 lg:gap-8">
+          <div className="relative grid grid-cols-2 gap-3 lg:col-span-6">
+            <Revelar>
+              <Foto foto={GALERIA_PINTA[0]} className="aspect-[4/5] w-full rounded-arco" sizes="(min-width:1024px) 24vw, 45vw" zoom />
+            </Revelar>
+            <Revelar retraso={0.08} className="pt-14">
+              <Foto foto={GALERIA_PINTA[2]} className="aspect-[4/5] w-full rounded-foto" sizes="(min-width:1024px) 24vw, 45vw" zoom />
+            </Revelar>
+            <CeramicShape nombre="taza" className="absolute -bottom-6 left-[46%] h-12 w-auto" />
+          </div>
+          <div className="lg:col-span-5 lg:col-start-8">
+            <SectionHeading
+              numero={n()}
+              eyebrow="Pinta tu pieza"
+              titulo={<span id="titulo-pinta">Tú eliges la pieza. Tú eliges los colores.</span>}
+              intro={<p>Elige entre diferentes piezas de cerámica y hazla completamente tuya.</p>}
+              tamano="t2"
+            />
+            <Revelar retraso={0.1}>
+              <p className="mt-8 text-cuerpo text-cafe/85">Piezas desde {pesosCortos(PINTA.precioDesde)}.</p>
+              <p className="mt-2 font-display text-t4 font-light">Reserva pagando el 50 % del valor de tu pieza.</p>
+              <BotonEnlace to="/pinta-tu-pieza" flecha className="mt-8">Quiero pintar</BotonEnlace>
             </Revelar>
           </div>
         </div>

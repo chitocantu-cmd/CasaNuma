@@ -107,6 +107,13 @@ export default function PanelCalendario() {
                                     <span className="font-medium">{a.nombre}</span>
                                     <span className="text-cafe/60"> · {a.personas} {a.personas === 1 ? 'persona' : 'personas'} · {a.folio ?? 'en proceso'}</span>
                                     {a.ninos?.length ? <span className="block text-[0.74rem] text-cafe/60">{a.ninos.map((n) => `${n.nombre} (${n.edad})`).join(', ')}</span> : null}
+                                    {a.pieza ? (
+                                      <span className="block text-[0.74rem] text-cafe/70">
+                                        {a.pieza}
+                                        {a.saldo !== undefined && a.saldo > 0 && ` · saldo $${a.saldo.toLocaleString('es-MX')}`}
+                                        {a.saldo !== undefined && a.saldo < 0 && ' · revisión manual'}
+                                      </span>
+                                    ) : null}
                                   </Link>
                                   <span className="flex items-center gap-3 text-[0.78rem] text-cafe/70">
                                     {a.telefono}

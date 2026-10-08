@@ -30,7 +30,9 @@ export default function PanelNuevaReserva() {
   // contrata desde la web.
   const opciones = useMemo(() => {
     const kids = [...(m1 ?? []), ...(m2 ?? [])].filter((x) => x.tipo === 'kids');
+    // Pinta tu pieza tampoco: su anticipo depende de la pieza y se aparta en el sitio.
     return [...(talleres ?? []), ...kids]
+      .filter((x) => x.tipo !== 'pinta')
       .filter((x) => !yaPaso(x.sesion.fecha, x.sesion.inicio))
       .filter((x, i, arr) => arr.findIndex((y) => y.sesion.id === x.sesion.id) === i)
       .sort((a, b) => (a.sesion.fecha + a.sesion.inicio).localeCompare(b.sesion.fecha + b.sesion.inicio));

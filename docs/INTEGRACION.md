@@ -176,6 +176,7 @@ Pruebas:
 | `registrar` / `entrar` / `salir` | localStorage | Supabase Auth; nombre y teléfono en los metadatos de la cuenta. Con confirmación de correo, `registrar` responde `CONFIRMAR_CORREO`. |
 | `recuperarPassword` / `cambiarPassword` | sin correo | Enlace de Supabase Auth a `/cuenta/nueva-contrasena`. |
 | `productos()` / `producto(slug)` | `PRODUCTOS_SEMILLA` | **Pendiente:** tabla `products`. Mientras, las mismas fichas de ejemplo (marcadas demo). |
+| `sesionesPinta()` / `piezasPinta()` | horario semanal + `src/contenido/piezasPinta.ts` (precios de ejemplo solo con datos de demostración visibles) | **Pendiente:** ver «Pinta tu pieza». Hoy devuelven `[]`. |
 | `suscribirNovedades` | localStorage | `suscribir_novedades()` → `newsletter_subscribers` (10 intentos por IP cada 10 min). |
 
 Panel (`RepositorioAdmin`):
@@ -196,6 +197,47 @@ Panel (`RepositorioAdmin`):
 | `membresias()` | reservas de tipo membresía con sus 4 clases. |
 | `clientes()` | clientes de las reservas + `admin_cuentas()` (cuentas sin reservas). |
 | `avisos()` | `integration_jobs`: enviado, en cola, sin destinatario, WhatsApp omitido (sin configurar) o fallido con su motivo. |
+
+## Pinta tu pieza (anticipo del 50 %)
+
+Funciona completo en la demo. **En Supabase todavía no existe**: `sesionesPinta()`
+y `piezasPinta()` devuelven listas vacías (la página ofrece WhatsApp) y
+`apartar` con `tipo: 'pinta'` responde `NO_CONECTADO`. Así nunca se cobra un
+anticipo calculado en el navegador. Para conectarlo:
+
+**Regla única.** `src/lib/anticipo.ts` → `calcularPagoReserva(precio)` =
+`{ total, porcentajeAnticipo: 50, anticipo, saldo }`, en centavos (el centavo
+impar queda en el saldo). El servidor debe repetir la misma cuenta; nunca se
+escribe un anticipo a mano. `SALDO = PRECIO FINAL − TOTAL YA PAGADO`, también
+al cambiar de pieza.
+
+**Base (migración pendiente, aplicar con `supabase db query --linked -f`):**
+
+| Qué | Detalle |
+|---|---|
+| `experience_type` | nuevo valor `paint_your_piece`; sesiones del horario semanal (jue 19:00–21:00, vie 10:00, sáb 11:00 y 16:00, dom 11:00; lunes a miércoles nada), cupo 16. |
+| `paint_pieces` | `id, name, description, category, images, price numeric NULL, size, finish_type, requires_firing, stock int NULL, is_available`. `price NULL` = «Precio pendiente», no se puede apartar. `stock NULL` = sin conteo. Hoy el catálogo vive en `src/contenido/piezasPinta.ts` con la misma forma. |
+| `reservations` | `piece_id, piece_name, piece_price, deposit_percentage, deposit_amount, amount_paid, final_payment_amount, remaining_balance` y el historial de cambios de pieza (`piece_changes jsonb` o tabla aparte). |
+| Estados de pago | `pending` → `deposit_paid` (anticipo confirmado) → `paid_in_full`; `refunded`. El repositorio ya traduce `deposit_paid` y `paid_in_full`. |
+| `crear_reserva_sesiones` | con `piece_id`: `SELECT … FOR UPDATE` sobre la pieza, rechaza sin precio / inactiva / sin existencias (contando apartados vigentes) y calcula `deposit_amount` en la base. |
+| Confirmar pago | descuenta 1 de `stock` (si no es NULL) y deja `deposit_paid`. Cancelar devuelve la pieza. |
+
+**Stripe.** `create-checkout-session` cobra `deposit_amount`, nunca
+`total_amount` (`montoEnLinea` en el front). El webhook verifica que lo cobrado
+sea igual al anticipo antes de confirmar.
+
+**Panel.** `liquidarSaldo(id, método)` → registra un pago `manual` con
+concepto `saldo`, `amount_paid += saldo`, `final_payment_amount`,
+`remaining_balance = 0`, `paid_in_full`; el registro del anticipo se conserva.
+`cambiarPieza(id, piezaId)` → mueve el inventario, guarda el cambio y
+recalcula el saldo; si queda negativo, **revisión manual** (sin reembolso
+automático hasta que Casa Numa defina su política). `piezas()` /
+`editarPieza()` → inventario (precio, existencias, encendida).
+
+Nombres: `total` = totalPrice, `cobro.porcentaje` = depositPercentage,
+`cobro.anticipo` = depositAmount, `cobro.pagado` = amount paid,
+`cobro.pagoFinal` = finalPaymentAmount, `cobro.saldo` = remainingBalance,
+`tipo: 'pinta'` = experienceType `paint_your_piece`.
 
 ## Avisos
 

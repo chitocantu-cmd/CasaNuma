@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { m } from 'framer-motion';
 import Header from '../Header';
@@ -6,6 +6,7 @@ import Footer from '../Footer';
 import { fuenteDatos } from '../../config/site';
 import { EASE_NUMA } from '../base/Revelar';
 import LimiteError from '../base/LimiteError';
+import { CargandoPagina } from '../base/Cargando';
 
 /** Al cambiar de página: arriba; si la URL trae #ancla, a esa sección. */
 function Desplazamiento() {
@@ -34,7 +35,7 @@ function AvisoDemo() {
   });
   if (fuenteDatos !== 'demo' || !visible) return null;
   return (
-    <div className="fixed bottom-3 left-3 z-30 flex items-center gap-2 rounded-full border border-indigo/30 bg-crema/95 py-1.5 pl-3.5 pr-1.5 text-[0.7rem] text-indigo shadow-[0_8px_24px_-12px_rgb(96_47_22/0.35)] backdrop-blur-sm">
+    <div className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-3 z-30 flex items-center gap-2 rounded-full border border-indigo/30 bg-crema/95 py-1.5 pl-3.5 pr-1.5 text-[0.7rem] text-indigo shadow-[0_8px_24px_-12px_rgb(96_47_22/0.35)] backdrop-blur-sm">
       <span className="h-1.5 w-1.5 rounded-full bg-indigo" aria-hidden="true" />
       <span>Versión demo · reservas y pagos simulados</span>
       <button
@@ -73,7 +74,12 @@ export default function Layout() {
         transition={{ duration: 0.45, ease: EASE_NUMA }}
       >
         <LimiteError key={pathname}>
-          <Outlet />
+          {/* Cada página se descarga al entrar. La espera va aquí y no arriba
+              del Layout: si suspendía todo el árbol, el encabezado se ocultaba
+              con el menú móvil a medio cerrar y este se quedaba encima. */}
+          <Suspense fallback={<CargandoPagina />}>
+            <Outlet />
+          </Suspense>
         </LimiteError>
       </m.main>
       <Footer />

@@ -450,7 +450,9 @@ npm run test:e2e         # Playwright: sitio en modo demo, Chrome instalado
 y recorre: reserva completa (taller → cuenta → pago simulado → folio → Mi
 cuenta → panel), pago rechazado, doble clic, NUMA Kids, membresía, eventos,
 todas las rutas (y la 404), 320–1440 px sin desbordes, el panel (crear,
-editar y desactivar un taller; reserva manual) y una revisión de cada botón,
+editar y desactivar un taller; reserva manual), Pinta tu pieza (anticipo del
+50 %, liquidar saldo, cambio de pieza, pieza agotada, refresh y celular), el
+menú y el flujo en un celular con toques, y una revisión de cada botón,
 imagen y campo. `npx playwright show-report` abre el detalle de una falla.
 
 La lista de pruebas manuales, con SQL reproducible, está en
@@ -499,5 +501,10 @@ No son de programación, pero bloquean el lanzamiento:
   encuadre que hace falta. (Las fotos del estudio y de NUMA Store ya son
   reales.)
 - **Precios de NUMA Store** (hoy «Precio por mensaje»).
+- **Pinta tu pieza:** precio, tamaño, acabado y existencias de cada pieza
+  (hoy «Precio pendiente»; en la demo, tres llevan precio de ejemplo), tiempo
+  de entrega y política de cancelación. Las piezas y sus fotos reales están en
+  `src/contenido/piezasPinta.ts`; el equipo captura precios en `/admin/piezas`.
+  El backend real todavía no la tiene: ver `docs/INTEGRACION.md`.
 - **Bios del equipo** y la historia real de Casa Numa.
 - **Política de cancelación**, que decide qué hace el sistema con los reembolsos.

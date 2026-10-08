@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { repo } from '.';
-import type { MesMembresia, Producto, Reserva, Sesion, Taller } from './tipos';
+import type { MesMembresia, PiezaPinta, Producto, Reserva, Sesion, Taller } from './tipos';
 
 // ---------------------------------------------------------------------------
 // Lectura de datos con caché breve en memoria
@@ -56,7 +56,7 @@ export function useConsulta<T>(clave: string | null, cargar: () => Promise<T>): 
 /** Tras reservar, lo que dependía del cupo debe volver a pedirse. */
 export function invalidarCupos() {
   for (const k of [...cache.keys()]) {
-    if (/^(talleres|taller:|membresia|kids|reservas|admin)/.test(k)) cache.delete(k);
+    if (/^(talleres|taller:|membresia|kids|pinta|reservas|admin)/.test(k)) cache.delete(k);
   }
 }
 
@@ -65,6 +65,8 @@ export const useTaller = (slug: string | undefined) =>
   useConsulta<Taller | null>(slug ? `taller:${slug}` : null, () => repo.taller(slug ?? ''));
 export const useMesesMembresia = () => useConsulta<MesMembresia[]>('membresia', () => repo.mesesMembresia());
 export const useSesionesKids = () => useConsulta<Sesion[]>('kids', () => repo.sesionesKids());
+export const useSesionesPinta = () => useConsulta<Sesion[]>('pinta:sesiones', () => repo.sesionesPinta());
+export const usePiezasPinta = () => useConsulta<PiezaPinta[]>('pinta:piezas', () => repo.piezasPinta());
 export const useProductos = () => useConsulta<Producto[]>('productos', () => repo.productos());
 export const useProducto = (slug: string | undefined) =>
   useConsulta<Producto | null>(slug ? `producto:${slug}` : null, () => repo.producto(slug ?? ''));

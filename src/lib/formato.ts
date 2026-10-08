@@ -120,7 +120,12 @@ export function fechaHoraCorta(iso: string): string {
   });
 }
 
-/** "$3,200 MXN" sin decimales ni "Sobre cotización": para precios fijos del sitio. */
+/**
+ * "$3,200 MXN" sin "Sobre cotización": para precios fijos del sitio. Sin
+ * decimales, salvo que el monto tenga centavos (un anticipo de $227.50 no se
+ * redondea a $228).
+ */
 export function pesosCortos(monto: number): string {
-  return `$${new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 }).format(monto)} MXN`;
+  const decimales = Number.isInteger(monto) ? 0 : 2;
+  return `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: decimales, maximumFractionDigits: decimales }).format(monto)} MXN`;
 }

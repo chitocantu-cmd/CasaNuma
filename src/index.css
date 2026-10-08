@@ -155,6 +155,16 @@
   }
 }
 
+/* En iPhone, un campo con letra menor a 16 px hace zoom al tocarlo y la página
+   queda ampliada. Fuera de las capas para ganarle a text-[0.84rem] y similares. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: max(1rem, 16px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { AnimatePresence, m } from 'framer-motion';
-import type { IdFoto } from '../../contenido/fotos';
+import type { EntradaFoto, IdFoto } from '../../contenido/fotos';
 import type { SesionReservada } from '../../datos/tipos';
 import { fechaCompacta, rango } from '../../lib/calendario';
 import { pesosCortos } from '../../lib/formato';
@@ -24,15 +24,19 @@ export interface AccionResumen {
  * Resumen de la reserva, siempre a la vista: precio, fechas, personas, total.
  * Escritorio: tarjeta fija al costado. Móvil: barra inferior con el total y
  * el botón al alcance del pulgar; el detalle se despliega si se toca.
+ *
+ * `etiquetaTotal`: qué es la cifra grande. En Pinta tu pieza es «Hoy pagas»
+ * (el anticipo), no el precio de la pieza.
  */
 export default function BookingSummary({
-  titulo, foto, filas, sesiones = [], total, accion, nota,
+  titulo, foto, filas, sesiones = [], total, etiquetaTotal = 'Total', accion, nota,
 }: {
   titulo: string;
-  foto?: IdFoto;
+  foto?: IdFoto | EntradaFoto;
   filas: Fila[];
   sesiones?: SesionReservada[];
   total: number | null;
+  etiquetaTotal?: string;
   accion?: AccionResumen;
   nota?: ReactNode;
 }) {
@@ -69,13 +73,15 @@ export default function BookingSummary({
     <>
       {/* Escritorio */}
       <aside className="sticky top-28 hidden overflow-hidden rounded-suave border border-cafe/12 bg-crema lg:block" aria-label="Resumen de tu reserva">
-        {foto && <Foto id={foto} className="aspect-[16/9] w-full" sizes="24rem" />}
+        {foto && (typeof foto === 'string'
+          ? <Foto id={foto} className="aspect-[16/9] w-full" sizes="24rem" />
+          : <Foto foto={foto} className="aspect-[16/9] w-full" sizes="24rem" />)}
         <div className="p-7">
           <p className="eyebrow text-cafe/55">Tu reserva</p>
           <h2 className="mt-2 font-display text-t4 font-light">{titulo}</h2>
           <div className="mt-6">{cuerpo}</div>
           <div className="mt-6 flex items-baseline justify-between border-t border-cafe/15 pt-5">
-            <span className="eyebrow text-cafe/60">Total</span>
+            <span className="eyebrow text-cafe/60">{etiquetaTotal}</span>
             <span className="cifra text-[2.1rem] leading-none">{total !== null ? pesosCortos(total) : '—'}</span>
           </div>
           {accion && (
@@ -117,6 +123,7 @@ export default function BookingSummary({
             className="flex min-h-12 flex-1 flex-col items-start justify-center text-left"
           >
             <span className="eyebrow flex items-center gap-1.5 text-[0.56rem] text-cafe/60">
+              {etiquetaTotal !== 'Total' && <span className="text-cafe/80">{etiquetaTotal} ·</span>}
               {detalle ? 'Ocultar detalle' : 'Ver detalle'}
               <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" className={detalle ? '' : 'rotate-180'} aria-hidden="true">
                 <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />

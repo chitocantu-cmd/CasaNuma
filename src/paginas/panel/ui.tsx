@@ -26,6 +26,7 @@ export const ETIQUETA_AVISO: Record<Aviso['estado'], string> = {
 
 export const ETIQUETA_PAGO: Record<EstadoPago, string> = {
   pagado: 'Pagado',
+  anticipo_pagado: 'Anticipo pagado',
   pendiente: 'Pendiente',
   reembolsado: 'Reembolsado',
   fallido: 'Rechazado',
@@ -35,6 +36,7 @@ export const ETIQUETA_TIPO: Record<TipoExperiencia, string> = {
   taller: 'Taller',
   membresia: 'Membresía',
   kids: 'NUMA Kids',
+  pinta: 'Pinta tu pieza',
 };
 
 export const ETIQUETA_METODO: Record<MetodoPago, string> = {
@@ -55,6 +57,7 @@ const TONO_ESTADO: Record<EstadoReserva, string> = {
 
 const TONO_PAGO: Record<EstadoPago, string> = {
   pagado: 'border-verde/60 text-cafe',
+  anticipo_pagado: 'border-amarillo text-cafe',
   pendiente: 'border-naranja/70 text-cafe',
   reembolsado: 'border-indigo/40 text-indigo',
   fallido: 'border-naranja text-cafe',
@@ -71,7 +74,12 @@ export function EstadoPill({ estado }: { estado: EstadoReserva }) {
 export function PagoPill({ pago }: { pago: EstadoPago }) {
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-[3px] text-[0.62rem] font-medium uppercase tracking-[0.1em] ${TONO_PAGO[pago]}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${pago === 'pagado' ? 'bg-verde' : pago === 'reembolsado' ? 'bg-indigo' : 'bg-naranja'}`} aria-hidden="true" />
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          pago === 'pagado' ? 'bg-verde' : pago === 'anticipo_pagado' ? 'bg-amarillo' : pago === 'reembolsado' ? 'bg-indigo' : 'bg-naranja'
+        }`}
+        aria-hidden="true"
+      />
       {ETIQUETA_PAGO[pago]}
     </span>
   );
@@ -116,7 +124,8 @@ export function fechaHora(isoInstante: string) {
 }
 
 export function dinero(n: number) {
-  return `$${new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 }).format(n)}`;
+  const decimales = Number.isInteger(n) ? 0 : 2;
+  return `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: decimales, maximumFractionDigits: decimales }).format(n)}`;
 }
 
 // --- Tarjetas ----------------------------------------------------------------

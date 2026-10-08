@@ -23,6 +23,7 @@ import { siteConfig } from '../../config/site';
 import { ANON_KEY, FUNCIONES, supabase } from '../../lib/supabase/client';
 import { claveMes, etiquetaMes, hoy, minutosEntre, sumarDias, yaPaso } from '../../lib/calendario';
 import { correoValido, soloDigitos } from '../../lib/formato';
+import { montoPagado } from '../../lib/anticipo';
 import { avisosReservaConfirmada } from '../avisos';
 import { PRODUCTOS_SEMILLA } from '../demo/semilla';
 import { ErrorDatos, type CambiosReserva, type CodigoError, type Repositorio, type RepositorioAdmin } from '../repositorio';
@@ -339,7 +340,9 @@ const ESTADOS: Record<string, EstadoReserva> = {
   expired: 'expirada',
 };
 
-const PAGOS: Record<string, EstadoPago> = { paid: 'pagado', refunded: 'reembolsado', failed: 'fallido' };
+const PAGOS: Record<string, EstadoPago> = {
+  paid: 'pagado', paid_in_full: 'pagado', deposit_paid: 'anticipo_pagado', refunded: 'reembolsado', failed: 'fallido',
+};
 
 function metodoDe(p: FilaPago | null): MetodoPago | null {
   if (p?.method) return p.method as MetodoPago;
@@ -361,6 +364,7 @@ function aReserva(f: FilaReserva, respaldo?: Contacto): Reserva {
   const titulo =
     tipo === 'taller' ? f.workshop?.title ?? 'Taller'
     : tipo === 'kids' ? 'NUMA Kids'
+    : tipo === 'pinta' ? 'Pinta tu pieza'
     : `Membresía ${etiquetaMes(mes).split(' ')[0]}`;
 
   let estado = ESTADOS[f.status] ?? 'cancelada';
@@ -410,6 +414,9 @@ async function misFilas(): Promise<FilaReserva[]> {
 
 const contactoDe = (u: Usuario): Contacto => ({ nombre: u.nombre, email: u.email, telefono: u.telefono });
 
+const pintaSinConectar = () =>
+  new ErrorDatos('NO_CONECTADO', 'Pinta tu pieza todavía no se puede reservar en línea. Escríbenos por WhatsApp y te apartamos tu lugar.');
+
 // --- Implementación pública ------------------------------------------------------------
 
 export const repoSupabase: Repositorio = {
@@ -438,6 +445,18 @@ export const repoSupabase: Repositorio = {
     return (await sesionesPublicas({ tipo: 'kids' })).map(aSesion);
   },
 
+  // PENDIENTE: Pinta tu pieza todavía no está en la base (tabla paint_pieces,
+  // sesiones 'paint_your_piece' y el cobro del anticipo en el servidor; ver
+  // docs/INTEGRACION.md). Sin fechas ni piezas, la página ofrece WhatsApp y
+  // no se puede apartar: nunca se cobra un anticipo calculado en el navegador.
+  async sesionesPinta() {
+    return [];
+  },
+
+  async piezasPinta() {
+    return [];
+  },
+
   // PENDIENTE: NUMA Store todavía no tiene tabla; son las fichas de ejemplo
   // (marcadas demo) hasta que Casa Numa suba las reales.
   async productos() {
@@ -455,6 +474,7 @@ export const repoSupabase: Repositorio = {
   },
 
   async apartar(s) {
+    if (s.tipo === 'pinta') throw pintaSinConectar();
     const usuario = await exigirSesion();
     if (!s.contacto.nombre.trim() || !correoValido(s.contacto.email) || soloDigitos(s.contacto.telefono).length < 10) {
       throw new ErrorDatos('DATOS_INVALIDOS', 'Revisa nombre, correo y teléfono.');
@@ -773,8 +793,11 @@ export const repoAdminSupabase: RepositorioAdmin = {
       reservasHoy: deHoy.length,
       personasHoy: deHoy.reduce((n, r) => n + r.participantes, 0),
       proximos7: vivas.filter((r) => r.sesiones.some((s) => s.fecha >= hoyIso && s.fecha < en7)).length,
-      ingresosConfirmados: reservas.filter((r) => r.pago === 'pagado').reduce((n, r) => n + r.total, 0),
+      ingresosConfirmados: reservas.reduce((n, r) => n + montoPagado(r), 0),
       pagosPendientes: vivas.filter((r) => r.pago === 'pendiente').length,
+      // Pinta tu pieza aún no llega a la base: no hay saldos que cobrar.
+      saldoPorCobrar: 0,
+      revisionManual: 0,
       cupoBajo: proximas.filter(
         (x) => x.tipo !== 'membresia' && !yaPaso(x.sesion.fecha, x.sesion.inicio) && x.sesion.disponibles !== null && x.sesion.disponibles <= 3,
       ).length,
@@ -846,6 +869,28 @@ export const repoAdminSupabase: RepositorioAdmin = {
     return nueva;
   },
 
+  // PENDIENTE: Pinta tu pieza en la base (docs/INTEGRACION.md). Hasta
+  // entonces no hay reservas con anticipo ni inventario que administrar.
+  async liquidarSaldo() {
+    await exigirAdmin();
+    throw pintaSinConectar();
+  },
+
+  async cambiarPieza() {
+    await exigirAdmin();
+    throw pintaSinConectar();
+  },
+
+  async piezas() {
+    await exigirAdmin();
+    return [];
+  },
+
+  async editarPieza() {
+    await exigirAdmin();
+    throw pintaSinConectar();
+  },
+
   async agenda(mes) {
     await exigirAdmin();
     const [a, m] = mes.split('-').map(Number);
@@ -893,7 +938,7 @@ export const repoAdminSupabase: RepositorioAdmin = {
       if (!c.nombre) c.nombre = r.contacto.nombre;
       if (!c.telefono) c.telefono = r.contacto.telefono;
       c.reservas += 1;
-      if (r.pago === 'pagado') c.pagado += r.total;
+      c.pagado += montoPagado(r);
       if (!c.ultima || r.creadaEn > c.ultima) c.ultima = r.creadaEn;
       mapa.set(k, c);
     }

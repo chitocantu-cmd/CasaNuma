@@ -3,7 +3,7 @@ import { entrarAlPanel, preparar, sinErrores } from './apoyo';
 
 const PANTALLAS = [
   '/admin', '/admin/reservas', '/admin/reservas/nueva', '/admin/calendario', '/admin/talleres',
-  '/admin/membresias', '/admin/clientes', '/admin/pagos', '/admin/avisos',
+  '/admin/membresias', '/admin/piezas', '/admin/clientes', '/admin/pagos', '/admin/avisos',
 ];
 
 test('cada pantalla del panel carga sin undefined, NaN ni null a la vista', async ({ page }) => {

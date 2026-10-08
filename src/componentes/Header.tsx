@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { NAV } from '../contenido/navegacion';
 import { enlaceInstagram } from '../config/site';
@@ -18,6 +18,8 @@ export default function Header() {
   const { pathname } = useLocation();
   const { usuario } = useSesion();
   const instagram = enlaceInstagram();
+  // Estable: el menú vuelve a enfocar «Cerrar» cada vez que cambia onCerrar.
+  const cerrarMenu = useCallback(() => setMenuAbierto(false), []);
 
   useEffect(() => {
     const revisar = () => setConFondo(window.scrollY > 24);
@@ -43,13 +45,14 @@ export default function Header() {
           </Link>
 
           <nav aria-label="Principal" className="hidden lg:block">
-            <ul className="flex items-center gap-6 xl:gap-9">
+            {/* Siete secciones: entre 1024 y 1280 px van más juntas para no partirse en dos líneas. */}
+            <ul className="flex items-center gap-4 xl:gap-9">
               {NAV.map((i) => (
                 <li key={i.to}>
                   <NavLink
                     to={i.to}
                     className={({ isActive }) =>
-                      `eyebrow subrayado pb-1 text-[0.7rem] transition-colors ${isActive ? 'text-cafe' : 'text-cafe/75 hover:text-cafe'}`
+                      `eyebrow subrayado whitespace-nowrap pb-1 text-[0.66rem] tracking-[0.14em] transition-colors xl:text-[0.7rem] xl:tracking-[0.22em] ${isActive ? 'text-cafe' : 'text-cafe/75 hover:text-cafe'}`
                     }
                   >
                     {i.label}
@@ -65,7 +68,7 @@ export default function Header() {
                 href={instagram}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden h-10 w-10 items-center justify-center rounded-full text-cafe/80 transition-colors hover:bg-cafe/[0.06] hover:text-cafe lg:inline-flex"
+                className="hidden h-10 w-10 items-center justify-center rounded-full text-cafe/80 transition-colors hover:bg-cafe/[0.06] hover:text-cafe xl:inline-flex"
                 aria-label="Instagram de Casa Numa"
               >
                 <Icono.instagram tam={20} />
@@ -96,7 +99,7 @@ export default function Header() {
         </div>
       </header>
 
-      <MobileMenu abierto={menuAbierto} onCerrar={() => setMenuAbierto(false)} />
+      <MobileMenu abierto={menuAbierto} onCerrar={cerrarMenu} />
     </>
   );
 }

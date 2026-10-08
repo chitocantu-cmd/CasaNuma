@@ -15,7 +15,7 @@ import ErrorCarga from '../../componentes/base/ErrorCarga';
 import { ETIQUETA_TIPO, EncabezadoPanel, claseCampo, claseTabla, diaMesSemana, dinero, horaCorta } from './ui';
 import { CargandoBloque } from '../../componentes/base/Cargando';
 
-const PESTANAS: TipoExperiencia[] = ['taller', 'kids', 'membresia'];
+const PESTANAS: TipoExperiencia[] = ['taller', 'kids', 'membresia', 'pinta'];
 type Mensaje = { texto: string; error: boolean } | null;
 
 /** Cupo editable por sesión. Vacío = sin confirmar (no se cuenta cupo). */

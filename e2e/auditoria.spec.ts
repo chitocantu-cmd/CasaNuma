@@ -8,7 +8,7 @@ const PUBLICAS = [
   '/nosotras', '/cuenta/entrar', '/cuenta/registro', '/cuenta/recuperar', '/aviso-de-privacidad', '/pago/cancelado',
   '/esta-ruta-no-existe',
 ];
-const PANEL = ['/admin', '/admin/reservas', '/admin/reservas/nueva', '/admin/calendario', '/admin/talleres', '/admin/membresias', '/admin/clientes', '/admin/pagos', '/admin/avisos'];
+const PANEL = ['/admin', '/admin/reservas', '/admin/reservas/nueva', '/admin/calendario', '/admin/talleres', '/admin/piezas', '/admin/membresias', '/admin/clientes', '/admin/pagos', '/admin/avisos'];
 
 async function revisar(page: Page, ruta: string) {
   await page.goto(ruta);

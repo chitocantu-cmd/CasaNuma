@@ -29,6 +29,13 @@ export function mensajeInformacionTaller(titulo: string, cuando: string): string
   return `Hola Casa Numa, quiero información sobre «${titulo}» (${cuando}): precio y lugares disponibles.`;
 }
 
+/** Pinta tu pieza: una pieza sin precio publicado, o dudas antes de reservar. */
+export function mensajePintaTuPieza(pieza?: string): string {
+  return pieza
+    ? `Hola Casa Numa, me gustaría pintar «${pieza}» en Pinta tu pieza. ¿Me comparten el precio y si está disponible?`
+    : 'Hola Casa Numa, quiero información sobre Pinta tu pieza: piezas disponibles, precios y horarios.';
+}
+
 export function mensajePieza(nombre: string): string {
   return `Hola Casa Numa, me interesa comprar la pieza «${nombre}» de NUMA Store. ¿Sigue disponible?`;
 }

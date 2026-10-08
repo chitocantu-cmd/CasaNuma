@@ -16,11 +16,13 @@ import CeramicShape from '../../componentes/marca/CeramicShape';
 import ErrorCarga from '../../componentes/base/ErrorCarga';
 import { CargandoBloque, CargandoPagina } from '../../componentes/base/Cargando';
 
-const TIPO: Record<Reserva['tipo'], string> = { taller: 'Taller', membresia: 'Membresía', kids: 'NUMA Kids' };
+const TIPO: Record<Reserva['tipo'], string> = { taller: 'Taller', membresia: 'Membresía', kids: 'NUMA Kids', pinta: 'Pinta tu pieza' };
 const ESTADO: Record<Reserva['estado'], string> = {
   confirmada: 'Confirmada', pendiente_pago: 'Pendiente de pago', cancelada: 'Cancelada', completada: 'Completada', no_asistio: 'No asististe', expirada: 'Expirada',
 };
-const PAGO: Record<Reserva['pago'], string> = { pagado: 'Pagado', pendiente: 'Pendiente', reembolsado: 'Reembolsado', fallido: 'Rechazado' };
+const PAGO: Record<Reserva['pago'], string> = {
+  pagado: 'Pagado', anticipo_pagado: 'Anticipo pagado', pendiente: 'Pendiente', reembolsado: 'Reembolsado', fallido: 'Rechazado',
+};
 
 interface Fila {
   reserva: Reserva;
@@ -163,9 +165,32 @@ function FilaReserva({ fila: { reserva: r, sesion: s, numero } }: { fila: Fila }
         <p className="mt-1 text-nota text-cafe/70 first-letter:uppercase">
           {fechaCompleta(s.fecha)} · {rango(s.inicio, s.fin)}
         </p>
-        <p className="mt-1 text-[0.74rem] text-cafe/60">
-          {r.ninos?.length ? r.ninos.map((n) => n.nombre).join(', ') : `${r.participantes} ${r.participantes === 1 ? 'persona' : 'personas'}`}
-        </p>
+        {r.cobro ? (
+          <>
+            {r.pieza && <p className="mt-1 text-nota">Pieza: <span className="text-cafe">{r.pieza.nombre}</span></p>}
+            <dl className="mt-3 grid grid-cols-3 gap-2 rounded-[0.6rem] bg-amarillo/[0.18] px-3 py-2.5 text-[0.74rem]" aria-label="Pago de tu pieza">
+              <div>
+                <dt className="text-cafe/60">Total</dt>
+                <dd className="mt-0.5 font-medium">{pesosCortos(r.total)}</dd>
+              </div>
+              <div>
+                <dt className="text-cafe/60">{r.pago === 'pagado' ? 'Pagado' : 'Anticipo pagado'}</dt>
+                <dd className="mt-0.5 font-medium">{pendiente ? '—' : pesosCortos(r.cobro.pagado)}</dd>
+              </div>
+              <div>
+                <dt className="text-cafe/60">Saldo pendiente</dt>
+                <dd className="mt-0.5 font-medium">
+                  {pendiente ? '—' : r.cobro.saldo < 0 ? 'En revisión' : r.cobro.saldo === 0 ? 'Liquidado' : pesosCortos(r.cobro.saldo)}
+                </dd>
+              </div>
+            </dl>
+            {!pendiente && r.cobro.saldo > 0 && <p className="mt-2 text-[0.72rem] text-cafe/60">El saldo se paga en Casa Numa.</p>}
+          </>
+        ) : (
+          <p className="mt-1 text-[0.74rem] text-cafe/60">
+            {r.ninos?.length ? r.ninos.map((n) => n.nombre).join(', ') : `${r.participantes} ${r.participantes === 1 ? 'persona' : 'personas'}`}
+          </p>
+        )}
       </div>
       <div className="col-span-2 flex flex-wrap gap-2 sm:col-span-1 sm:flex-col sm:items-end">
         <span className={`eyebrow rounded-full px-2.5 py-1 text-[0.55rem] ${pendiente ? 'bg-naranja/20' : 'bg-verde/25'}`}>{ESTADO[r.estado]}</span>

@@ -46,6 +46,21 @@ export default function PanelResumen() {
             <Kpi etiqueta="Cupo bajo" valor={datos.cupoBajo} alerta={datos.cupoBajo > 0} nota="sesiones con 3 lugares o menos" />
           </div>
 
+          {(datos.saldoPorCobrar > 0 || datos.revisionManual > 0) && (
+            <div className="flex flex-col gap-3 rounded-suave border border-amarillo bg-amarillo/[0.14] p-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[0.86rem]">
+                <span className="eyebrow block text-[0.6rem] text-cafe/70">Pinta tu pieza · saldo por cobrar en el estudio</span>
+                <span className="cifra mt-1 block text-[2rem] leading-none" data-saldo-por-cobrar>{dinero(datos.saldoPorCobrar)}</span>
+                {datos.revisionManual > 0 && (
+                  <span className="mt-2 block font-medium text-naranja">
+                    {datos.revisionManual} {datos.revisionManual === 1 ? 'reserva requiere' : 'reservas requieren'} revisión manual
+                  </span>
+                )}
+              </p>
+              <Link to="/admin/reservas?q=" className="subrayado-fijo self-start pb-0.5 text-[0.74rem] sm:self-auto">Ver reservas</Link>
+            </div>
+          )}
+
           <div className="grid gap-6 xl:grid-cols-12">
             <Tarjeta
               titulo="Últimas reservas"

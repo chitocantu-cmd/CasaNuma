@@ -108,6 +108,14 @@ function descargar(contenido: string, nombre: string) {
   URL.revokeObjectURL(url);
 }
 
+/** Folio y, en Pinta tu pieza, la pieza y el saldo que se paga en el estudio. */
+function detalleReserva(r: Reserva): string {
+  const partes = [`Reservación ${r.folio ?? ''}`.trim()];
+  if (r.pieza) partes.push(`Pieza: ${r.pieza.nombre}`);
+  if (r.cobro && r.cobro.saldo > 0) partes.push(`Saldo pendiente: $${r.cobro.saldo.toLocaleString('es-MX')} MXN, se paga en Casa Numa`);
+  return partes.join(' · ');
+}
+
 /** Reserva del sitio rediseñado: una o varias sesiones. */
 export function descargarIcsReserva(r: Reserva, lugar: string): void {
   const eventos = r.sesiones.map((s, i) => ({
@@ -117,7 +125,7 @@ export function descargarIcsReserva(r: Reserva, lugar: string): void {
     fin: s.fin,
     titulo: r.sesiones.length > 1 ? `Casa Numa — ${r.titulo} (${i + 1}/${r.sesiones.length})` : `Casa Numa — ${r.titulo}`,
     lugar,
-    descripcion: `Reservación ${r.folio ?? ''}`.trim(),
+    descripcion: detalleReserva(r),
   }));
   descargar(construirIcsEventos(eventos), `casa-numa-${(r.folio ?? r.id).toLowerCase()}.ics`);
 }
@@ -142,7 +150,7 @@ export function enlaceGoogleCalendarReserva(r: Reserva, lugar: string): string |
     text: `Casa Numa — ${r.titulo}`,
     dates: `${compacta(s.inicio)}/${compacta(fin)}`,
     ctz: 'America/Monterrey',
-    details: `Reservación ${r.folio ?? ''}`.trim(),
+    details: detalleReserva(r),
     location: lugar,
   });
   return `https://calendar.google.com/calendar/render?${params}`;

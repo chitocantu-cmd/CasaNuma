@@ -1,14 +1,17 @@
 import type { EntradaFoto, IdFoto } from '../contenido/fotos';
+import type { CategoriaPieza } from '../contenido/piezasPinta';
 
 // ===========================================================================
 // Dominio del sitio público
 // ---------------------------------------------------------------------------
-// Tres experiencias se reservan y pagan en línea: talleres de fin de semana,
-// membresía y NUMA Kids. Eventos y NUMA Store se atienden por WhatsApp y por
-// eso no tienen reserva aquí.
+// Cuatro experiencias se reservan en línea: talleres de fin de semana,
+// membresía y NUMA Kids (se pagan completas) y Pinta tu pieza (se aparta con
+// el 50 % del valor de la pieza y el resto se paga en Casa Numa). Eventos y
+// NUMA Store se atienden por WhatsApp y por eso no tienen reserva aquí.
 // ===========================================================================
 
-export type TipoExperiencia = 'taller' | 'membresia' | 'kids';
+/** 'pinta' = Pinta tu pieza (experienceType "paint_your_piece" en la base). */
+export type TipoExperiencia = 'taller' | 'membresia' | 'kids' | 'pinta';
 
 /** Un horario concreto con cupo. Fechas 'YYYY-MM-DD', horas 'HH:MM' (Monterrey). */
 export interface Sesion {
@@ -109,7 +112,11 @@ export interface Usuario {
  * Una reserva reembolsada queda cancelada con el pago 'reembolsado'.
  */
 export type EstadoReserva = 'pendiente_pago' | 'confirmada' | 'cancelada' | 'completada' | 'no_asistio' | 'expirada';
-export type EstadoPago = 'pendiente' | 'pagado' | 'reembolsado' | 'fallido';
+/**
+ * pendiente: no se ha cobrado nada · anticipo_pagado: se pagó una parte y
+ * falta saldo (deposit_paid) · pagado: pagado completo (paid_in_full).
+ */
+export type EstadoPago = 'pendiente' | 'anticipo_pagado' | 'pagado' | 'reembolsado' | 'fallido';
 export type MetodoPago = 'tarjeta' | 'transferencia' | 'efectivo' | 'otro';
 
 export interface Nino {
@@ -124,6 +131,64 @@ export interface SesionReservada {
   fin: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Pinta tu pieza
+// ---------------------------------------------------------------------------
+
+/** Pieza de bizcochito que se puede elegir para pintar. */
+export interface PiezaPinta {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  categoria: CategoriaPieza;
+  /** La primera es la principal. */
+  fotos: EntradaFoto[];
+  /** MXN. null = precio pendiente: se muestra la pieza pero no se puede pagar. */
+  precio: number | null;
+  tamano: string | null;
+  /** Tipo de acabado (finishType). */
+  acabado: string | null;
+  /** null = Casa Numa no lo ha indicado. */
+  requiereQuema: boolean | null;
+  /** Piezas en existencia. null = sin conteo: no se limita por inventario. */
+  stock: number | null;
+  /** stock menos los apartados vigentes. null si no hay conteo. */
+  disponibles: number | null;
+  /** Apagada desde el panel: se ve como no disponible (isAvailable). */
+  activa: boolean;
+  /** Pieza o precio de ejemplo para recorrer la demo: no es del catálogo de Casa Numa. */
+  demo: boolean;
+}
+
+export interface PiezaElegida {
+  id: string;
+  nombre: string;
+  /** Precio al momento de elegirla. */
+  precio: number;
+}
+
+export interface PiezaReservada extends PiezaElegida {
+  /** Cambios hechos en el estudio, del más antiguo al más reciente. */
+  cambios: { de: PiezaElegida; a: PiezaElegida; en: string }[];
+}
+
+/**
+ * Cobro en partes (Pinta tu pieza). Sin esto, la reserva se paga completa.
+ * El total de la reserva es el precio de la pieza (Reserva.total).
+ */
+export interface CobroAnticipo {
+  /** 50 (depositPercentage). */
+  porcentaje: number;
+  /** Lo que se cobra en línea para reservar (depositAmount). No cambia aunque cambie la pieza. */
+  anticipo: number;
+  /** Todo lo recibido hasta ahora: anticipo + lo cobrado en el estudio. */
+  pagado: number;
+  /** Lo cobrado en el estudio al liquidar (finalPaymentAmount). null = aún no. */
+  pagoFinal: number | null;
+  /** total − pagado (remainingBalance). Negativo = pagó de más: revisión manual. */
+  saldo: number;
+}
+
 export interface Reserva {
   id: string;
   /** NUMA-00001… Lo asigna el backend cuando el pago se confirma. */
@@ -136,6 +201,10 @@ export interface Reserva {
   participantes: number;
   /** NUMA Kids: solo nombre y edad, nada más del menor. */
   ninos?: Nino[];
+  /** Pinta tu pieza: la pieza que va a pintar. */
+  pieza?: PiezaReservada;
+  /** Pinta tu pieza: anticipo, lo pagado y el saldo. */
+  cobro?: CobroAnticipo;
   precioUnitario: number;
   subtotal: number;
   total: number;
@@ -174,6 +243,8 @@ export interface SolicitudReserva {
   sesionIds: string[];
   participantes: number;
   ninos?: Nino[];
+  /** Pinta tu pieza: solo el id; el precio lo pone el catálogo. */
+  piezaId?: string;
   contacto: Contacto;
   notas?: string;
 }
@@ -204,6 +275,8 @@ export interface Pago {
   referencia: string | null;
   metodo: MetodoPago | null;
   monto: number;
+  /** Qué cubre: la reserva completa, el anticipo en línea o el saldo en el estudio. */
+  concepto?: 'total' | 'anticipo' | 'saldo';
   estado: EstadoPago;
   creadoEn: string;
   demo: boolean;
@@ -238,6 +311,9 @@ export interface Asistente {
   estado: EstadoReserva;
   pago: EstadoPago;
   ninos?: Nino[];
+  /** Pinta tu pieza: qué pieza pinta y cuánto falta cobrarle en el estudio. */
+  pieza?: string;
+  saldo?: number;
 }
 
 /** Una sesión con quién va: la vista del calendario del equipo. */
@@ -287,6 +363,10 @@ export interface ResumenAdmin {
   proximos7: number;
   ingresosConfirmados: number;
   pagosPendientes: number;
+  /** Pinta tu pieza: saldos que se cobran en el estudio (reservas confirmadas). */
+  saldoPorCobrar: number;
+  /** Reservas con pago de más tras un cambio de pieza: revisión manual. */
+  revisionManual: number;
   cupoBajo: number;
   ultimas: Reserva[];
   hoy: SesionAdmin[];

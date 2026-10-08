@@ -13,6 +13,7 @@ const COLUMNAS: { titulo: string; enlaces: { label: string; to: string }[] }[] =
     titulo: 'Experiencias',
     enlaces: [
       { label: 'Talleres', to: '/talleres' },
+      { label: 'Pinta tu pieza', to: '/pinta-tu-pieza' },
       { label: 'Membresía', to: '/membresia' },
       { label: 'NUMA Kids', to: '/numa-kids' },
       { label: 'Eventos', to: '/eventos' },

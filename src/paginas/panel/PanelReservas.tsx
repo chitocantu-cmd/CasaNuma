@@ -5,6 +5,7 @@ import { useConsulta } from '../../datos/hooks';
 import type { EstadoPago, EstadoReserva, Reserva, TipoExperiencia } from '../../datos/tipos';
 import { diaSemana, hoy, sumarDias } from '../../lib/calendario';
 import { soloDigitos } from '../../lib/formato';
+import { montoPagado, saldoDe } from '../../lib/anticipo';
 import { Icono } from '../../componentes/base/Iconos';
 import ErrorCarga from '../../componentes/base/ErrorCarga';
 import { CargandoBloque } from '../../componentes/base/Cargando';
@@ -48,9 +49,19 @@ function coincide(r: Reserva, q: string): boolean {
     r.contacto.nombre.toLowerCase().includes(t) ||
     r.contacto.email.toLowerCase().includes(t) ||
     (r.folio ?? '').toLowerCase().includes(t) ||
+    (r.pieza?.nombre ?? '').toLowerCase().includes(t) ||
     (dig.length >= 3 && soloDigitos(r.contacto.telefono).includes(dig)) ||
     (r.ninos ?? []).some((n) => n.nombre.toLowerCase().includes(t))
   );
+}
+
+/** Lo que falta cobrar: el saldo, «Revisión» si pagó de más o «—» si no aplica. */
+function Pendiente({ r }: { r: Reserva }) {
+  if (r.estado === 'cancelada' || r.estado === 'expirada') return <span className="text-cafe/40">—</span>;
+  const saldo = saldoDe(r);
+  if (saldo < 0) return <span className="font-medium text-naranja">Revisión</span>;
+  if (saldo === 0) return <span className="text-cafe/50">$0</span>;
+  return <span className={r.cobro ? 'font-medium' : ''}>{dinero(saldo)}</span>;
 }
 
 export default function PanelReservas() {
@@ -89,7 +100,11 @@ export default function PanelReservas() {
   }, [datos, estado, pago, tipo, taller, rango, fecha, q, orden]);
 
   const personas = lista.filter((r) => r.estado !== 'cancelada').reduce((n, r) => n + r.participantes, 0);
-  const cobrado = lista.filter((r) => r.pago === 'pagado').reduce((n, r) => n + r.total, 0);
+  const cobrado = lista.reduce((n, r) => n + montoPagado(r), 0);
+  // Pinta tu pieza: lo que falta cobrar en el estudio de las reservas confirmadas.
+  const porCobrar = lista
+    .filter((r) => r.cobro && (r.estado === 'confirmada' || r.estado === 'completada'))
+    .reduce((n, r) => n + Math.max(0, saldoDe(r)), 0);
 
   return (
     <div className="space-y-6">
@@ -151,6 +166,7 @@ export default function PanelReservas() {
         </div>
         <p className="text-[0.78rem] text-cafe/65">
           {lista.length} {lista.length === 1 ? 'reserva' : 'reservas'} · {personas} {personas === 1 ? 'persona' : 'personas'} · {dinero(cobrado)} cobrado
+          {porCobrar > 0 && <> · <strong className="font-medium text-cafe">{dinero(porCobrar)} por cobrar en el estudio</strong></>}
         </p>
       </div>
 
@@ -169,8 +185,8 @@ export default function PanelReservas() {
             <table className={claseTabla.tabla}>
               <thead>
                 <tr>
-                  {['Folio', 'Cliente', 'Experiencia', 'Fecha', 'Hora', 'Personas', 'Total', 'Pago', 'Estado'].map((h) => (
-                    <th key={h} className={`${claseTabla.th} ${['Personas', 'Total'].includes(h) ? 'text-right' : ''}`}>{h}</th>
+                  {['Folio', 'Cliente', 'Experiencia', 'Fecha', 'Hora', 'Personas', 'Total', 'Pagado', 'Pendiente', 'Pago', 'Estado'].map((h) => (
+                    <th key={h} className={`${claseTabla.th} ${['Personas', 'Total', 'Pagado', 'Pendiente'].includes(h) ? 'text-right' : ''}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -192,6 +208,7 @@ export default function PanelReservas() {
                     </td>
                     <td className={claseTabla.td}>
                       <span className="block">{r.titulo}</span>
+                      {r.pieza && <span className="block text-[0.76rem] text-cafe">{r.pieza.nombre}</span>}
                       <span className="text-[0.7rem] text-cafe/55">{r.origen === 'panel' ? 'Registrada en el panel' : 'Web'}</span>
                     </td>
                     <td className={`${claseTabla.td} whitespace-nowrap`}>
@@ -201,6 +218,8 @@ export default function PanelReservas() {
                     <td className={`${claseTabla.td} whitespace-nowrap`}>{r.sesiones[0] ? horaCorta(r.sesiones[0].inicio) : '—'}</td>
                     <td className={`${claseTabla.td} text-right`}>{r.participantes}</td>
                     <td className={`${claseTabla.td} whitespace-nowrap text-right`}>{dinero(r.total)}</td>
+                    <td className={`${claseTabla.td} whitespace-nowrap text-right`}>{dinero(montoPagado(r))}</td>
+                    <td className={`${claseTabla.td} whitespace-nowrap text-right`}><Pendiente r={r} /></td>
                     <td className={claseTabla.td}><PagoPill pago={r.pago} /></td>
                     <td className={claseTabla.td}><EstadoPill estado={r.estado} /></td>
                   </tr>
@@ -224,10 +243,17 @@ export default function PanelReservas() {
                   <span className="mt-1 block text-[0.8rem] text-cafe/70">
                     {r.titulo}{r.sesiones[0] ? ` · ${diaMes(r.sesiones[0].fecha)} · ${horaCorta(r.sesiones[0].inicio)}` : ''} · {r.participantes} pers.
                   </span>
+                  {r.pieza && <span className="mt-0.5 block text-[0.8rem]">{r.pieza.nombre}</span>}
                   <span className="mt-3 flex items-center justify-between">
                     <span className="cifra text-[1.2rem]">{dinero(r.total)}</span>
                     <PagoPill pago={r.pago} />
                   </span>
+                  {r.cobro && (
+                    <span className="mt-2 flex justify-between text-[0.76rem] text-cafe/70">
+                      <span>Pagado {dinero(montoPagado(r))}</span>
+                      <span>Pendiente <Pendiente r={r} /></span>
+                    </span>
+                  )}
                 </Link>
               </li>
             ))}

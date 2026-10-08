@@ -5,9 +5,10 @@ import { fuenteDatos, siteConfig } from '../../config/site';
 import { fechaCompleta, hora } from '../../lib/calendario';
 import { pesosCortos } from '../../lib/formato';
 import { descargarIcsReserva, enlaceGoogleCalendarReserva } from '../../lib/ics';
-import { BotonEnlace } from '../base/Boton';
+import { Boton, BotonEnlace } from '../base/Boton';
 import { EASE_NUMA } from '../base/Revelar';
 import CeramicShape, { type NombreSilueta } from '../marca/CeramicShape';
+import DesgloseAnticipo from '../pinta/DesgloseAnticipo';
 
 const mayuscula = (t: string) => t.replace(/^./, (c) => c.toUpperCase());
 
@@ -55,20 +56,34 @@ export default function Confirmacion({
             </li>
           ))}
         </ul>
-        <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-cafe/10 pt-5">
-          <p className="text-nota text-cafe/75">
-            {r.ninos?.length
-              ? r.ninos.map((n) => `${n.nombre} (${n.edad} años)`).join(' · ')
-              : `${r.participantes} ${r.participantes === 1 ? 'participante' : 'participantes'}`}
-          </p>
-          <p className="text-right">
-            <span className="eyebrow block text-[0.6rem] text-cafe/55">Total</span>
-            <span className="cifra text-[1.9rem] leading-none">{pesosCortos(r.total)}</span>
-            <span className="mt-1 block text-[0.74rem] text-cafe/65">
-              Pago: {pago}{fuenteDatos === 'demo' ? ' · simulado en la demo' : ''}
-            </span>
-          </p>
-        </div>
+        {r.cobro ? (
+          <div className="mt-5 border-t border-cafe/10 pt-5">
+            {r.pieza && <p className="text-nota text-cafe/75">Pieza: <span className="text-cafe">{r.pieza.nombre}</span></p>}
+            <DesgloseAnticipo
+              modo="despues" className="mt-4" total={r.total} anticipo={r.cobro.anticipo} porcentaje={r.cobro.porcentaje}
+              pagado={r.cobro.pagado} saldo={r.cobro.saldo}
+            />
+            <p className="mt-5 rounded-[0.6rem] bg-amarillo/25 px-4 py-3 text-nota text-cafe">
+              Tu reservación está confirmada. El saldo restante se liquida en Casa Numa.
+            </p>
+            {fuenteDatos === 'demo' && <p className="mt-2 text-[0.74rem] text-cafe/65">Pago simulado en la demo.</p>}
+          </div>
+        ) : (
+          <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-cafe/10 pt-5">
+            <p className="text-nota text-cafe/75">
+              {r.ninos?.length
+                ? r.ninos.map((n) => `${n.nombre} (${n.edad} años)`).join(' · ')
+                : `${r.participantes} ${r.participantes === 1 ? 'participante' : 'participantes'}`}
+            </p>
+            <p className="text-right">
+              <span className="eyebrow block text-[0.6rem] text-cafe/55">Total</span>
+              <span className="cifra text-[1.9rem] leading-none">{pesosCortos(r.total)}</span>
+              <span className="mt-1 block text-[0.74rem] text-cafe/65">
+                Pago: {pago}{fuenteDatos === 'demo' ? ' · simulado en la demo' : ''}
+              </span>
+            </p>
+          </div>
+        )}
         {children && <div className="mt-5 border-t border-cafe/10 pt-5 text-nota text-cafe/75">{children}</div>}
       </div>
 
@@ -79,12 +94,17 @@ export default function Confirmacion({
 
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <BotonEnlace to="/cuenta" flecha>Ver mis reservas</BotonEnlace>
+        {r.cobro && (
+          <Boton variante="secundario" onClick={() => descargarIcsReserva(r, lugar)}>Agregar a mi calendario</Boton>
+        )}
         <BotonEnlace to={volver.to} variante="secundario">{volver.texto}</BotonEnlace>
       </div>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-nota text-cafe/75">
-        <button type="button" onClick={() => descargarIcsReserva(r, lugar)} className="subrayado-fijo pb-0.5">
-          Agregar a mi calendario (.ics)
-        </button>
+        {!r.cobro && (
+          <button type="button" onClick={() => descargarIcsReserva(r, lugar)} className="subrayado-fijo pb-0.5">
+            Agregar a mi calendario (.ics)
+          </button>
+        )}
         {google && (
           <a href={google} target="_blank" rel="noopener noreferrer" className="subrayado-fijo pb-0.5">
             Agregar a Google Calendar

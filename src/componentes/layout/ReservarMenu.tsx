@@ -8,7 +8,7 @@ import { EASE_NUMA } from '../base/Revelar';
 import { clasesBoton } from '../base/Boton';
 
 /**
- * "Reservar" no manda a una sola página: abre las cuatro puertas de entrada y
+ * "Reservar" no manda a una sola página: abre las puertas de entrada y
  * dice de una vez qué se paga en línea y qué se cotiza por WhatsApp.
  */
 export default function ReservarMenu({ compacto = false }: { compacto?: boolean }) {
@@ -31,15 +31,17 @@ export default function ReservarMenu({ compacto = false }: { compacto?: boolean 
         boton.current?.focus();
       }
     };
-    const alClic = (e: MouseEvent) => {
+    // pointerdown y no mousedown: en iPhone, tocar una zona sin enlaces no
+    // dispara mousedown y el panel se quedaba abierto.
+    const alTocar = (e: PointerEvent) => {
       const t = e.target as Node;
       if (!panel.current?.contains(t) && !boton.current?.contains(t)) setAbierto(false);
     };
     window.addEventListener('keydown', alTeclear);
-    window.addEventListener('mousedown', alClic);
+    window.addEventListener('pointerdown', alTocar);
     return () => {
       window.removeEventListener('keydown', alTeclear);
-      window.removeEventListener('mousedown', alClic);
+      window.removeEventListener('pointerdown', alTocar);
     };
   }, [abierto]);
 
