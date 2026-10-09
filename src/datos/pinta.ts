@@ -1,16 +1,15 @@
 import { PINTA } from '../contenido/oferta';
 import { PRECIOS_EJEMPLO, type RegistroPieza } from '../contenido/piezasPinta';
-import { calcularPagoReserva } from '../lib/anticipo';
 import { diaSemana, hoy, sumarDias } from '../lib/calendario';
 import { ErrorDatos } from './repositorio';
-import type { CobroAnticipo, PiezaPinta, Sesion } from './tipos';
+import type { PiezaPinta, Sesion } from './tipos';
 
 // ===========================================================================
 // Pinta tu pieza · reglas compartidas
 // ---------------------------------------------------------------------------
 // Las mismas para la demo y para Supabase: qué fechas se abren, cuándo se
-// puede elegir una pieza y cómo arranca el cobro de una reserva. El cálculo
-// del anticipo vive en lib/anticipo.ts.
+// puede elegir una pieza. El anticipo es el mismo de toda reserva en línea
+// (datos/cobro.ts y lib/anticipo.ts).
 // ===========================================================================
 
 /** `pinta-2026-10-09-1000` */
@@ -90,10 +89,4 @@ export function exigirPiezaReservable(p: PiezaPinta | undefined): asserts p is P
   if (estado === 'precio_pendiente') {
     throw new ErrorDatos('SIN_PIEZA', `«${p.nombre}» todavía no tiene precio publicado. Escríbenos para consultar disponibilidad.`);
   }
-}
-
-/** Cobro de una reserva recién apartada: nada pagado todavía. */
-export function cobroInicial(precioPieza: number): CobroAnticipo {
-  const p = calcularPagoReserva(precioPieza);
-  return { porcentaje: p.porcentajeAnticipo, anticipo: p.anticipo, pagado: 0, pagoFinal: null, saldo: p.total };
 }

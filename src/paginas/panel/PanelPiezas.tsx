@@ -3,7 +3,7 @@ import { ErrorDatos, repoAdmin } from '../../datos';
 import { invalidarCupos, useConsulta } from '../../datos/hooks';
 import { estadoPieza } from '../../datos/pinta';
 import type { PiezaPinta } from '../../datos/tipos';
-import { calcularPagoReserva } from '../../lib/anticipo';
+import { PORCENTAJE_ANTICIPO, calcularPagoReserva } from '../../lib/anticipo';
 import Foto from '../../componentes/base/Foto';
 import { Aviso } from '../../componentes/base/Campos';
 import ErrorCarga from '../../componentes/base/ErrorCarga';
@@ -127,7 +127,7 @@ export default function PanelPiezas() {
     <div className="space-y-6">
       <EncabezadoPanel eyebrow="Pinta tu pieza" titulo="Piezas" />
       <p className="max-w-3xl text-[0.84rem] text-cafe/75">
-        El precio de cada pieza define el anticipo (50 %) que se paga en línea. Sin precio, la pieza aparece como «Precio
+        El precio de cada pieza define el anticipo ({PORCENTAJE_ANTICIPO} %) que se paga en línea. Sin precio, la pieza aparece como «Precio
         pendiente» y no se puede pagar. Existencias vacías = sin conteo; 0 = agotada. Se descuentan al confirmarse un
         anticipo y vuelven si la reserva se cancela.
       </p>

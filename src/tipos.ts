@@ -199,6 +199,10 @@ export interface EstadoReserva {
   status: ReservationStatus;
   quantity: number;
   total_amount: number;
+  /** Reservas en línea: anticipo del 50 %, lo pagado y el saldo (datos_reserva). */
+  deposit_amount?: number | null;
+  amount_paid?: number | null;
+  remaining_balance?: number | null;
   currency: string;
   expires_at: string | null;
   payment_status: PaymentStatus | null;

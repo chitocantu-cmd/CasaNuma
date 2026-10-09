@@ -1,6 +1,7 @@
 import type { NombreSilueta } from '../componentes/marca/trazos';
 import { EDADES_KIDS, MEMBRESIA, PINTA } from './oferta';
 import { pesosCortos } from '../lib/formato';
+import { PORCENTAJE_ANTICIPO } from '../lib/anticipo';
 
 export interface ItemNav {
   label: string;
@@ -31,7 +32,7 @@ export const OPCIONES_RESERVA: OpcionReserva[] = [
   { titulo: 'Clases de fin de semana', detalle: 'Elige taller, fecha y horario', to: '/talleres', silueta: 'taza', canal: 'en línea' },
   {
     titulo: 'Pinta tu pieza',
-    detalle: `Desde ${pesosCortos(PINTA.precioDesde)} · apartas con el 50 % de tu pieza`,
+    detalle: `Desde ${pesosCortos(PINTA.precioDesde)} · apartas con el ${PORCENTAJE_ANTICIPO} % de tu pieza`,
     to: '/pinta-tu-pieza/reservar',
     silueta: 'jarron',
     canal: 'en línea',

@@ -6,6 +6,7 @@ import type { Reserva, SesionReservada } from '../../datos/tipos';
 import { useSesion } from '../../features/cuenta/sesion';
 import { etiquetaMes, fechaCompacta, fechaCompleta, hora, rango, yaPaso } from '../../lib/calendario';
 import { pesosCortos } from '../../lib/formato';
+import { montoPagado, saldoDe } from '../../lib/anticipo';
 import { useSeo } from '../../lib/seo';
 import { Boton, BotonEnlace } from '../../componentes/base/Boton';
 import { Aviso, Campo } from '../../componentes/base/Campos';
@@ -165,32 +166,15 @@ function FilaReserva({ fila: { reserva: r, sesion: s, numero } }: { fila: Fila }
         <p className="mt-1 text-nota text-cafe/70 first-letter:uppercase">
           {fechaCompleta(s.fecha)} · {rango(s.inicio, s.fin)}
         </p>
-        {r.cobro ? (
-          <>
-            {r.pieza && <p className="mt-1 text-nota">Pieza: <span className="text-cafe">{r.pieza.nombre}</span></p>}
-            <dl className="mt-3 grid grid-cols-3 gap-2 rounded-[0.6rem] bg-amarillo/[0.18] px-3 py-2.5 text-[0.74rem]" aria-label="Pago de tu pieza">
-              <div>
-                <dt className="text-cafe/60">Total</dt>
-                <dd className="mt-0.5 font-medium">{pesosCortos(r.total)}</dd>
-              </div>
-              <div>
-                <dt className="text-cafe/60">{r.pago === 'pagado' ? 'Pagado' : 'Anticipo pagado'}</dt>
-                <dd className="mt-0.5 font-medium">{pendiente ? '—' : pesosCortos(r.cobro.pagado)}</dd>
-              </div>
-              <div>
-                <dt className="text-cafe/60">Saldo pendiente</dt>
-                <dd className="mt-0.5 font-medium">
-                  {pendiente ? '—' : r.cobro.saldo < 0 ? 'En revisión' : r.cobro.saldo === 0 ? 'Liquidado' : pesosCortos(r.cobro.saldo)}
-                </dd>
-              </div>
-            </dl>
-            {!pendiente && r.cobro.saldo > 0 && <p className="mt-2 text-[0.72rem] text-cafe/60">El saldo se paga en Casa Numa.</p>}
-          </>
-        ) : (
-          <p className="mt-1 text-[0.74rem] text-cafe/60">
-            {r.ninos?.length ? r.ninos.map((n) => n.nombre).join(', ') : `${r.participantes} ${r.participantes === 1 ? 'persona' : 'personas'}`}
+        {r.tipo !== 'membresia' && (
+          <p className="mt-1 text-[0.8rem] text-cafe/70">
+            {r.pieza
+              ? <>Pieza: <span className="text-cafe">{r.pieza.nombre}</span></>
+              : r.ninos?.length ? r.ninos.map((n) => n.nombre).join(', ') : `${r.participantes} ${r.participantes === 1 ? 'persona' : 'personas'}`}
           </p>
         )}
+        {/* La membresía muestra su cobro una vez, en su tarjeta; no en cada clase. */}
+        {r.tipo !== 'membresia' && <CobroReserva reserva={r} />}
       </div>
       <div className="col-span-2 flex flex-wrap gap-2 sm:col-span-1 sm:flex-col sm:items-end">
         <span className={`eyebrow rounded-full px-2.5 py-1 text-[0.55rem] ${pendiente ? 'bg-naranja/20' : 'bg-verde/25'}`}>{ESTADO[r.estado]}</span>
@@ -198,6 +182,39 @@ function FilaReserva({ fila: { reserva: r, sesion: s, numero } }: { fila: Fila }
         {r.demo && <MarcaDemo />}
       </div>
     </li>
+  );
+}
+
+/** Total, lo pagado y lo pendiente: con anticipo, «Pagado» solo cuando no queda saldo. */
+function CobroReserva({ reserva: r, oscuro = false }: { reserva: Reserva; oscuro?: boolean }) {
+  const pendiente = r.estado === 'pendiente_pago';
+  const pagado = montoPagado(r);
+  const saldo = saldoDe(r);
+  const tenue = oscuro ? 'text-crema/60' : 'text-cafe/60';
+  return (
+    <>
+      <dl
+        className={`mt-3 grid grid-cols-3 gap-2 rounded-[0.6rem] px-3 py-2.5 text-[0.74rem] ${oscuro ? 'bg-crema/10' : 'bg-amarillo/[0.18]'}`}
+        aria-label="Pago de tu reserva"
+        data-cobro-cuenta
+      >
+        <div>
+          <dt className={tenue}>Total</dt>
+          <dd className="mt-0.5 font-medium">{pesosCortos(r.total)}</dd>
+        </div>
+        <div>
+          <dt className={tenue}>{r.cobro && saldo > 0 ? 'Anticipo pagado' : 'Pagado'}</dt>
+          <dd className="mt-0.5 font-medium">{pendiente ? '—' : pesosCortos(pagado)}</dd>
+        </div>
+        <div>
+          <dt className={tenue}>Pendiente</dt>
+          <dd className="mt-0.5 font-medium">
+            {pendiente ? '—' : saldo < 0 ? 'En revisión' : saldo === 0 ? 'Liquidado' : pesosCortos(saldo)}
+          </dd>
+        </div>
+      </dl>
+      {!pendiente && saldo > 0 && <p className={`mt-2 text-[0.72rem] ${tenue}`}>El saldo se liquida en Casa Numa.</p>}
+    </>
   );
 }
 
@@ -247,7 +264,10 @@ function TarjetaMembresia({ reserva: r }: { reserva: Reserva }) {
           </ul>
         </>
       )}
-      <p className="mt-6 text-[0.72rem] text-crema/55">{pesosCortos(r.precioUnitario)} · {r.folio ?? 'Pago en proceso'}</p>
+      <div className="mt-6">
+        <CobroReserva reserva={r} oscuro />
+      </div>
+      <p className="mt-3 text-[0.72rem] text-crema/55">Folio {r.folio ?? 'en proceso'}</p>
       <Link to="/membresia/reservar" className="subrayado-fijo mt-5 inline-block pb-0.5 text-[0.78rem]">Reservar el siguiente mes</Link>
     </div>
   );

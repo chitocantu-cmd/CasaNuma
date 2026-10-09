@@ -18,6 +18,7 @@ import { EDADES_KIDS, MEMBRESIA, PINTA } from '../contenido/oferta';
 import { GALERIA_PINTA } from '../contenido/piezasPinta';
 import { useProductos, useTalleres } from '../datos/hooks';
 import { pesosCortos } from '../lib/formato';
+import { PORCENTAJE_ANTICIPO } from '../lib/anticipo';
 import { MESES } from '../lib/calendario';
 import { esProximo } from '../lib/talleres';
 import { ldNegocio, useSeo } from '../lib/seo';
@@ -90,8 +91,8 @@ export default function Inicio() {
           <Revelar retraso={0.1} className="max-w-[26rem] lg:pb-3">
             <p className="flex gap-3 text-nota text-cafe/75">
               <Icono.candado tam={18} className="mt-0.5 shrink-0 text-terracota" />
-              Talleres de fin de semana, membresía y NUMA Kids se reservan y pagan en línea. Pinta tu pieza se aparta en
-              línea con el 50 % del valor de tu pieza.
+              Talleres, membresía, NUMA Kids y Pinta tu pieza se reservan en línea pagando el {PORCENTAJE_ANTICIPO} %; el
+              saldo se liquida en Casa Numa.
             </p>
           </Revelar>
         </div>
@@ -152,7 +153,7 @@ export default function Inicio() {
             />
             <Revelar retraso={0.1}>
               <p className="mt-8 text-cuerpo text-cafe/85">Piezas desde {pesosCortos(PINTA.precioDesde)}.</p>
-              <p className="mt-2 font-display text-t4 font-light">Reserva pagando el 50 % del valor de tu pieza.</p>
+              <p className="mt-2 font-display text-t4 font-light">Reserva pagando el {PORCENTAJE_ANTICIPO} % del valor de tu pieza.</p>
               <BotonEnlace to="/pinta-tu-pieza" flecha className="mt-8">Quiero pintar</BotonEnlace>
             </Revelar>
           </div>

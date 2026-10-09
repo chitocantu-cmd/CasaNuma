@@ -110,6 +110,9 @@ export default function App() {
                   <Route path="/store/:slug" element={<Redirigir a="/numa-store/:slug" />} />
                   <Route path="/tienda/:slug" element={<Redirigir a="/numa-store/:slug" />} />
                   <Route path="/checkout" element={<Navigate to="/talleres" replace />} />
+                  {/* La confirmación vive dentro de cada flujo; fuera de él, las reservas están en Mi cuenta. */}
+                  <Route path="/checkout/confirmacion" element={<Navigate to="/cuenta#proximas" replace />} />
+                  <Route path="/checkout/*" element={<Navigate to="/talleres" replace />} />
                   <Route path="/login" element={<Navigate to="/cuenta/entrar" replace />} />
                   <Route path="/registro" element={<Navigate to="/cuenta/registro" replace />} />
                   <Route path="/recuperar-password" element={<Navigate to="/cuenta/recuperar" replace />} />

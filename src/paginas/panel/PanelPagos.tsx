@@ -25,6 +25,10 @@ export default function PanelPagos() {
         <ErrorCarga onReintentar={recargar} />
       ) : !datos ? (
         <CargandoBloque className="h-60" />
+      ) : datos.length === 0 ? (
+        <p className="rounded-suave border border-dashed border-cafe/20 p-8 text-center text-nota text-cafe/65">
+          Aún no hay pagos. Aparecen aquí en cuanto se cobra un anticipo o se registra un pago en el estudio.
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-suave border border-cafe/12 bg-crema">
           <table className={claseTabla.tabla}>
@@ -44,7 +48,7 @@ export default function PanelPagos() {
                   <td className={`${claseTabla.td} whitespace-nowrap`}>
                     {dinero(p.monto)}
                     {p.concepto && p.concepto !== 'total' && (
-                      <span className="block text-[0.7rem] text-cafe/60">{p.concepto === 'anticipo' ? 'Anticipo · Pinta tu pieza' : 'Saldo en el estudio'}</span>
+                      <span className="block text-[0.7rem] text-cafe/60">{p.concepto === 'anticipo' ? 'Anticipo en línea' : 'Saldo en el estudio'}</span>
                     )}
                   </td>
                   <td className={claseTabla.td}>{PROVEEDOR[p.proveedor]}</td>

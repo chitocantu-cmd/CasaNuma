@@ -28,9 +28,9 @@ const RESERVAR = '/pinta-tu-pieza/reservar';
 const PASOS_EXPERIENCIA = [
   { titulo: 'Elige cuándo venir', texto: 'Selecciona la fecha y horario que mejor te funcionen.' },
   { titulo: 'Elige tu pieza', texto: 'Explora las piezas disponibles y selecciona la que quieres pintar.' },
-  { titulo: 'Aparta con el 50 %', texto: 'Paga el 50 % del valor de la pieza para confirmar tu reservación.' },
+  { titulo: `Aparta con el ${PORCENTAJE_ANTICIPO} %`, texto: `Paga el ${PORCENTAJE_ANTICIPO} % del valor de la pieza para confirmar tu reservación.` },
   { titulo: 'Ven a crear', texto: 'Te esperamos en Casa Numa para pintar y personalizar tu pieza.' },
-  { titulo: 'Liquida el resto', texto: 'El 50 % restante se paga en Casa Numa.' },
+  { titulo: 'Liquida el resto', texto: `El ${100 - PORCENTAJE_ANTICIPO} % restante se paga en Casa Numa.` },
 ];
 
 /** Ejemplos del cálculo (no son el catálogo): mismos números que la actualización de Casa Numa. */
@@ -41,7 +41,7 @@ const CANTIDAD_INICIAL = 8;
 export default function PintaTuPieza() {
   useSeo({
     titulo: 'Pinta tu pieza | Pinta cerámica en San Pedro | Casa Numa',
-    descripcion: `Elige una pieza de cerámica en bizcochito y píntala a tu gusto en Casa Numa. Piezas de ${pesosCortos(PINTA.precioDesde)} a ${pesosCortos(PINTA.precioHasta)}; reservas pagando el 50 % del valor de tu pieza.`,
+    descripcion: `Elige una pieza de cerámica en bizcochito y píntala a tu gusto en Casa Numa. Piezas de ${pesosCortos(PINTA.precioDesde)} a ${pesosCortos(PINTA.precioHasta)}; reservas pagando el ${PORCENTAJE_ANTICIPO} % del valor de tu pieza.`,
   });
   const { datos: piezas, error, recargar } = usePiezasPinta();
   const [categoria, setCategoria] = useState<CategoriaPieza | 'todas'>('todas');

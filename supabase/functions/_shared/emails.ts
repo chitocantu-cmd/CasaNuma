@@ -46,6 +46,12 @@ export interface DatosReserva {
   reservation_code: string;
   quantity: number;
   total_amount: string | number;
+  /** Anticipo del 50 % (reservas en línea). Sin él, la reserva se paga completa. */
+  deposit_percentage?: string | number | null;
+  deposit_amount?: string | number | null;
+  amount_paid?: string | number | null;
+  remaining_balance?: string | number | null;
+  payment_status?: 'pending' | 'deposit_paid' | 'paid_in_full' | 'refunded' | null;
   currency: string;
   companions?: string | null;
   customer: { full_name: string; email: string; phone: string | null };
@@ -126,20 +132,30 @@ function fila(k: string, v: string): string {
   </tr>`;
 }
 
+/** Total, lo pagado y el saldo: lo mismo que ven la clienta y el panel. */
+function cobro(r: DatosReserva): [string, string][] {
+  if (r.deposit_amount === null || r.deposit_amount === undefined) return [['Total', pesos(r.total_amount, r.currency)]];
+  const saldo = Number(r.remaining_balance ?? 0);
+  return [
+    ['Total', pesos(r.total_amount, r.currency)],
+    [`Pagado (anticipo ${Number(r.deposit_percentage ?? 50)} %)`, pesos(r.amount_paid ?? r.deposit_amount, r.currency)],
+    ['Saldo pendiente', saldo > 0 ? `${pesos(saldo, r.currency)} — se liquida en Casa Numa` : 'Liquidado'],
+  ];
+}
+
 const TABLA_INI = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #DDD5C6;border-bottom:1px solid #DDD5C6;margin-bottom:24px;">`;
 
 // ---------------------------------------------------------------------------
 // Confirmación al cliente
 // ---------------------------------------------------------------------------
 export function confirmacion(r: DatosReserva, appUrl: string): Correo {
-  const total = pesos(r.total_amount, r.currency);
   const folio = r.folio ?? r.reservation_code;
   const filas: [string, string][] = [
     ['Folio', folio],
     ['Experiencia', r.workshop.title],
     ...cuando(r),
     ...participantes(r),
-    ['Total', total],
+    ...cobro(r),
   ];
 
   return {
@@ -184,8 +200,8 @@ export function avisoAdminReserva(r: DatosReserva, para: string, appUrl = ''): C
     ['Experiencia', r.workshop.title],
     ...cuando(r),
     ...participantes(r),
-    ['Total', pesos(r.total_amount, r.currency)],
-    ['Estado', pagado ? 'PAGADO' : 'PAGO PENDIENTE'],
+    ...cobro(r),
+    ['Estado', r.payment_status === 'deposit_paid' ? 'ANTICIPO PAGADO · SALDO EN EL ESTUDIO' : pagado ? 'PAGADO' : 'PAGO PENDIENTE'],
     ['Folio', r.folio ?? r.reservation_code],
   ];
   const enlace = appUrl && r.id ? `${appUrl}/admin/reservas/${r.id}` : '';

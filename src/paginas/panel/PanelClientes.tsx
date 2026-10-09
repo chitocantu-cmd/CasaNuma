@@ -33,6 +33,10 @@ export default function PanelClientes() {
         <ErrorCarga onReintentar={recargar} />
       ) : !datos ? (
         <CargandoBloque className="h-60" />
+      ) : lista.length === 0 ? (
+        <p className="rounded-suave border border-dashed border-cafe/20 p-8 text-center text-nota text-cafe/65">
+          {q ? 'Ningún cliente coincide con la búsqueda.' : 'Aún no hay clientes: aparecen al crear una cuenta o reservar.'}
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-suave border border-cafe/12 bg-crema">
           <table className={claseTabla.tabla}>

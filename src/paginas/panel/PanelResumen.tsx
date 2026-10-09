@@ -49,7 +49,7 @@ export default function PanelResumen() {
           {(datos.saldoPorCobrar > 0 || datos.revisionManual > 0) && (
             <div className="flex flex-col gap-3 rounded-suave border border-amarillo bg-amarillo/[0.14] p-5 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-[0.86rem]">
-                <span className="eyebrow block text-[0.6rem] text-cafe/70">Pinta tu pieza · saldo por cobrar en el estudio</span>
+                <span className="eyebrow block text-[0.6rem] text-cafe/70">Saldo por cobrar en el estudio · anticipos ya pagados</span>
                 <span className="cifra mt-1 block text-[2rem] leading-none" data-saldo-por-cobrar>{dinero(datos.saldoPorCobrar)}</span>
                 {datos.revisionManual > 0 && (
                   <span className="mt-2 block font-medium text-naranja">

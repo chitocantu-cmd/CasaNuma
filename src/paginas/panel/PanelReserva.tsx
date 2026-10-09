@@ -187,8 +187,9 @@ export default function PanelReserva() {
                   </div>
                 )}
                 <dl>
-                  <Dato k="Precio de la pieza (total)"><span className="cifra text-[1.4rem]">{dinero(r.total)} MXN</span></Dato>
-                  <Dato k={`Anticipo en línea (${r.cobro.porcentaje} %)`}>{dinero(r.cobro.anticipo)} MXN</Dato>
+                  {r.tipo !== 'pinta' && <Dato k={r.tipo === 'membresia' ? 'Precio mensual' : r.tipo === 'kids' ? 'Precio por niño' : 'Precio por persona'}>{dinero(r.precioUnitario)} MXN</Dato>}
+                  <Dato k={r.pieza ? 'Precio total (pieza)' : 'Precio total'}><span className="cifra text-[1.4rem]" data-total-panel>{dinero(r.total)} MXN</span></Dato>
+                  <Dato k={`Anticipo recibido (${r.cobro.porcentaje} %)`}>{r.estado === 'pendiente_pago' ? '—' : `${dinero(r.cobro.anticipo)} MXN`}</Dato>
                   <Dato k="Pago final en el estudio">{r.cobro.pagoFinal !== null ? `${dinero(r.cobro.pagoFinal)} MXN` : '—'}</Dato>
                   <Dato k="Pagado hasta hoy">{dinero(r.cobro.pagado)} MXN</Dato>
                   <Dato k="Saldo pendiente">
@@ -231,7 +232,7 @@ export default function PanelReserva() {
 
         <div className="space-y-6 lg:col-span-5">
           {r.cobro && (r.estado === 'confirmada' || r.estado === 'completada') && (
-            <AccionesPinta
+            <AccionesCobro
               reserva={r}
               onListo={(texto, error = false) => {
                 setMensaje({ tipo: error ? 'error' : 'exito', texto });
@@ -334,11 +335,11 @@ export default function PanelReserva() {
 }
 
 /**
- * Pinta tu pieza en el estudio: cobrar lo que falta y, si la persona cambia
- * de pieza, recalcular el saldo como precio final − total ya pagado.
+ * Reserva en línea en el estudio: cobrar el saldo que dejó el anticipo y, en
+ * Pinta tu pieza, cambiar de pieza (saldo = precio final − total ya pagado).
  */
-function AccionesPinta({ reserva: r, onListo }: { reserva: Reserva; onListo: (texto: string, error?: boolean) => void }) {
-  const { datos: piezas } = useConsulta('admin:piezas', () => repoAdmin.piezas());
+function AccionesCobro({ reserva: r, onListo }: { reserva: Reserva; onListo: (texto: string, error?: boolean) => void }) {
+  const { datos: piezas } = useConsulta(r.pieza ? 'admin:piezas' : null, () => repoAdmin.piezas());
   const [metodo, setMetodo] = useState<MetodoPago | ''>('');
   const [piezaId, setPiezaId] = useState('');
   const [ocupado, setOcupado] = useState(false);
@@ -367,7 +368,7 @@ function AccionesPinta({ reserva: r, onListo }: { reserva: Reserva; onListo: (te
   }
 
   return (
-    <Tarjeta titulo="Pinta tu pieza · cobro en el estudio">
+    <Tarjeta titulo="Cobro en el estudio">
       {cobro.saldo > 0 ? (
         <>
           <p className="text-[0.86rem]">
@@ -397,6 +398,7 @@ function AccionesPinta({ reserva: r, onListo }: { reserva: Reserva; onListo: (te
         <p className="text-[0.86rem] text-cafe/80">Revisión manual requerida: pagó {dinero(-cobro.saldo)} más de lo que vale su pieza.</p>
       )}
 
+      {r.pieza && (
       <div className="mt-5 border-t border-cafe/10 pt-4">
         <label htmlFor="cambiar-pieza" className="eyebrow text-[0.58rem] text-cafe/60">¿Cambió de pieza?</label>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -424,6 +426,7 @@ function AccionesPinta({ reserva: r, onListo }: { reserva: Reserva; onListo: (te
           </p>
         )}
       </div>
+      )}
     </Tarjeta>
   );
 }

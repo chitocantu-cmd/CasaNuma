@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useSesionesKids } from '../datos/hooks';
 import type { Contacto, Nino } from '../datos/tipos';
 import CheckoutLayout, { comprobarCupo, useApartado } from '../componentes/reservas/CheckoutLayout';
-import BookingSummary from '../componentes/reservas/BookingSummary';
+import BookingSummary, { NOTA_ANTICIPO, resumenCobro } from '../componentes/reservas/BookingSummary';
+import { PORCENTAJE_ANTICIPO, totalReserva } from '../lib/anticipo';
 import TimeSlot from '../componentes/reservas/TimeSlot';
 import PasoCuenta from '../componentes/reservas/PasoCuenta';
 import PasoPago from '../componentes/reservas/PasoPago';
@@ -115,6 +116,9 @@ export default function ReservarKids() {
     else recargar();
   }
 
+  // Total de todos los niños y, de él, lo que se paga hoy.
+  const cobro = resumenCobro(sesion ? totalReserva(KIDS.precio, ninos.length) : null);
+
   const confirmada = reserva?.estado === 'confirmada';
   useEffect(() => {
     if (!confirmada) return;
@@ -137,17 +141,19 @@ export default function ReservarKids() {
             { k: 'Precio por niño', v: pesosCortos(KIDS.precio) },
             { k: 'Duración', v: duracionTexto(KIDS.duracionMin) },
             { k: 'Niños', v: ninos.length },
+            ...cobro.filas,
           ]}
           sesiones={sesion ? [sesion] : []}
-          total={sesion ? KIDS.precio * ninos.length : null}
+          total={cobro.hoy}
+          etiquetaTotal="Hoy pagas"
           accion={paso < 2 ? { texto: 'Continuar', onClick: siguiente, deshabilitada: paso === 0 && !sesion, cargando: consultando } : undefined}
-          nota="Incluye arcilla, materiales, uso de herramientas, pintura, vidriado y horneado."
+          nota={<>{NOTA_ANTICIPO}<span className="mt-2 block">Incluye arcilla, materiales, uso de herramientas, pintura, vidriado y horneado.</span></>}
         />
       }
     >
       {confirmada && reserva ? (
         <>
-          <Confirmacion reserva={reserva} titulo="¡Nos vemos el jueves!" silueta="tarro" volver={{ to: '/numa-kids', texto: 'Volver a NUMA Kids' }}>
+          <Confirmacion reserva={reserva} silueta="tarro" volver={{ to: '/talleres', texto: 'Volver a talleres' }}>
             Las piezas requieren secado, horneado y acabado, por lo que no se entregan el mismo día del taller.
           </Confirmacion>
           <Pendiente className="mx-auto mt-10 max-w-3xl">Plazo estimado de entrega de piezas y política de cancelación.</Pendiente>
@@ -222,6 +228,7 @@ export default function ReservarKids() {
               </ol>
               <p className="mt-6 text-nota text-cafe/65">
                 {pesosCortos(KIDS.precio)} por niño · Hasta {MAX_NINOS} por reserva.
+                {cobro.hoy !== null && <> Hoy pagas {pesosCortos(cobro.hoy)}, el {PORCENTAJE_ANTICIPO} % del total.</>}
               </p>
               <button type="button" onClick={() => setPaso(0)} className="subrayado-fijo mt-8 pb-0.5 text-nota">Cambiar fecha</button>
             </section>

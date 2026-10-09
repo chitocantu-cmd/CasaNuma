@@ -5,8 +5,10 @@
 // lee de la base de datos.
 //
 // Aunque alguien manipule React o DevTools y mande un total distinto, no hay
-// ningún parámetro de monto en esta API: Stripe cobra el precio que calculó
-// la base al apartar (sesión o plan de membresía) × lugares.
+// ningún parámetro de monto en esta API: Stripe cobra lo que calculó la base
+// al apartar. Toda reserva en línea se confirma con el 50 % del total
+// (precio × lugares), así que Stripe cobra SOLO ese anticipo (amount_due);
+// el saldo se liquida en Casa Numa.
 //
 // Se usa Stripe Checkout (página alojada), no Elements ni formulario propio:
 // los datos de tarjeta nunca tocan este código, lo que mantiene a Casa Numa
@@ -15,7 +17,7 @@
 
 import { preflight, json } from '../_shared/cors.ts';
 import { db, getStripe, traducirError, logError, APP_URL } from '../_shared/clients.ts';
-import { fechaCorta } from '../_shared/emails.ts';
+import { fechaCorta, pesos } from '../_shared/emails.ts';
 
 // Stripe exige que expires_at esté al menos a 30 minutos. El hold dura menos
 // (10 por omisión), así que el webhook revalida el cupo antes de confirmar.
@@ -66,7 +68,10 @@ Deno.serve(async (req: Request) => {
     // Stripe trabaja en la unidad mínima de la moneda. Ésta es la ÚNICA
     // conversión a centavos de todo el sistema; la base guarda numeric(10,2)
     // exacto y aquí se redondea una sola vez.
-    const unitAmountCents = Math.round(Number(r.unit_price) * 100);
+    // Lo que se cobra hoy: el anticipo (o el total si la reserva no lo tiene).
+    const cobrar = Number(r.amount_due ?? r.total_amount);
+    const cobrarCents = Math.round(cobrar * 100);
+    const conAnticipo = cobrar < Number(r.total_amount);
 
     // "sáb 3 oct · 11:00" — una línea por clase en la membresía.
     const sesiones = (r.sessions ?? []) as { date: string; start_time: string }[];
@@ -87,14 +92,19 @@ Deno.serve(async (req: Request) => {
         mode: 'payment',
         customer_email: r.customer_email ?? undefined,
         expires_at: Math.floor(Date.now() / 1000) + SESION_MINUTOS * 60,
+        // Una sola línea por el anticipo: Stripe nunca ve el total como cobro.
         line_items: [{
-          quantity: r.quantity,
+          quantity: 1,
           price_data: {
             currency: String(r.currency ?? 'MXN').toLowerCase(),
-            unit_amount: unitAmountCents,
+            unit_amount: cobrarCents,
             product_data: {
-              name: r.workshop_title,
-              description: fechas,
+              name: conAnticipo
+                ? `Anticipo ${Number(r.deposit_percentage)} % · ${r.workshop_title}`
+                : r.workshop_title,
+              description: conAnticipo
+                ? `${fechas} · ${r.quantity} ${r.quantity === 1 ? 'lugar' : 'lugares'} · Total ${pesos(r.total_amount, r.currency)}; saldo de ${pesos(r.remaining_after, r.currency)} en Casa Numa`
+                : fechas,
             },
           },
         }],
@@ -115,7 +125,7 @@ Deno.serve(async (req: Request) => {
     await db.rpc('guardar_checkout_session', {
       p_reservation_id: r.reservation_id,
       p_session_id: sesion.id,
-      p_amount: r.total_amount,
+      p_amount: cobrar,
       p_currency: r.currency,
     });
 
@@ -125,6 +135,8 @@ Deno.serve(async (req: Request) => {
         session_id: sesion.id,
         reservation_code: r.reservation_code,
         total_amount: r.total_amount,
+        deposit_amount: r.deposit_amount,
+        amount_due: cobrar,
         currency: r.currency,
         expires_at: r.expires_at,
       },

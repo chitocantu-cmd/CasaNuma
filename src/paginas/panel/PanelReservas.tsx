@@ -101,7 +101,7 @@ export default function PanelReservas() {
 
   const personas = lista.filter((r) => r.estado !== 'cancelada').reduce((n, r) => n + r.participantes, 0);
   const cobrado = lista.reduce((n, r) => n + montoPagado(r), 0);
-  // Pinta tu pieza: lo que falta cobrar en el estudio de las reservas confirmadas.
+  // Lo que falta cobrar en el estudio de las reservas confirmadas con anticipo.
   const porCobrar = lista
     .filter((r) => r.cobro && (r.estado === 'confirmada' || r.estado === 'completada'))
     .reduce((n, r) => n + Math.max(0, saldoDe(r)), 0);

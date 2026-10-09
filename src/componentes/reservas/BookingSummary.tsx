@@ -4,6 +4,7 @@ import type { EntradaFoto, IdFoto } from '../../contenido/fotos';
 import type { SesionReservada } from '../../datos/tipos';
 import { fechaCompacta, rango } from '../../lib/calendario';
 import { pesosCortos } from '../../lib/formato';
+import { PORCENTAJE_ANTICIPO, calcularPagoReserva } from '../../lib/anticipo';
 import Foto from '../base/Foto';
 import { Boton } from '../base/Boton';
 import { EASE_NUMA } from '../base/Revelar';
@@ -11,6 +12,23 @@ import { EASE_NUMA } from '../base/Revelar';
 export interface Fila {
   k: string;
   v: ReactNode;
+}
+
+/** «Reserva tu lugar pagando el 50 %…»: la misma frase en todos los resúmenes. */
+export const NOTA_ANTICIPO = `Reserva tu lugar pagando el ${PORCENTAJE_ANTICIPO} % del total. El saldo restante se liquida en Casa Numa.`;
+
+/**
+ * Lo que va en el resumen de cualquier reserva en línea: la cifra grande es
+ * lo que se paga hoy (el anticipo) y las filas, el total y el saldo. Sin
+ * total válido no hay cifras (nunca $0).
+ */
+export function resumenCobro(total: number | null, etiquetaTotal = 'Total'): { filas: Fila[]; hoy: number | null } {
+  if (total === null || !(total > 0)) return { filas: [], hoy: null };
+  const p = calcularPagoReserva(total);
+  return {
+    filas: [{ k: etiquetaTotal, v: pesosCortos(p.total) }, { k: 'Saldo en Casa Numa', v: pesosCortos(p.saldo) }],
+    hoy: p.anticipo,
+  };
 }
 
 export interface AccionResumen {

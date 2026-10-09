@@ -3,7 +3,7 @@ import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTaller } from '../datos/hooks';
 import type { Contacto, Sesion, Taller } from '../datos/tipos';
 import CheckoutLayout, { comprobarCupo, useApartado } from '../componentes/reservas/CheckoutLayout';
-import BookingSummary, { type Fila } from '../componentes/reservas/BookingSummary';
+import BookingSummary, { NOTA_ANTICIPO, resumenCobro, type Fila } from '../componentes/reservas/BookingSummary';
 import TimeSlot from '../componentes/reservas/TimeSlot';
 import PasoCuenta from '../componentes/reservas/PasoCuenta';
 import PasoPago from '../componentes/reservas/PasoPago';
@@ -20,6 +20,7 @@ import { mensajeInformacionTaller } from '../contenido/whatsapp';
 import { duracionTexto, fechaCompleta, rango } from '../lib/calendario';
 import { maximoPersonas, sinLugar, textoLugares } from '../lib/cupo';
 import { pesosCortos } from '../lib/formato';
+import { PORCENTAJE_ANTICIPO, totalReserva } from '../lib/anticipo';
 import { cuandoTaller, precioTaller, publicoTaller, rutaReserva } from '../lib/talleres';
 import { ldEvento, useSeo } from '../lib/seo';
 import ErrorCarga from '../componentes/base/ErrorCarga';
@@ -237,11 +238,15 @@ function Checkout({ taller }: { taller: Taller }) {
   }
 
   const fechas = [...new Set(taller.sesiones.map((s) => s.fecha))];
+  // Primero el total (precio × personas) y de él, el 50 % que se paga hoy.
+  const total = totalReserva(precio, personas);
+  const cobro = resumenCobro(sesion ? total : null);
   const filas: Fila[] = [
     { k: 'Precio por persona', v: pesosCortos(precio) },
     ...(taller.duracionMin ? [{ k: 'Duración', v: duracionTexto(taller.duracionMin) }] : []),
     { k: 'Personas', v: personas },
     ...(sesion && sesion.disponibles === null ? [{ k: 'Cupo', v: 'Limitado' }] : []),
+    ...cobro.filas,
   ];
 
   return (
@@ -258,9 +263,10 @@ function Checkout({ taller }: { taller: Taller }) {
           foto={taller.foto}
           filas={filas}
           sesiones={sesion ? [sesion] : []}
-          total={sesion ? precio * personas : null}
+          total={cobro.hoy}
+          etiquetaTotal="Hoy pagas"
           accion={paso < 2 ? { texto: 'Continuar', onClick: siguiente, deshabilitada: paso === 0 && !sesion, cargando: consultando } : undefined}
-          nota={taller.incluye.length ? `Incluye: ${taller.incluye.join(', ')}.` : undefined}
+          nota={<>{NOTA_ANTICIPO}{taller.incluye.length ? <span className="mt-2 block">Incluye: {taller.incluye.join(', ')}.</span> : null}</>}
         />
       }
     >
@@ -290,6 +296,7 @@ function Checkout({ taller }: { taller: Taller }) {
                 <span className="cifra text-[1.4rem] leading-none">{precioTaller(taller)}</span>
                 <span className="text-[0.78rem] text-cafe/75">por persona</span>
               </p>
+              <p className="mt-3 text-nota text-cafe/75">Reserva tu lugar pagando el {PORCENTAJE_ANTICIPO} %; el resto se liquida en Casa Numa.</p>
               {taller.incluye.length > 0 && (
                 <ul className="mt-6 flex flex-wrap gap-2">
                   {taller.incluye.map((i) => (
@@ -351,8 +358,9 @@ function Checkout({ taller }: { taller: Taller }) {
                   <Icono.mas tam={20} />
                 </button>
               </div>
-              <p className="mt-6 text-nota text-cafe/70">
-                {pesosCortos(precio)} × {personas} = <strong className="font-medium text-cafe">{pesosCortos(precio * personas)}</strong>
+              <p className="mt-6 text-nota text-cafe/70" data-cuenta-personas>
+                {pesosCortos(precio)} × {personas} = <strong className="font-medium text-cafe">{pesosCortos(total)}</strong>
+                {cobro.hoy !== null && <> · hoy pagas <strong className="font-medium text-cafe">{pesosCortos(cobro.hoy)}</strong> ({PORCENTAJE_ANTICIPO} %)</>}
               </p>
               <p className="mt-2 text-nota text-cafe/60">
                 {sesion.disponibles !== null && sesion.disponibles <= MAX_PERSONAS

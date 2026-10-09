@@ -49,7 +49,11 @@ describe('reserva en la demo', () => {
     if (res.tipo !== 'confirmado') return;
     folio = res.reserva.folio ?? '';
     expect(folio).toMatch(/^NUMA-\d{5}$/);
-    expect(res.reserva.pago).toBe('pagado');
+    // Regla global: 2 × $800 = $1,600; se cobra el 50 % y queda el resto.
+    expect(res.reserva.estado).toBe('confirmada');
+    expect(res.reserva.pago).toBe('anticipo_pagado');
+    expect(res.reserva.total).toBe(1600);
+    expect(res.reserva.cobro).toEqual({ porcentaje: 50, anticipo: 800, pagado: 800, pagoFinal: null, saldo: 800 });
     const otra = await repoDemo.pagar(reservaId, { simulacion: 'aprobado' });
     expect(otra.tipo === 'confirmado' && otra.reserva.folio).toBe(folio);
     expect((await repoDemo.misReservas()).filter((x) => x.id === reservaId)).toHaveLength(1);
@@ -63,8 +67,14 @@ describe('reserva en la demo', () => {
     expect(r?.contacto.email).toBe(contacto.email);
     const pagos = (await repoAdminDemo.pagos()).filter((p) => p.reservaId === reservaId);
     expect(pagos).toHaveLength(1);
-    expect(pagos[0].estado).toBe('pagado');
-    expect((await repoAdminDemo.avisos(reservaId)).length).toBe(3);
+    expect(pagos[0]).toMatchObject({ estado: 'pagado', monto: 800, concepto: 'anticipo' });
+    expect(r?.cobro).toMatchObject({ pagado: 800, saldo: 800 });
+    const avisos = await repoAdminDemo.avisos(reservaId);
+    expect(avisos.length).toBe(3);
+    // El correo dice lo mismo que la reserva: total, anticipo y saldo.
+    const equipo = avisos.find((a) => a.destinatario === 'equipo' && a.canal === 'email')!;
+    expect(equipo.lineas).toEqual(expect.arrayContaining(['Total: $1,600 MXN', 'Anticipo pagado (50 %): $800 MXN']));
+    expect(equipo.lineas.some((l) => l.startsWith('Saldo pendiente: $800 MXN'))).toBe(true);
     const sesion = (await repoAdminDemo.agenda('2026-10')).find((s) => s.sesion.id === SESION);
     expect(sesion?.asistentes.some((a) => a.reservaId === reservaId)).toBe(true);
   });

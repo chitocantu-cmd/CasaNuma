@@ -23,13 +23,13 @@ import { siteConfig } from '../../config/site';
 import { ANON_KEY, FUNCIONES, supabase } from '../../lib/supabase/client';
 import { claveMes, etiquetaMes, hoy, minutosEntre, sumarDias, yaPaso } from '../../lib/calendario';
 import { correoValido, soloDigitos } from '../../lib/formato';
-import { montoPagado } from '../../lib/anticipo';
+import { montoPagado, saldoDe } from '../../lib/anticipo';
 import { avisosReservaConfirmada } from '../avisos';
 import { PRODUCTOS_SEMILLA } from '../demo/semilla';
 import { ErrorDatos, type CambiosReserva, type CodigoError, type Repositorio, type RepositorioAdmin } from '../repositorio';
 import { CATEGORIA_DB, slugTaller, validarCambiosTaller, validarTallerNuevo } from '../catalogo';
 import type {
-  Asistente, Aviso, CambiosTaller, ClaseMembresia, ClienteAdmin, Contacto, EstadoPago, EstadoReserva, MembresiaAdmin,
+  Asistente, Aviso, CambiosTaller, ClaseMembresia, ClienteAdmin, CobroAnticipo, Contacto, EstadoPago, EstadoReserva, MembresiaAdmin,
   MesMembresia, MetodoPago, Nino, Pago, Reserva, ResumenAdmin, Sesion, SesionAdmin, SolicitudManual,
   Taller, TallerCatalogo, TallerNuevo, TipoExperiencia, Usuario,
 } from '../tipos';
@@ -93,6 +93,13 @@ interface FilaReserva {
   quantity: number;
   unit_price: number;
   total_amount: number;
+  /** Anticipo del 50 % (reservas en línea); null = se paga completa (panel). */
+  deposit_percentage?: number | null;
+  deposit_amount?: number | null;
+  amount_paid?: number | null;
+  final_payment_amount?: number | null;
+  remaining_balance?: number | null;
+  payment_status?: 'pending' | 'deposit_paid' | 'paid_in_full' | 'refunded' | null;
   expires_at: string | null;
   confirmed_at: string | null;
   created_at: string;
@@ -372,9 +379,18 @@ function aReserva(f: FilaReserva, respaldo?: Contacto): Reserva {
   if (estado === 'pendiente_pago' && f.origin === 'web' && f.expires_at && new Date(f.expires_at).getTime() <= Date.now()) {
     estado = 'expirada';
   }
-  const pago: EstadoPago =
-    PAGOS[f.payment?.status ?? ''] ?? (f.status === 'refunded' ? 'reembolsado' : 'pendiente');
   const total = num(f.total_amount);
+  // El cobro lo lleva la base (anticipo, pagado, saldo); aquí solo se copia.
+  const cobro: CobroAnticipo | undefined = f.deposit_amount === null || f.deposit_amount === undefined ? undefined : {
+    porcentaje: num(f.deposit_percentage),
+    anticipo: num(f.deposit_amount),
+    pagado: num(f.amount_paid),
+    pagoFinal: f.final_payment_amount === null || f.final_payment_amount === undefined ? null : num(f.final_payment_amount),
+    saldo: f.remaining_balance === null || f.remaining_balance === undefined ? total - num(f.amount_paid) : num(f.remaining_balance),
+  };
+  const pago: EstadoPago =
+    f.payment?.status === 'paid' && f.payment_status === 'deposit_paid' ? 'anticipo_pagado'
+    : PAGOS[f.payment?.status ?? ''] ?? (f.status === 'refunded' ? 'reembolsado' : 'pendiente');
 
   return {
     id: f.id,
@@ -388,6 +404,7 @@ function aReserva(f: FilaReserva, respaldo?: Contacto): Reserva {
     precioUnitario: num(f.unit_price),
     subtotal: total,
     total,
+    cobro,
     estado,
     pago,
     metodoPago: metodoDe(f.payment),
@@ -610,6 +627,7 @@ export const repoSupabase: Repositorio = {
 
 const SELECT_RESERVA = `
   id, reservation_code, folio, experience_type, status, quantity, unit_price, total_amount, expires_at,
+  deposit_percentage, deposit_amount, amount_paid, final_payment_amount, remaining_balance, payment_status,
   confirmed_at, created_at, updated_at, user_id, origin, internal_notes,
   customers ( full_name, email, phone ),
   workshops ( slug, title ),
@@ -795,9 +813,9 @@ export const repoAdminSupabase: RepositorioAdmin = {
       proximos7: vivas.filter((r) => r.sesiones.some((s) => s.fecha >= hoyIso && s.fecha < en7)).length,
       ingresosConfirmados: reservas.reduce((n, r) => n + montoPagado(r), 0),
       pagosPendientes: vivas.filter((r) => r.pago === 'pendiente').length,
-      // Pinta tu pieza aún no llega a la base: no hay saldos que cobrar.
-      saldoPorCobrar: 0,
-      revisionManual: 0,
+      // Lo que falta cobrar en el estudio de las reservas confirmadas con anticipo.
+      saldoPorCobrar: vivas.filter((r) => r.cobro && r.estado !== 'pendiente_pago').reduce((n, r) => n + Math.max(0, saldoDe(r)), 0),
+      revisionManual: reservas.filter((r) => r.cobro && r.cobro.saldo < 0 && r.estado !== 'cancelada').length,
       cupoBajo: proximas.filter(
         (x) => x.tipo !== 'membresia' && !yaPaso(x.sesion.fecha, x.sesion.inicio) && x.sesion.disponibles !== null && x.sesion.disponibles <= 3,
       ).length,
@@ -822,16 +840,22 @@ export const repoAdminSupabase: RepositorioAdmin = {
     const r = (await reservasPanel({ id }))[0];
     if (!r) throw new ErrorDatos('NO_ENCONTRADO', 'No encontramos esa reserva.');
 
+    // Una reserva en línea no se marca «pagado» a mano: el anticipo lo confirma
+    // el pago en línea y el resto se cobra con «Marcar saldo como pagado».
+    if (r.cobro && cambios.pago === 'pagado') {
+      throw new ErrorDatos('DATOS_INVALIDOS', 'Registra lo cobrado en el estudio con «Marcar saldo como pagado».');
+    }
+
     // Pago recibido en el estudio: confirma, pone folio y avisa (la base
     // vuelve a medir el cupo si el apartado ya había vencido).
     if (cambios.pago === 'pagado' && r.pago !== 'pagado') {
       await accion('register_payment', { reservation_id: id, amount: r.total });
-    } else if (cambios.pago === 'reembolsado' && r.pago === 'pagado') {
+    } else if (cambios.pago === 'reembolsado' && (r.pago === 'pagado' || r.pago === 'anticipo_pagado')) {
       await accion('mark_refunded', { reservation_id: id });
     }
 
     if (cambios.estado && cambios.estado !== r.estado) {
-      if (cambios.estado === 'confirmada' && cambios.pago !== 'pagado' && r.pago !== 'pagado') {
+      if (cambios.estado === 'confirmada' && cambios.pago !== 'pagado' && r.pago !== 'pagado' && r.pago !== 'anticipo_pagado') {
         throw new ErrorDatos('DATOS_INVALIDOS', 'Registra el pago antes de confirmar la reserva.');
       }
       if (cambios.estado === 'cancelada') await accion('cancel_reservation', { reservation_id: id });
@@ -869,13 +893,22 @@ export const repoAdminSupabase: RepositorioAdmin = {
     return nueva;
   },
 
-  // PENDIENTE: Pinta tu pieza en la base (docs/INTEGRACION.md). Hasta
-  // entonces no hay reservas con anticipo ni inventario que administrar.
-  async liquidarSaldo() {
+  // Saldo cobrado en el estudio: deposit_paid → paid_in_full. El pago del
+  // anticipo se conserva; el saldo entra como su propio pago.
+  async liquidarSaldo(id, metodo) {
     await exigirAdmin();
-    throw pintaSinConectar();
+    const r = (await reservasPanel({ id }))[0];
+    if (!r) throw new ErrorDatos('NO_ENCONTRADO', 'No encontramos esa reserva.');
+    if (!r.cobro) throw new ErrorDatos('DATOS_INVALIDOS', 'Esta reserva no se paga por anticipo.');
+    if (r.cobro.saldo < 0) throw new ErrorDatos('DATOS_INVALIDOS', 'Pagó más del total: requiere revisión manual.');
+    await accion('settle_balance', { reservation_id: id, method: metodo });
+    const nueva = (await reservasPanel({ id }))[0];
+    if (!nueva) throw new ErrorDatos('NO_ENCONTRADO', 'No encontramos esa reserva.');
+    return nueva;
   },
 
+  // PENDIENTE: Pinta tu pieza en la base (docs/INTEGRACION.md). Hasta
+  // entonces no hay piezas ni inventario que administrar.
   async cambiarPieza() {
     await exigirAdmin();
     throw pintaSinConectar();
@@ -949,12 +982,12 @@ export const repoAdminSupabase: RepositorioAdmin = {
     await exigirAdmin();
     const { data, error } = await supabase
       .from('payments')
-      .select('id, reservation_id, provider, status, method, reference, stripe_payment_intent_id, amount, created_at, reservations ( folio, customers ( full_name ) )')
+      .select('id, reservation_id, provider, status, method, reference, stripe_payment_intent_id, amount, created_at, reservations ( folio, deposit_amount, customers ( full_name ) )')
       // Un cobro abandonado (el apartado venció) no es un pago.
       .neq('status', 'cancelled')
       .order('created_at', { ascending: false });
     if (error) throw errorBase(error, 'No pudimos cargar los pagos. Intenta de nuevo.');
-    type Fila = FilaPago & { reservation_id: string; reservations: { folio: string | null; customers: { full_name: string } | null } | null };
+    type Fila = FilaPago & { reservation_id: string; reservations: { folio: string | null; deposit_amount: number | null; customers: { full_name: string } | null } | null };
     return ((data ?? []) as unknown as Fila[]).map((p) => ({
       id: p.id!,
       reservaId: p.reservation_id,
@@ -964,6 +997,7 @@ export const repoAdminSupabase: RepositorioAdmin = {
       referencia: p.reference ?? p.stripe_payment_intent_id ?? null,
       metodo: metodoDe(p),
       monto: num(p.amount),
+      concepto: p.reference === 'Saldo en el estudio' ? 'saldo' : p.reservations?.deposit_amount != null ? 'anticipo' : 'total',
       estado: PAGOS[p.status] ?? 'pendiente',
       creadoEn: p.created_at!,
       demo: false,

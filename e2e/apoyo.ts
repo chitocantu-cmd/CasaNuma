@@ -31,6 +31,33 @@ export function sinErrores(errores: string[]) {
   expect(errores, errores.join('\n')).toEqual([]);
 }
 
+/**
+ * En el panel, la reserva de ese folio con las mismas cifras que vio la
+ * clienta: en la lista (total, pagado, pendiente) y en el detalle.
+ */
+export async function verificarCifrasPanel(
+  page: Page, folio: string, c: { total: string; pagado: string; pendiente: string; personas?: string },
+) {
+  await page.goto('/admin/reservas');
+  await page.getByPlaceholder('Nombre, teléfono, correo o folio').fill(folio);
+  const fila = page.getByRole('row').filter({ hasText: folio });
+  await expect(fila).toHaveCount(1);
+  const celdas = fila.getByRole('cell');
+  // Folio, Cliente, Experiencia, Fecha, Hora, Personas, Total, Pagado, Pendiente, Pago, Estado
+  if (c.personas) await expect(celdas.nth(5)).toHaveText(c.personas);
+  await expect(celdas.nth(6)).toHaveText(c.total);
+  await expect(celdas.nth(7)).toHaveText(c.pagado);
+  await expect(celdas.nth(8)).toHaveText(c.pendiente);
+  await expect(celdas.nth(9)).toHaveText(/Anticipo pagado/i);
+  await expect(celdas.nth(10)).toHaveText(/Confirmada/i);
+  await fila.getByRole('link', { name: folio }).click();
+  await expect(page.getByRole('heading', { level: 1, name: folio })).toBeVisible();
+  await expect(page.locator('[data-total-panel]')).toHaveText(`${c.total} MXN`);
+  await expect(page.getByText(/^Anticipo recibido \(50 %\)$/).locator('..')).toContainText(`${c.pagado} MXN`);
+  await expect(page.locator('[data-saldo-panel]')).toHaveText(`${c.pendiente} MXN`);
+  await expect(page.getByRole('button', { name: 'Marcar saldo como pagado' })).toBeVisible();
+}
+
 export async function entrarAlPanel(page: Page) {
   await page.goto('/admin/entrar');
   await page.locator('#p-email').fill(CUENTA_DEMO_ADMIN.email);

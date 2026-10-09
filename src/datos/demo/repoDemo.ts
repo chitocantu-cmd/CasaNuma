@@ -7,7 +7,9 @@
 //   · el cupo se vuelve a comprobar en el mismo paso que aparta los lugares
 //     (en Supabase: transacción con bloqueo de fila en crear_reserva);
 //   · un apartado sin pagar se libera solo a los 15 minutos;
-//   · la reserva se CONFIRMA solo cuando el pago se confirma, y es entonces
+//   · toda reserva en línea se paga en dos partes: el anticipo (50 % del
+//     total, lib/anticipo.ts) en línea y el saldo en el estudio;
+//   · la reserva se CONFIRMA solo cuando el anticipo se cobra, y es entonces
 //     cuando recibe su folio consecutivo (NUMA-00001…) y salen los avisos;
 //   · el panel exige una sesión con rol 'admin'; una clienta solo ve lo suyo.
 //
@@ -18,14 +20,15 @@
 import { EDADES_KIDS, KIDS, MEMBRESIA } from '../../contenido/oferta';
 import { PIEZAS_PINTA, type RegistroPieza } from '../../contenido/piezasPinta';
 import { mostrarPendientes } from '../../config/site';
-import { montoEnLinea, montoPagado, saldoDe, saldoPendiente } from '../../lib/anticipo';
+import { montoEnLinea, montoPagado, saldoDe, saldoPendiente, totalReserva } from '../../lib/anticipo';
 import { claveMes, etiquetaMes, hoy, minutosEntre, sumarDias, yaPaso } from '../../lib/calendario';
 import { sinLugar } from '../../lib/cupo';
 import { correoValido, soloDigitos } from '../../lib/formato';
 import { AGENDA, flujoAgenda, idSesionAgenda, type RegistroTaller } from '../agenda';
 import { CATEGORIA_DB, slugTaller, validarCambiosTaller, validarTallerNuevo } from '../catalogo';
 import { avisoClienteManual, avisosReservaConfirmada } from '../avisos';
-import { aPiezaPinta, cobroInicial, exigirPiezaReservable, sesionPintaDeId, sesionesPinta, sesionesPintaAbiertas } from '../pinta';
+import { aPiezaPinta, exigirPiezaReservable, sesionPintaDeId, sesionesPinta, sesionesPintaAbiertas } from '../pinta';
+import { cobroInicial } from '../cobro';
 import { ErrorDatos, type CambiosPieza, type CambiosReserva, type Repositorio, type RepositorioAdmin } from '../repositorio';
 import type {
   Asistente, Aviso, CambiosTaller, ClaseMembresia, ClienteAdmin, Contacto, MembresiaAdmin, MesMembresia, MetodoPago, Nino,
@@ -379,8 +382,10 @@ interface Semilla {
   usuarioId?: string;
   ninos?: Nino[];
   notas?: string;
-  /** Pinta tu pieza: la pieza, y si ya liquidó el saldo en el estudio. */
-  pieza?: { id: string; nombre: string; precio: number; liquidada: boolean };
+  /** Pinta tu pieza: la pieza elegida. */
+  pieza?: { id: string; nombre: string; precio: number };
+  /** Reserva web: además del anticipo en línea, ya liquidó el saldo en el estudio. */
+  liquidada?: boolean;
 }
 
 const sr = (s: Sesion): SesionReservada => ({ id: s.id, fecha: s.fecha, inicio: s.inicio, fin: s.fin });
@@ -409,20 +414,20 @@ function semillas(usuarioAna: UsuarioGuardado): Semilla[] {
     tipo: 'membresia', titulo: `Membresía ${etiquetaMes(mesAna).split(' ')[0]}`, referencia: mesAna,
     sesiones: [...pasadas, ...futuras].map(sr), participantes: 1, precioUnitario: MEMBRESIA.precio,
     contacto: { nombre: usuarioAna.nombre, email: usuarioAna.email, telefono: usuarioAna.telefono },
-    hace: 20 * 24, pagado: true, metodo: 'tarjeta', origen: 'web', usuarioId: usuarioAna.id,
+    hace: 20 * 24, pagado: true, metodo: 'tarjeta', origen: 'web', usuarioId: usuarioAna.id, liquidada: true,
   });
 
-  const taller = (slug: string, hora: string, nombre: string, n: number, personas: number, hace: number, pagado = true, origen: 'web' | 'panel' = 'web', notas?: string) => {
+  const taller = (slug: string, hora: string, nombre: string, n: number, personas: number, hace: number, pagado = true, origen: 'web' | 'panel' = 'web', notas?: string, liquidada = false) => {
     const x = sesion(slug, hora);
     if (!x || x.t.precio === null) return;
     lista.push({
       tipo: 'taller', titulo: x.t.titulo, referencia: x.t.slug, sesiones: [sr(x.s)], participantes: personas,
-      precioUnitario: x.t.precio, hace, pagado, metodo: pagado ? 'tarjeta' : 'transferencia', origen, notas,
+      precioUnitario: x.t.precio, hace, pagado, metodo: pagado ? 'tarjeta' : 'transferencia', origen, notas, liquidada,
       contacto: { nombre, email: `${nombre.split(' ')[0].toLowerCase()}@demo.casanuma.mx`, telefono: tel(n) },
     });
   };
   taller('tazas-de-halloween-03', '11:00', 'Mariana Treviño', 11, 2, 72);
-  taller('tazas-de-halloween-03', '11:00', 'Daniela Garza', 12, 1, 50);
+  taller('tazas-de-halloween-03', '11:00', 'Daniela Garza', 12, 1, 50, true, 'web', undefined, true);
   taller('tazas-de-halloween-03', '16:00', 'Luis Villarreal', 13, 3, 26, true, 'web', 'Viene con su hija de 12 años.');
   taller('tazas-de-halloween-03', '16:00', 'Paola Cantú', 14, 2, 5, false, 'panel', 'Apartó por Instagram; paga por transferencia.');
   taller('tazas-de-halloween-y-pan', '11:00', 'Regina Salinas', 15, 2, 40);
@@ -447,7 +452,7 @@ function semillas(usuarioAna: UsuarioGuardado): Semilla[] {
     lista.push({
       tipo: 'pinta', titulo: 'Pinta tu pieza', referencia: 'pinta', sesiones: [sr(s)], participantes: 1,
       precioUnitario: p.precio, hace, pagado: true, metodo: 'tarjeta', origen: 'web',
-      pieza: { id: p.id, nombre: p.nombre, precio: p.precio, liquidada },
+      pieza: { id: p.id, nombre: p.nombre, precio: p.precio }, liquidada,
       contacto: { nombre, email: `${nombre.split(' ')[0].toLowerCase()}@demo.casanuma.mx`, telefono: tel(n) },
     });
   };
@@ -484,12 +489,13 @@ async function sembrar(e: Estado): Promise<Estado> {
 
   for (const s of semillas(ana)) {
     const creada = new Date(Date.now() - s.hace * 3600_000).toISOString();
-    const total = s.precioUnitario * s.participantes;
-    // Pinta tu pieza: anticipo pagado en línea y, si ya liquidó, el saldo en el estudio.
-    const inicial = s.pieza ? cobroInicial(s.pieza.precio) : undefined;
-    const cobro = inicial && s.pieza
-      ? s.pieza.liquidada
-        ? { ...inicial, pagado: inicial.saldo + inicial.anticipo, pagoFinal: inicial.saldo, saldo: 0 }
+    const total = totalReserva(s.precioUnitario, s.participantes);
+    // Reservas web: anticipo del 50 % pagado en línea y, si ya liquidó, el
+    // saldo en el estudio. Las del panel se registran por el total.
+    const inicial = s.origen === 'web' && s.pagado ? cobroInicial(total) : undefined;
+    const cobro = inicial
+      ? s.liquidada
+        ? { ...inicial, pagado: total, pagoFinal: saldoPendiente(total, inicial.anticipo), saldo: 0 }
         : { ...inicial, pagado: inicial.anticipo, saldo: saldoPendiente(total, inicial.anticipo) }
       : undefined;
     const r: Reserva = {
@@ -742,7 +748,8 @@ export const repoDemo: Repositorio = {
     verificarCupo(r.sesiones, solicitud.participantes);
 
     const t = ahora();
-    const total = r.precioUnitario * solicitud.participantes;
+    // Primero el total (precio del catálogo × personas) y de él, el anticipo.
+    const total = totalReserva(r.precioUnitario, solicitud.participantes);
     const reserva: Reserva = {
       id: id('res'),
       folio: null,
@@ -753,8 +760,8 @@ export const repoDemo: Repositorio = {
       participantes: solicitud.participantes,
       ninos: solicitud.ninos,
       pieza: r.pieza ? { id: r.pieza.id, nombre: r.pieza.nombre, precio: r.pieza.precio, cambios: [] } : undefined,
-      // Anticipo calculado aquí, con el precio del catálogo (lib/anticipo.ts).
-      cobro: r.pieza ? cobroInicial(r.pieza.precio) : undefined,
+      // Toda reserva en línea: anticipo del 50 % del total (lib/anticipo.ts).
+      cobro: cobroInicial(total),
       precioUnitario: r.precioUnitario,
       subtotal: total,
       total,
@@ -1015,10 +1022,10 @@ export const repoAdminDemo: RepositorioAdmin = {
     let nueva: Reserva = { ...r, actualizadaEn: ahora() };
     if (cambios.notasInternas !== undefined) nueva.notasInternas = cambios.notasInternas;
 
-    // Pinta tu pieza no se marca «pagado» a mano: el anticipo lo confirma el
-    // pago en línea y el resto se cobra con «Marcar saldo como pagado».
+    // Una reserva en línea no se marca «pagado» a mano: el anticipo lo confirma
+    // el pago en línea y el resto se cobra con «Marcar saldo como pagado».
     if (r.cobro && cambios.pago === 'pagado') {
-      throw new ErrorDatos('DATOS_INVALIDOS', 'En Pinta tu pieza, registra lo cobrado en el estudio con «Marcar saldo como pagado».');
+      throw new ErrorDatos('DATOS_INVALIDOS', 'Registra lo cobrado en el estudio con «Marcar saldo como pagado».');
     }
 
     // Registrar un pago recibido en el estudio (transferencia, efectivo):

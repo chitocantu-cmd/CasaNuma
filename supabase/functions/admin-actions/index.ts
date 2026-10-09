@@ -6,6 +6,7 @@
 //
 //   · cancel_reservation        — libera cupo, avisa al cliente, actualiza Calendar
 //   · register_payment          — pago recibido por transferencia o efectivo
+//   · settle_balance            — saldo cobrado en el estudio (tras el anticipo del 50 %)
 //   · update_reservation        — completada / no asistió / notas internas
 //   · create_manual_reservation — reserva que registra el equipo (y su pago)
 //   · mark_refunded             — reembolso hecho fuera (Stripe, transferencia)
@@ -85,6 +86,26 @@ Deno.serve(async (req: Request) => {
           p_method: body.method ? String(body.method) : null,
           p_reference: body.reference ? String(body.reference) : null,
           p_avisar_cliente: body.notify_client !== false,
+          p_actor: admin.email || admin.userId,
+        });
+        if (error) throw error;
+        return json({ ok: true, result: data }, 200, origin);
+      }
+
+      // ---------------------------------------------------------------------
+      // Marcar saldo como pagado
+      // ---------------------------------------------------------------------
+      // La reserva en línea se confirmó con el anticipo; el resto se cobra en
+      // Casa Numa. deposit_paid → paid_in_full; el pago del anticipo se
+      // conserva y el saldo entra como su propio pago.
+      // ---------------------------------------------------------------------
+      case 'settle_balance': {
+        const id = String(body.reservation_id ?? '');
+        if (!id) return json({ error: 'INVALID_INPUT' }, 400, origin);
+
+        const { data, error } = await db.rpc('admin_liquidar_saldo', {
+          p_reservation_id: id,
+          p_method: String(body.method ?? ''),
           p_actor: admin.email || admin.userId,
         });
         if (error) throw error;

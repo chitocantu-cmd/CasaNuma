@@ -4,7 +4,8 @@ import { entrarAlPanel, preparar, sinErrores } from './apoyo';
 // Revisión de cada elemento interactivo de la página: nada decorativo.
 const PUBLICAS = [
   '/', '/talleres', '/talleres/tazas-de-halloween-03-oct', '/talleres/tardes-de-ceramica-adultos-01-oct', '/membresia',
-  '/membresia/reservar', '/numa-kids', '/numa-kids/reservar', '/eventos', '/numa-store', '/numa-store/vasija-con-rostro',
+  '/membresia/reservar', '/numa-kids', '/numa-kids/reservar', '/pinta-tu-pieza', '/pinta-tu-pieza/reservar', '/eventos',
+  '/numa-store', '/numa-store/vasija-con-rostro',
   '/nosotras', '/cuenta/entrar', '/cuenta/registro', '/cuenta/recuperar', '/aviso-de-privacidad', '/pago/cancelado',
   '/esta-ruta-no-existe',
 ];

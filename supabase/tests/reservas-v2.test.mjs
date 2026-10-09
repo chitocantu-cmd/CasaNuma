@@ -29,7 +29,10 @@ const reservar = (db, { tipo, sesiones, personas = 1, nombre = 'Clienta Prueba',
   tel = '8112345678', ninos = [], usuario = null, origen = 'web' }) =>
   intentar(db, RESERVAR, [tipo, sesiones, personas, nombre, correo, tel, JSON.stringify(ninos), usuario, origen]);
 const pagar = (db, id, n) =>
-  db.query(`select confirmar_pago($1, $2, $3, $4, 'mxn', 'succeeded') as s`, [id, `cs_${n}`, `pi_${n}`, 1]);
+  // Stripe cobra lo que dice reserva_para_pago: el anticipo (o el total si no lo hay).
+  db.query(`select confirmar_pago($1, $2, $3,
+    (select coalesce(deposit_amount, total_amount) from reservations where id = $1), 'mxn', 'succeeded') as s`,
+    [id, `cs_${n}`, `pi_${n}`]);
 
 console.log('\nReservas v2 · Casa Numa\n' + '='.repeat(60));
 const db = await crearBase();
@@ -473,6 +476,69 @@ seccion('Catálogo administrado desde el panel');
 }
 
 // ---------------------------------------------------------------------------
+seccion('Anticipo del 50 % (toda reserva en línea)');
+{
+  const sTaller = await sesion(`insert into workshop_sessions (experience_type, workshop_id, date, start_time, end_time, capacity, price)
+                                values ('taller', '${taller}', current_date + 27, '17:45', '19:45', 10, 800)`);
+  const a = await reservar(db, { tipo: 'taller', sesiones: [sTaller], personas: 2, correo: 'anticipo@ejemplo.com' });
+  const id = a.rows?.[0].r.reservation_id;
+  const fila = async () => (await db.query(`select total_amount, deposit_percentage, deposit_amount, amount_paid, remaining_balance,
+      payment_status, final_payment_amount, status, folio from reservations where id = $1`, [id])).rows[0];
+  let x = await fila();
+  ok('2 × $800: total $1,600 y anticipo $800 (50 %), calculado por la base',
+     Number(x.total_amount) === 1600 && Number(x.deposit_amount) === 800 && Number(x.deposit_percentage) === 50, JSON.stringify(x));
+  ok('al apartar: nada pagado, payment_status pending', Number(x.amount_paid) === 0 && x.payment_status === 'pending', JSON.stringify(x));
+
+  const { rows: [{ p }] } = await db.query(`select reserva_para_pago($1) p`, [id]);
+  ok('Stripe cobra el anticipo: amount_due $800 (no $1,600)', Number(p.amount_due) === 800 && Number(p.remaining_after) === 800, JSON.stringify(p));
+
+  const st = await pagar(db, id, 'anticipo');
+  x = await fila();
+  ok('pago del anticipo → confirmada con folio', st.rows[0].s === 'confirmed' && x.status === 'confirmed' && /^NUMA-/.test(x.folio ?? ''), st.rows[0].s);
+  ok('deposit_paid: pagado $800, saldo $800',
+     x.payment_status === 'deposit_paid' && Number(x.amount_paid) === 800 && Number(x.remaining_balance) === 800, JSON.stringify(x));
+  const { rows: [{ d }] } = await db.query(`select datos_reserva($1) d`, [id]);
+  ok('correo y WhatsApp reciben lo mismo: total $1,600, pagado $800, saldo $800',
+     Number(d.total_amount) === 1600 && Number(d.deposit_amount) === 800 && Number(d.amount_paid) === 800
+       && Number(d.remaining_balance) === 800 && d.payment_status === 'deposit_paid', JSON.stringify(d));
+  const { rows: [{ q }] } = await db.query(
+    `select consultar_reserva(reservation_code, 'anticipo@ejemplo.com') q from reservations where id = $1`, [id]);
+  ok('/pago/exitoso (código + correo): pagado $800 y saldo $800',
+     Number(q?.amount_paid) === 800 && Number(q?.remaining_balance) === 800, JSON.stringify(q));
+
+  const l = await intentar(db, `select admin_liquidar_saldo($1, 'efectivo', 'prueba') r`, [id]);
+  x = await fila();
+  ok('liquidar saldo → paid_in_full, saldo $0', l.ok && x.payment_status === 'paid_in_full' && Number(x.remaining_balance) === 0, l.error ?? JSON.stringify(x));
+  ok('el anticipo se conserva y el pago final queda aparte',
+     Number(x.deposit_amount) === 800 && Number(x.final_payment_amount) === 800, JSON.stringify(x));
+  const { rows: pagos } = await db.query(`select provider, amount from payments where reservation_id = $1 and status = 'paid' order by created_at`, [id]);
+  ok('dos pagos: anticipo (Stripe) y saldo (estudio)', pagos.length === 2 && pagos.every((q) => Number(q.amount) === 800), JSON.stringify(pagos));
+  const otra = await intentar(db, `select admin_liquidar_saldo($1, 'efectivo', 'prueba') r`, [id]);
+  ok('no se cobra dos veces el saldo', !otra.ok && otra.code === 'CN004', otra.error);
+  const sinMetodo = await intentar(db, `select admin_liquidar_saldo($1, null, 'prueba') r`, [id]);
+  ok('liquidar exige el método de pago', !sinMetodo.ok && sinMetodo.code === 'CN004', sinMetodo.error);
+
+  // Stripe cobró menos que el anticipo: el dinero se registra, la reserva no se confirma.
+  const b = await reservar(db, { tipo: 'taller', sesiones: [sTaller], personas: 1, correo: 'corto@ejemplo.com' });
+  const idB = b.rows?.[0].r.reservation_id;
+  const c = await intentar(db, `select confirmar_pago($1, 'cs_corto', 'pi_corto', 100, 'mxn', 'paid') s`, [idB]);
+  const { rows: [y] } = await db.query(`select status from reservations where id = $1`, [idB]);
+  ok('cobro menor al anticipo → needs_review, sin confirmar', c.ok && c.rows[0].s === 'needs_review' && y.status === 'pending_payment',
+     c.error ?? `${c.rows?.[0]?.s} / ${y.status}`);
+
+  // NUMA Kids $680 → $340; centavos: $455.01 → $227.50 (el centavo queda en el saldo).
+  const k = await reservar(db, { tipo: 'kids', sesiones: [S.kids], personas: 1, correo: 'kidsanticipo@ejemplo.com',
+    ninos: [{ name: 'Leo', age: 11 }] });
+  const { rows: [kd] } = await db.query(`select total_amount, deposit_amount from reservations where id = $1`, [k.rows?.[0].r.reservation_id]);
+  ok('NUMA Kids $680 → anticipo $340', Number(kd.total_amount) === 680 && Number(kd.deposit_amount) === 340, k.error ?? JSON.stringify(kd));
+  const { rows: [cent] } = await db.query(`select floor(455.01 * anticipo_porcentaje()) / 100 a`);
+  ok('centavos: $455.01 → $227.50', Number(cent.a) === 227.5, String(cent.a));
+
+  // Lo que registra el equipo en el panel se paga completo: sin anticipo.
+  const { rows: [pn] } = await db.query(`select count(*)::int n from reservations where origin = 'panel' and deposit_amount is not null`);
+  ok('reservas del panel sin anticipo', pn.n === 0, String(pn.n));
+}
+
 seccion('Seguridad');
 {
   const { rows: [{ ana }] } = await db.query(`insert into auth.users (email) values ('ana@cuenta.com') returning id as ana`);

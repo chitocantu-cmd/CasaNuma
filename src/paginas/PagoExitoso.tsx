@@ -70,8 +70,8 @@ export default function PagoExitoso() {
 
 const CONFIRMACION: Record<Reserva['tipo'], Pick<Parameters<typeof Confirmacion>[0], 'titulo' | 'silueta' | 'volver'>> = {
   taller: { silueta: 'taza', volver: { to: '/talleres', texto: 'Volver a talleres' } },
-  kids: { titulo: '¡Nos vemos el jueves!', silueta: 'tarro', volver: { to: '/numa-kids', texto: 'Volver a NUMA Kids' } },
-  membresia: { titulo: '¡Tu membresía está lista!', silueta: 'guaje', volver: { to: '/talleres', texto: 'Volver a talleres' } },
+  kids: { silueta: 'tarro', volver: { to: '/talleres', texto: 'Volver a talleres' } },
+  membresia: { silueta: 'guaje', volver: { to: '/talleres', texto: 'Volver a talleres' } },
   pinta: { silueta: 'jarron', volver: { to: '/', texto: 'Volver al inicio' } },
 };
 

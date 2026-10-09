@@ -11,17 +11,16 @@ import TimeSlot from '../componentes/reservas/TimeSlot';
 import PasoCuenta from '../componentes/reservas/PasoCuenta';
 import PasoPago from '../componentes/reservas/PasoPago';
 import Confirmacion from '../componentes/reservas/Confirmacion';
-import DesgloseAnticipo from '../componentes/pinta/DesgloseAnticipo';
 import TarjetaPieza from '../componentes/pinta/TarjetaPieza';
-import { Aviso, Casilla } from '../componentes/base/Campos';
+import { Aviso } from '../componentes/base/Campos';
 import CtaWhatsapp from '../componentes/base/CtaWhatsapp';
 import ErrorCarga from '../componentes/base/ErrorCarga';
 import { CargandoBloque } from '../componentes/base/Cargando';
 import { Pendiente } from '../componentes/base/Pendiente';
 import { CATEGORIAS_PIEZA, GALERIA_PINTA, type CategoriaPieza } from '../contenido/piezasPinta';
 import { mensajePintaTuPieza } from '../contenido/whatsapp';
-import { calcularPagoReserva, saldoPendiente } from '../lib/anticipo';
-import { claveMes, fechaCompleta, hora, rango } from '../lib/calendario';
+import { PORCENTAJE_ANTICIPO, calcularPagoReserva, saldoPendiente } from '../lib/anticipo';
+import { claveMes, fechaCompleta, hora } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
 import { sinLugar } from '../lib/cupo';
 import { borrarBorrador, useBorrador } from '../lib/borrador';
@@ -34,7 +33,7 @@ const mayuscula = (t: string) => t.replace(/^./, (c) => c.toUpperCase());
 export default function ReservarPinta() {
   useSeo({
     titulo: 'Reservar Pinta tu pieza | Casa Numa',
-    descripcion: 'Elige fecha, horario y la pieza que quieres pintar. Reservas pagando el 50 % del valor de tu pieza; el resto se paga en Casa Numa.',
+    descripcion: `Elige fecha, horario y la pieza que quieres pintar. Reservas pagando el ${PORCENTAJE_ANTICIPO} % del valor de tu pieza; el resto se paga en Casa Numa.`,
     indexar: false,
   });
 
@@ -54,7 +53,6 @@ export default function ReservarPinta() {
 
   const [mes, setMes] = useState<string | null>(null);
   const [categoria, setCategoria] = useState<CategoriaPieza | 'todas'>('todas');
-  const [acepto, setAcepto] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [consultando, setConsultando] = useState(false);
   const { reserva, setReserva, error, setError, apartando, apartar, soltar } = useApartado();
@@ -139,12 +137,8 @@ export default function ReservarPinta() {
     if (!sesion || !pieza) return;
     // Solo viaja el id de la pieza: el precio y el anticipo los pone quien guarda la reserva.
     const r = await apartar({ tipo: 'pinta', referencia: 'pinta', sesionIds: [sesion.id], participantes: 1, piezaId: pieza.id, contacto });
-    if (r) {
-      setAcepto(false);
-      setPaso(4);
-    } else {
-      recargar();
-    }
+    if (r) setPaso(4);
+    else recargar();
   }
 
   const confirmada = reserva?.estado === 'confirmada';
@@ -208,7 +202,7 @@ export default function ReservarPinta() {
           nota={
             cifras
               ? `Hoy pagas el anticipo: el ${cifras.porcentaje} % del valor de tu pieza. El resto se paga en Casa Numa.`
-              : 'Al elegir tu pieza verás cuánto pagas hoy: el 50 % de su valor. El resto se paga en Casa Numa.'
+              : `Al elegir tu pieza verás cuánto pagas hoy: el ${PORCENTAJE_ANTICIPO} % de su valor. El resto se paga en Casa Numa.`
           }
         />
       }
@@ -282,7 +276,7 @@ export default function ReservarPinta() {
                 <section aria-labelledby="p-pieza">
                   <h2 id="p-pieza" className="font-display text-t3 font-light">¿Qué quieres pintar?</h2>
                   <p className="mt-3 max-w-lectura text-cuerpo text-cafe/75">
-                    Cada pieza tiene su precio. Para reservar pagas el 50 % del valor de la pieza que elijas; el resto, en Casa Numa.
+                    Cada pieza tiene su precio. Para reservar pagas el {PORCENTAJE_ANTICIPO} % del valor de la pieza que elijas; el resto, en Casa Numa.
                   </p>
                   <div className="carril -mx-canal mt-8 flex gap-2 overflow-x-auto px-canal pb-1" role="group" aria-label="Tipo de pieza">
                     {(['todas', ...CATEGORIAS_PIEZA] as const).map((c) => (
@@ -329,39 +323,14 @@ export default function ReservarPinta() {
                 </div>
               )}
 
-              {paso === 4 && reserva && reserva.cobro && cifras && (
+              {paso === 4 && reserva && (
                 <PasoPago
                   reserva={reserva}
-                  titulo="Resumen y pago"
-                  bloqueado={!acepto}
                   onPagado={setReserva}
                   onVencido={alVencer}
                   onVolver={() => { soltar(); setPaso(2); }}
                   textoVolver="Volver a elegir"
-                >
-                  <section aria-labelledby="p-resumen" className="rounded-suave border border-cafe/15 p-6 sm:p-8">
-                    <h3 id="p-resumen" className="font-display text-t3 font-light">Tu reservación</h3>
-                    <p className="eyebrow mt-5 text-cafe/60">Pinta tu pieza</p>
-                    <p className="mt-2 text-cuerpo">
-                      {mayuscula(fechaCompleta(reserva.sesiones[0].fecha))}
-                      <span className="block text-cafe/75">{rango(reserva.sesiones[0].inicio, reserva.sesiones[0].fin)}</span>
-                    </p>
-                    {reserva.pieza && <p className="mt-4 text-cuerpo">Pieza: <strong className="font-medium">{reserva.pieza.nombre}</strong></p>}
-                    <DesgloseAnticipo
-                      modo="antes" className="mt-6" total={cifras.total} anticipo={cifras.anticipo}
-                      porcentaje={cifras.porcentaje} saldo={cifras.saldo}
-                    />
-                    <p className="mt-6 rounded-[0.6rem] bg-amarillo/25 px-4 py-3 text-nota text-cafe" data-texto-anticipo>
-                      Hoy pagarás {pesosCortos(cifras.anticipo)} para confirmar tu reservación. El saldo restante de{' '}
-                      {pesosCortos(cifras.saldo)} se paga directamente en Casa Numa.
-                    </p>
-                  </section>
-                  <Casilla id="p-acepto" className="mt-6" checked={acepto} onChange={(e) => setAcepto(e.target.checked)} required>
-                    Entiendo que hoy pagaré únicamente el 50 % del valor de mi pieza y que el saldo restante deberá liquidarse en
-                    Casa Numa.
-                  </Casilla>
-                  {!acepto && <p className="mt-2 text-[0.76rem] text-cafe/60">Marca la casilla para continuar con el pago.</p>}
-                </PasoPago>
+                />
               )}
             </>
           )}

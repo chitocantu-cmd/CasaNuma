@@ -10,6 +10,7 @@ import { rango } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
 import { useSeo } from '../lib/seo';
 import { horariosMembresia, type HorarioMembresia } from '../lib/talleres';
+import { PORCENTAJE_ANTICIPO } from '../lib/anticipo';
 
 /** "viernes, sábados y domingos" */
 function listaDias(hs: HorarioMembresia[]): string {
@@ -48,6 +49,7 @@ export default function Membresia() {
               <BotonEnlace to="/membresia/reservar" flecha>Quiero mi membresía</BotonEnlace>
               <p className="text-nota text-cafe/75">
                 <span className="cifra text-[1.5rem] text-cafe">{pesosCortos(MEMBRESIA.precio)}</span> al mes
+                <span className="block">Reserva tu lugar pagando el {PORCENTAJE_ANTICIPO} %.</span>
               </p>
             </div>
           </Revelar>
@@ -177,7 +179,7 @@ export default function Membresia() {
                 <span className="mt-3 block font-display text-t3 font-light text-crema/85">al mes</span>
               </h2>
               <p className="mt-8 max-w-[40ch] text-cuerpo text-crema/80">
-                El pago se realiza al iniciar la membresía; se aceptan todas las formas de pago.
+                Reserva tu lugar pagando el {PORCENTAJE_ANTICIPO} % en línea; el saldo se liquida en Casa Numa.
               </p>
               <div className="mt-10">
                 <BotonEnlace to="/membresia/reservar" variante="claro" flecha>Quiero mi membresía</BotonEnlace>

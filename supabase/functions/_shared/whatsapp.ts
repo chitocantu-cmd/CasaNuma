@@ -11,6 +11,8 @@
 //   {{3}} · {{4}} personas
 //   Total {{5}} · Folio {{6}}
 //
+// {{5}} lleva el anticipo cuando lo hay: "$1,600 (pagó $800, saldo $800)".
+//
 // Variables de entorno (Supabase → Edge Functions → Secrets):
 //   WHATSAPP_TOKEN            token permanente del usuario del sistema
 //   WHATSAPP_PHONE_NUMBER_ID  id del número emisor (no el número)
@@ -38,6 +40,16 @@ function config() {
   return token && numeroId && para.length && plantilla ? { token, numeroId, para, plantilla, idioma } : null;
 }
 
+/** El total y, si la reserva va con anticipo, lo pagado y el saldo. */
+function totalConSaldo(r: DatosReserva): string {
+  const total = pesos(r.total_amount, r.currency);
+  if (r.deposit_amount === null || r.deposit_amount === undefined) return total;
+  const saldo = Number(r.remaining_balance ?? 0);
+  return saldo > 0
+    ? `${total} (pagó ${pesos(r.amount_paid ?? r.deposit_amount, r.currency)}, saldo ${pesos(saldo, r.currency)})`
+    : `${total} (liquidado)`;
+}
+
 export function whatsappConfigurado(): boolean {
   return config() !== null;
 }
@@ -59,7 +71,7 @@ export async function avisarReservaPorWhatsApp(
     `${fechaCorta(primera.date)} ${hora12(primera.start_time)}`,
     r.customer.full_name,
     String(r.quantity),
-    pesos(r.total_amount, r.currency),
+    totalConSaldo(r),
     r.folio ?? r.reservation_code,
   ];
 

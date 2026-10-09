@@ -37,13 +37,14 @@ function cuando(r: Reserva): string[] {
 }
 
 /** Pinta tu pieza: la pieza y cómo va el pago (anticipo en línea, saldo en el estudio). */
+/** Total, anticipo y saldo: lo mismo que ve la clienta en la confirmación y el equipo en el panel. */
 function cobro(r: Reserva): string[] {
   if (!r.cobro) return [`Total: ${pesosCortos(r.total)}`];
   return [
     ...(r.pieza ? [`Pieza: ${r.pieza.nombre}`] : []),
-    `Precio de la pieza: ${pesosCortos(r.total)}`,
+    `Total: ${pesosCortos(r.total)}`,
     `Anticipo pagado (${r.cobro.porcentaje} %): ${pesosCortos(r.cobro.pagado)}`,
-    `Saldo pendiente: ${pesosCortos(Math.max(0, r.cobro.saldo))} — se paga en Casa Numa`,
+    `Saldo pendiente: ${pesosCortos(Math.max(0, r.cobro.saldo))} — se liquida en Casa Numa`,
   ];
 }
 

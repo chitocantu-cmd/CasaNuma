@@ -36,6 +36,12 @@ test('direcciones comunes llevan a su página', async ({ page }) => {
     ['/mi-cuenta', /\/cuenta\/entrar/],
     ['/kids', /\/numa-kids$/],
     ['/pinta', /\/pinta-tu-pieza$/],
+    ['/checkout/confirmacion', /\/cuenta/],
+    ['/checkout/pago', /\/talleres$/],
+    ['/store/vasija-con-rostro', /\/numa-store\/vasija-con-rostro$/],
+    ['/mi-cuenta/reservas', /\/cuenta/],
+    ['/mi-cuenta/membresia', /\/cuenta/],
+    ['/mi-cuenta/perfil', /\/cuenta/],
     ['/checkout', /\/talleres$/],
     ['/ubicacion', /\/#ubicacion$/],
     ['/admin/login', /\/admin\/entrar$/],
@@ -85,7 +91,7 @@ test('Mi cuenta sin sesión pide entrar y regresa a donde iba', async ({ page })
 test('ningún enlace interno termina en 404 o en una página vacía', async ({ page }) => {
   const errores = await preparar(page);
   const porVisitar = new Set<string>();
-  for (const origen of ['/', '/talleres', '/numa-store', '/eventos', '/nosotras', '/membresia', '/numa-kids']) {
+  for (const origen of ['/', '/talleres', '/pinta-tu-pieza', '/numa-store', '/eventos', '/nosotras', '/membresia', '/numa-kids', '/cuenta/entrar']) {
     await page.goto(origen);
     // La demo tarda unos cientos de milisegundos en traer talleres y piezas.
     await page.waitForLoadState('networkidle');

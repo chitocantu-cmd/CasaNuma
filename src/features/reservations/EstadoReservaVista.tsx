@@ -212,7 +212,18 @@ export default function EstadoReservaVista({ code }: { code: string }) {
           <Fila k="Horario" v={rangoHorario(reserva.workshop.start_time, reserva.workshop.end_time)} />
           {reserva.workshop.location && <Fila k="Lugar" v={reserva.workshop.location} />}
           <Fila k="Lugares" v={String(reserva.quantity)} />
-          <Fila k="Total pagado" v={pesos(reserva.total_amount, reserva.currency)} />
+          {reserva.deposit_amount != null ? (
+            <>
+              <Fila k="Precio total" v={pesos(reserva.total_amount, reserva.currency)} />
+              <Fila k="Pagaste" v={pesos(reserva.amount_paid ?? reserva.deposit_amount, reserva.currency)} />
+              <Fila
+                k="Saldo pendiente"
+                v={Number(reserva.remaining_balance ?? 0) > 0 ? `${pesos(Number(reserva.remaining_balance), reserva.currency)} · se liquida en Casa Numa` : 'Liquidado'}
+              />
+            </>
+          ) : (
+            <Fila k="Total pagado" v={pesos(reserva.total_amount, reserva.currency)} />
+          )}
           <Fila k="Código" v={reserva.reservation_code} />
         </dl>
       </div>

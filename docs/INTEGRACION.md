@@ -147,7 +147,14 @@ Pruebas:
    panel: detalle, notas, agenda, cupo, reserva manual, pago, cancelación,
    reembolso, clientes, pagos y avisos. Los datos de prueba se borraron y el
    folio volvió a cero.
-6. Publicar: en Vercel, `VITE_FUENTE_DATOS=supabase`; en Supabase,
+6. **Anticipo del 50 % (pendiente de aplicar en la base real).** En este
+   orden, porque el panel nuevo lee columnas que crea la migración:
+   1. `npx supabase db query --linked -f supabase/migrations/20261008100000_anticipo_50.sql`
+      (no `db push`) y verificar con
+      `select to_regprocedure('admin_liquidar_saldo(uuid,text,text)');`.
+   2. `npx supabase functions deploy create-checkout-session admin-actions process-jobs --project-ref xjerknpiyokzzcihwkpg`.
+   3. Publicar el sitio. Hasta entonces el sitio publicado cobra el total.
+7. Publicar: en Vercel, `VITE_FUENTE_DATOS=supabase`; en Supabase,
    `APP_URL` y `STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` con el dominio
    definitivo. En Supabase → Authentication:
    - **URL Configuration:** Site URL = el dominio, y en Redirect URLs
@@ -198,7 +205,31 @@ Panel (`RepositorioAdmin`):
 | `clientes()` | clientes de las reservas + `admin_cuentas()` (cuentas sin reservas). |
 | `avisos()` | `integration_jobs`: enviado, en cola, sin destinatario, WhatsApp omitido (sin configurar) o fallido con su motivo. |
 
-## Pinta tu pieza (anticipo del 50 %)
+## Anticipo del 50 % (toda reserva en línea)
+
+Talleres, NUMA Kids, membresía y Pinta tu pieza se confirman pagando el 50 %
+del total (precio × personas); el resto se liquida en Casa Numa. Eventos y
+NUMA Store siguen por WhatsApp y no usan la regla. Las reservas que registra
+el equipo en el panel se pagan completas, como antes.
+
+- **Sitio y demo:** el porcentaje vive solo en `src/config/reservas.ts` y la
+  cuenta en `src/lib/anticipo.ts` (`calcularPagoReserva`, en centavos).
+- **Base** (`20261008100000_anticipo_50.sql`): `anticipo_porcentaje()` = 50;
+  al apartar en la web un trigger fija `deposit_percentage` y
+  `deposit_amount`; `amount_paid` es la suma de los pagos cobrados;
+  `remaining_balance` y `payment_status` (`pending` → `deposit_paid` →
+  `paid_in_full`, o `refunded`) se calculan solos.
+- **Stripe:** `reserva_para_pago` devuelve `amount_due` (el anticipo) y
+  `create-checkout-session` cobra solo eso, en una línea «Anticipo 50 % ·
+  taller» con el total y el saldo en la descripción. `confirmar_pago` no
+  confirma si Stripe cobró menos del anticipo (queda en revisión).
+- **Panel:** «Marcar saldo como pagado» → `admin-actions` `settle_balance` →
+  `admin_liquidar_saldo()`: agrega un pago `manual` por el saldo y llena
+  `final_payment_amount`; el pago del anticipo se conserva.
+- **Avisos:** `datos_reserva` lleva total, anticipo, pagado y saldo; el correo
+  y el WhatsApp (variable {{5}}) los muestran.
+
+## Pinta tu pieza
 
 Funciona completo en la demo. **En Supabase todavía no existe**: `sesionesPinta()`
 y `piezasPinta()` devuelven listas vacías (la página ofrece WhatsApp) y
@@ -211,25 +242,20 @@ impar queda en el saldo). El servidor debe repetir la misma cuenta; nunca se
 escribe un anticipo a mano. `SALDO = PRECIO FINAL − TOTAL YA PAGADO`, también
 al cambiar de pieza.
 
+El anticipo, los estados de pago, el cobro en Stripe y «Marcar saldo como
+pagado» ya están en la base (sección anterior). Falta lo propio de las piezas.
+
 **Base (migración pendiente, aplicar con `supabase db query --linked -f`):**
 
 | Qué | Detalle |
 |---|---|
 | `experience_type` | nuevo valor `paint_your_piece`; sesiones del horario semanal (jue 19:00–21:00, vie 10:00, sáb 11:00 y 16:00, dom 11:00; lunes a miércoles nada), cupo 16. |
 | `paint_pieces` | `id, name, description, category, images, price numeric NULL, size, finish_type, requires_firing, stock int NULL, is_available`. `price NULL` = «Precio pendiente», no se puede apartar. `stock NULL` = sin conteo. Hoy el catálogo vive en `src/contenido/piezasPinta.ts` con la misma forma. |
-| `reservations` | `piece_id, piece_name, piece_price, deposit_percentage, deposit_amount, amount_paid, final_payment_amount, remaining_balance` y el historial de cambios de pieza (`piece_changes jsonb` o tabla aparte). |
-| Estados de pago | `pending` → `deposit_paid` (anticipo confirmado) → `paid_in_full`; `refunded`. El repositorio ya traduce `deposit_paid` y `paid_in_full`. |
-| `crear_reserva_sesiones` | con `piece_id`: `SELECT … FOR UPDATE` sobre la pieza, rechaza sin precio / inactiva / sin existencias (contando apartados vigentes) y calcula `deposit_amount` en la base. |
-| Confirmar pago | descuenta 1 de `stock` (si no es NULL) y deja `deposit_paid`. Cancelar devuelve la pieza. |
+| `reservations` | `piece_id, piece_name, piece_price` y el historial de cambios de pieza (`piece_changes jsonb` o tabla aparte). |
+| `crear_reserva_sesiones` | con `piece_id`: `SELECT … FOR UPDATE` sobre la pieza, rechaza sin precio / inactiva / sin existencias (contando apartados vigentes); el total es el precio de la pieza y el trigger fija el anticipo. |
+| Confirmar pago | descuenta 1 de `stock` (si no es NULL). Cancelar devuelve la pieza. |
 
-**Stripe.** `create-checkout-session` cobra `deposit_amount`, nunca
-`total_amount` (`montoEnLinea` en el front). El webhook verifica que lo cobrado
-sea igual al anticipo antes de confirmar.
-
-**Panel.** `liquidarSaldo(id, método)` → registra un pago `manual` con
-concepto `saldo`, `amount_paid += saldo`, `final_payment_amount`,
-`remaining_balance = 0`, `paid_in_full`; el registro del anticipo se conserva.
-`cambiarPieza(id, piezaId)` → mueve el inventario, guarda el cambio y
+**Panel.** `cambiarPieza(id, piezaId)` → mueve el inventario, guarda el cambio y
 recalcula el saldo; si queda negativo, **revisión manual** (sin reembolso
 automático hasta que Casa Numa defina su política). `piezas()` /
 `editarPieza()` → inventario (precio, existencias, encendida).

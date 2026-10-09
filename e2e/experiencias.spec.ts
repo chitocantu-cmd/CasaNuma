@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { entrarAlPanel, preparar, sinErrores } from './apoyo';
+import { entrarAlPanel, preparar, sinErrores, verificarCifrasPanel } from './apoyo';
 
 async function crearCuentaEnCheckout(page: Page, correo: string, nombre: string) {
   await page.locator('#c-nombre').fill(nombre);
@@ -10,8 +10,10 @@ async function crearCuentaEnCheckout(page: Page, correo: string, nombre: string)
   await expect(page.getByText('Pago de demostración')).toBeVisible();
 }
 
-test('mamá o papá reserva NUMA Kids (edad validada) y el panel ve al niño', async ({ page }) => {
+test('NUMA Kids: $680 total, $340 hoy y $340 de saldo en checkout, confirmación, Mi cuenta y panel', async ({ page }) => {
   const errores = await preparar(page);
+  await page.goto('/numa-kids');
+  await expect(page.getByText('Reserva tu lugar pagando el 50 %.')).toBeVisible();
   await page.goto('/numa-kids/reservar');
   await page.getByRole('button', { name: /Jueves 1 de octubre/ }).click();
   await page.getByRole('button', { name: 'Continuar' }).click();
@@ -24,20 +26,32 @@ test('mamá o papá reserva NUMA Kids (edad validada) y el panel ve al niño', a
   await page.getByRole('button', { name: 'Continuar' }).click();
 
   await crearCuentaEnCheckout(page, 'e2e-kids@ejemplo.com', 'Mamá E2E');
-  await page.getByRole('button', { name: /Simular pago aprobado/ }).click();
-  await expect(page.getByRole('heading', { name: '¡Nos vemos el jueves!' })).toBeVisible();
-  const folio = (await page.getByText(/^NUMA-\d{5}$/).first().innerText()).trim();
-  await expect(page.getByText('Leo (11 años)')).toBeVisible();
+  const resumen = page.locator('[data-resumen-pago]');
+  await expect(resumen.locator('[data-asistentes]')).toHaveText('Leo (11 años)');
+  await expect(resumen.locator('[data-total]')).toHaveText('$680 MXN');
+  await expect(resumen.locator('[data-anticipo]')).toHaveText('$340 MXN');
+  await expect(resumen.locator('[data-saldo]')).toHaveText('$340 MXN');
+  await page.locator('#p-acepto').check();
+  await page.getByRole('button', { name: 'Simular pago aprobado · $340 MXN' }).click();
+
+  await expect(page.getByRole('heading', { name: '¡Tu lugar está reservado!' })).toBeVisible();
+  const folio = (await page.locator('[data-folio]').innerText()).trim();
+  await expect(page.locator('[data-asistentes]')).toHaveText('Leo (11 años)');
+  await expect(page.locator('[data-total]')).toHaveText('$680 MXN');
+  await expect(page.locator('[data-pagado]')).toHaveText('$340 MXN');
+  await expect(page.locator('[data-saldo]')).toHaveText('$340 MXN');
+
+  await page.getByRole('link', { name: 'Ver mis reservas' }).click();
+  const fila = page.getByRole('listitem').filter({ hasText: folio });
+  await expect(fila.locator('[data-cobro-cuenta] dd')).toHaveText(['$680 MXN', '$340 MXN', '$340 MXN']);
 
   await entrarAlPanel(page);
-  await page.goto('/admin/reservas');
-  await page.getByPlaceholder('Nombre, teléfono, correo o folio').fill(folio);
-  await page.getByRole('link', { name: folio }).first().click();
+  await verificarCifrasPanel(page, folio, { total: '$680', pagado: '$340', pendiente: '$340', personas: '1' });
   await expect(page.getByText('Leo · 11 años')).toBeVisible();
   sinErrores(errores);
 });
 
-test('membresía: 4 clases exactas, sin quinta, y Mi cuenta muestra 0/4 utilizadas', async ({ page }) => {
+test('membresía: 4 clases exactas, $1,600 hoy de $3,200, y Mi cuenta y panel con las mismas cifras', async ({ page }) => {
   const errores = await preparar(page);
   await page.goto('/membresia');
   await page.getByRole('link', { name: /Quiero mi membresía/i }).first().click();
@@ -52,15 +66,32 @@ test('membresía: 4 clases exactas, sin quinta, y Mi cuenta muestra 0/4 utilizad
   await expect(page.getByLabel('4 de 4 clases elegidas')).toBeVisible();
 
   await page.getByRole('button', { name: 'Continuar (4/4)' }).click();
+  await expect(page.locator('[data-cuenta-membresia]')).toContainText('Reservas pagando el 50 % ($1,600 MXN)');
   await page.getByRole('button', { name: 'Continuar' }).click();
   await crearCuentaEnCheckout(page, 'e2e-membresia@ejemplo.com', 'Alumna E2E');
-  await page.getByRole('button', { name: /Simular pago aprobado · \$3,200/ }).click();
-  await expect(page.getByRole('heading', { name: '¡Tu membresía está lista!' })).toBeVisible();
+  const resumen = page.locator('[data-resumen-pago]');
+  await expect(resumen.locator('[data-asistentes]')).toHaveText('4 clases');
+  await expect(resumen.locator('ol li')).toHaveCount(4);
+  await expect(resumen.getByText('Precio mensual')).toBeVisible();
+  await expect(resumen.locator('[data-total]')).toHaveText('$3,200 MXN');
+  await expect(resumen.locator('[data-anticipo]')).toHaveText('$1,600 MXN');
+  await expect(resumen.locator('[data-saldo]')).toHaveText('$1,600 MXN');
+  await page.locator('#p-acepto').check();
+  await page.getByRole('button', { name: 'Simular pago aprobado · $1,600 MXN' }).click();
+  await expect(page.getByRole('heading', { name: '¡Tu lugar está reservado!' })).toBeVisible();
+  const folio = (await page.locator('[data-folio]').innerText()).trim();
+  await expect(page.locator('[data-pagado]')).toHaveText('$1,600 MXN');
+  await expect(page.locator('[data-saldo]')).toHaveText('$1,600 MXN');
 
   await page.getByRole('link', { name: 'Ver mis reservas' }).click();
   await expect(page.getByText('Membresía octubre').first()).toBeVisible();
   await expect(page.getByText('utilizadas')).toBeVisible();
   await expect(page.getByText('4 clases disponibles, ya con fecha reservada.')).toBeVisible();
+  await expect(page.locator('[data-cobro-cuenta] dd')).toHaveText(['$3,200 MXN', '$1,600 MXN', '$1,600 MXN']);
+
+  await entrarAlPanel(page);
+  await verificarCifrasPanel(page, folio, { total: '$3,200', pagado: '$1,600', pendiente: '$1,600' });
+  await expect(page.getByText(/^[1-4]\/4$/)).toHaveCount(4);
   sinErrores(errores);
 });
 

@@ -15,6 +15,7 @@ import { FILTROS, esProximo, precioTaller, publicoTaller, semanaDelMes } from '.
 import { useSeo } from '../lib/seo';
 import ErrorCarga from '../componentes/base/ErrorCarga';
 import { CargandoBloque } from '../componentes/base/Cargando';
+import { PORCENTAJE_ANTICIPO } from '../lib/anticipo';
 
 interface Semana {
   clave: string;
@@ -107,7 +108,8 @@ export default function Talleres() {
             <h1 className="mt-6 max-w-[18ch] font-display text-t1 font-light">Cada fin de semana, una nueva experiencia.</h1>
             <p className="mt-6 max-w-lectura text-cuerpo-l text-cafe/85">
               Descubre nuestros talleres de cerámica, elige tu proyecto favorito y disfruta de un momento creativo en Casa
-              Numa. Selecciona la fecha y el horario que más te gusten y reserva tu lugar.
+              Numa. Selecciona la fecha y el horario que más te gusten y reserva tu lugar pagando el {PORCENTAJE_ANTICIPO} %; el
+              saldo se liquida en Casa Numa.
             </p>
           </Revelar>
           {mesPortada && (

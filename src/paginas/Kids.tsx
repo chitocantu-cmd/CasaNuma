@@ -13,6 +13,7 @@ import { duracionTexto, fechaCompacta, hora, yaPaso } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
 import { useSeo } from '../lib/seo';
 import ErrorCarga from '../componentes/base/ErrorCarga';
+import { PORCENTAJE_ANTICIPO } from '../lib/anticipo';
 
 // Texto: documento de contenido, sección 4.
 
@@ -79,6 +80,7 @@ export default function Kids() {
               <p>
                 <span className="cifra block text-[3.2rem] leading-none">{pesosCortos(KIDS.precio)}</span>
                 <span className="mt-2 block text-nota text-cafe/80">por niño y por sesión</span>
+                <span className="mt-2 block text-nota text-cafe/80">Reserva tu lugar pagando el {PORCENTAJE_ANTICIPO} %.</span>
               </p>
               <BotonEnlace to="/numa-kids/reservar" flecha className="self-start">Reservar taller infantil</BotonEnlace>
             </div>

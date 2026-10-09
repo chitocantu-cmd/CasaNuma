@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMesesMembresia } from '../datos/hooks';
 import type { Contacto, MesMembresia, Sesion } from '../datos/tipos';
 import CheckoutLayout, { comprobarCupo, useApartado } from '../componentes/reservas/CheckoutLayout';
-import BookingSummary from '../componentes/reservas/BookingSummary';
+import BookingSummary, { NOTA_ANTICIPO, resumenCobro } from '../componentes/reservas/BookingSummary';
 import Calendar from '../componentes/reservas/Calendar';
 import TimeSlot from '../componentes/reservas/TimeSlot';
 import PasoCuenta from '../componentes/reservas/PasoCuenta';
@@ -15,6 +15,7 @@ import { MEMBRESIA } from '../contenido/oferta';
 import { horariosMembresia } from '../lib/talleres';
 import { diaSemana, fechaCompleta, rango, yaPaso } from '../lib/calendario';
 import { pesosCortos } from '../lib/formato';
+import { PORCENTAJE_ANTICIPO } from '../lib/anticipo';
 import { sinLugar } from '../lib/cupo';
 import { useSeo } from '../lib/seo';
 import ErrorCarga from '../componentes/base/ErrorCarga';
@@ -154,6 +155,8 @@ export default function ReservarMembresia() {
     borrarBorrador('membresia:clases');
   }, [confirmada]);
   const etiquetaMes = mes?.etiqueta.split(' ')[0] ?? '';
+  // El mes completo; de él, lo que se paga hoy.
+  const cobro = resumenCobro(MEMBRESIA.precio, 'Precio mensual');
 
   return (
     <CheckoutLayout
@@ -170,22 +173,24 @@ export default function ReservarMembresia() {
             { k: 'Clases', v: <span className="cifra text-[1.2rem]">{elegidas.length} / {CLASES}</span> },
             { k: 'Horas de cerámica', v: `${MEMBRESIA.horasPorMes} h` },
             { k: 'Arcilla', v: 'Aprox. 3 kg en total' },
+            ...cobro.filas,
           ]}
           sesiones={ordenadas}
-          total={MEMBRESIA.precio}
+          total={cobro.hoy}
+          etiquetaTotal="Hoy pagas"
           accion={paso < 3 ? {
             texto: paso === 2 ? 'Continuar' : paso === 1 ? `Continuar (${elegidas.length}/${CLASES})` : 'Continuar',
             onClick: siguiente,
             cargando: consultando,
             deshabilitada: (paso === 1 && elegidas.length !== CLASES) || (paso === 0 && !mes),
           } : undefined}
-          nota="Incluye materiales, herramientas, pintura, vidriado, horneado y acompañamiento."
+          nota={<>{NOTA_ANTICIPO}<span className="mt-2 block">Incluye materiales, herramientas, pintura, vidriado, horneado y acompañamiento.</span></>}
         />
       }
     >
       {confirmada && reserva ? (
         <>
-          <Confirmacion reserva={reserva} titulo="¡Tu membresía está lista!" silueta="guaje" volver={{ to: '/talleres', texto: 'Volver a talleres' }}>
+          <Confirmacion reserva={reserva} silueta="guaje" volver={{ to: '/talleres', texto: 'Volver a talleres' }}>
             Tus cuatro clases ya están en tu cuenta. Trae ganas de ensuciarte las manos.
           </Confirmacion>
           <Pendiente className="mx-auto mt-10 max-w-3xl">Reglas de reprogramación y vigencia de clases.</Pendiente>
@@ -308,8 +313,9 @@ export default function ReservarMembresia() {
                   );
                 })}
               </ul>
-              <p className="mt-8 text-nota text-cafe/75">
-                {pesosCortos(MEMBRESIA.precio)} por el mes completo. El pago se realiza al iniciar la membresía.
+              <p className="mt-8 text-nota text-cafe/75" data-cuenta-membresia>
+                {pesosCortos(MEMBRESIA.precio)} por el mes completo. Reservas pagando el {PORCENTAJE_ANTICIPO} % ({pesosCortos(cobro.hoy ?? 0)}) y el
+                saldo se liquida en Casa Numa.
               </p>
               <button type="button" onClick={() => setPaso(1)} className="subrayado-fijo mt-8 pb-0.5 text-nota">
                 Cambiar fechas

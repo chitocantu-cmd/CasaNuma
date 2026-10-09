@@ -26,7 +26,7 @@ async function datosYResumen(page: Page, correo: string, tocar = false) {
   await page.locator('#c-email').fill(correo);
   await page.locator('#c-password').fill('secreta-e2e');
   await pulsar(page.getByRole('button', { name: 'Crear cuenta y continuar' }));
-  await expect(page.getByRole('heading', { name: 'Tu reservación' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Resumen de tu reservación' })).toBeVisible();
 }
 
 async function pagarDemo(page: Page, monto: string, tocar = false) {
@@ -117,8 +117,9 @@ test('reserva completa: anticipo exacto, confirmación, Mi cuenta y saldo cobrad
   await datosYResumen(page, 'pinta-completa@ejemplo.com');
   await expect(page.locator('[data-anticipo]')).toHaveText('$300 MXN');
   await expect(page.locator('[data-saldo]')).toHaveText('$300 MXN');
+  await expect(page.locator('[data-total]')).toHaveText('$600 MXN');
   await expect(page.locator('[data-texto-anticipo]')).toHaveText(
-    'Hoy pagarás $300 MXN para confirmar tu reservación. El saldo restante de $300 MXN se paga directamente en Casa Numa.',
+    'Tu reservación se confirma con el pago del 50 %: hoy pagarás $300 MXN. El saldo restante de $300 MXN se liquida posteriormente en Casa Numa.',
   );
   await expect(page.locator('[data-monto-cobro]')).toHaveText('$300 MXN');
   // Sin aceptar la casilla no se paga, y se cobra el anticipo, no el total.
@@ -127,9 +128,9 @@ test('reserva completa: anticipo exacto, confirmación, Mi cuenta y saldo cobrad
   const folio = await pagarDemo(page, '$300 MXN');
 
   // Confirmación
-  await expect(page.getByText('Pieza: Florero dulce')).toBeVisible();
+  await expect(page.locator('[data-asistentes]')).toHaveText('Pieza: Florero dulce');
   await expect(page.locator('[data-saldo]')).toHaveText('$300 MXN');
-  await expect(page.getByText('Tu reservación está confirmada. El saldo restante se liquida en Casa Numa.')).toBeVisible();
+  await expect(page.getByText('Tu reservación está confirmada. El saldo restante se liquida en Casa Numa.', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ver mis reservas' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Agregar a mi calendario' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Volver al inicio' })).toBeVisible();
@@ -153,7 +154,7 @@ test('reserva completa: anticipo exacto, confirmación, Mi cuenta y saldo cobrad
   await expect(renglon.getByRole('cell')).toContainText(['Pinta tu pieza', '$600', '$300', '$300', 'Anticipo pagado', 'Confirmada']);
   await renglon.getByRole('link', { name: folio }).click();
   await expect(page.locator('[data-saldo-panel]')).toHaveText('$300 MXN');
-  await expect(page.getByText('Anticipo en línea (50 %)')).toBeVisible();
+  await expect(page.getByText('Anticipo recibido (50 %)')).toBeVisible();
 
   await page.getByLabel('Cómo pagó el saldo').selectOption('efectivo');
   await page.getByRole('button', { name: 'Marcar saldo como pagado' }).click();
